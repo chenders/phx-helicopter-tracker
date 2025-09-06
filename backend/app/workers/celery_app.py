@@ -42,6 +42,10 @@ celery_app.conf.update(
             "task": "app.workers.analysis_tasks.analyze_recent_patterns",
             "schedule": 300.0,  # Every 5 minutes
         },
+        "analyze-and-score-flights": {
+            "task": "app.workers.analysis_tasks.analyze_and_score_flights",
+            "schedule": 600.0,  # Every 10 minutes - analyze unscored flights
+        },
         "analyze-flight-patterns": {
             "task": "app.workers.analysis_tasks.analyze_flight_patterns",
             "schedule": 3600.0,  # Every hour
@@ -72,14 +76,14 @@ celery_app.conf.update(
             "task": "app.workers.fr24_scheduler.schedule_fr24_downloads",
             "schedule": 3600.0,  # Every hour - dynamically schedules downloads based on credits
         },
-        "import-fr24-historical": {
-            "task": "import_fr24_historical",  # matches @celery_app.task name in data_import_tasks
+        "download-fr24-full-tracks": {
+            "task": "download_and_import_fr24_flights",  # Full flight track downloads
             "schedule": 7200.0,  # Every 2 hours
             "kwargs": {
                 "registration": "N622FB",  # Primary aircraft
                 "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
                 "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "interval_hours": 6,
+                "format": "kml",  # KML has the most detailed position data
             },
         },
         

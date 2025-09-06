@@ -3,7 +3,7 @@ Celery tasks for data import and file processing
 """
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 from celery import current_task
 
@@ -290,6 +290,189 @@ def get_all_active_tasks() -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error getting active tasks: {str(e)}")
         return []
+
+
+@celery_app.task(bind=True, name="download_and_import_fr24_flights")
+def download_and_import_fr24_flights(
+    self, registration: str, start_date: str, end_date: str, format: str = "kml"
+):
+    """
+    Download full flight track files from FR24 and import them
+    
+    Args:
+        registration: Aircraft registration
+        start_date: Start date (YYYY-MM-DD)
+        end_date: End date (YYYY-MM-DD) 
+        format: File format (kml, csv, json)
+    """
+    try:
+        logger.info(f"Downloading FR24 flight tracks for {registration}")
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(
+            _download_and_import_fr24_async(
+                registration, start_date, end_date, format
+            )
+        )
+        loop.close()
+        
+        return result
+        
+    except Exception as exc:
+        logger.error(f"FR24 download/import failed: {exc}")
+        if self.request.retries < 3:
+            raise self.retry(countdown=300, exc=exc)
+        raise
+
+
+async def _download_and_import_fr24_async(
+    registration: str, start_date: str, end_date: str, format: str
+) -> Dict[str, Any]:
+    """Download flight data using FR24 API and import it"""
+    from app.services.flightradar24_api_service import fr24_api_service
+    from app.crud.aircraft import aircraft_crud
+    from app.crud.flights import flight_log_crud, flight_position_crud
+    from app.schemas.flights import FlightLogCreate, FlightPositionCreate
+    
+    db = SessionLocal()
+    results = {
+        "registration": registration,
+        "flights_downloaded": 0,
+        "flights_imported": 0,
+        "total_positions": 0,
+        "errors": []
+    }
+    
+    try:
+        # Get aircraft
+        aircraft = aircraft_crud.get_by_registration(db, registration=registration)
+        if not aircraft:
+            results["errors"].append(f"Aircraft {registration} not found")
+            return results
+            
+        async with fr24_api_service:
+            # Check credits
+            if fr24_api_service.credit_manager:
+                stats = await fr24_api_service.credit_manager.get_usage_stats()
+                if stats["monthly_percentage"] > 90:
+                    results["errors"].append(f"Credit usage too high: {stats['monthly_percentage']:.1f}%")
+                    return results
+            
+            # Get flight list for the date range
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            
+            logger.info(f"Getting flight list for {registration} from {start_date} to {end_date}")
+            
+            # Use the flight list endpoint to get all flights in the date range
+            flights_data = await fr24_api_service.get_aircraft_flights(
+                registration=registration,
+                limit=100  # Get up to 100 flights
+            )
+            
+            if not flights_data:
+                logger.info(f"No flights found for {registration}")
+                return results
+            
+            # Filter flights within our date range
+            relevant_flights = []
+            for flight in flights_data:
+                if 'time' in flight:
+                    flight_time = datetime.fromtimestamp(flight['time'], tz=timezone.utc)
+                    if start_dt <= flight_time.date() <= end_dt:
+                        relevant_flights.append(flight)
+            
+            logger.info(f"Found {len(relevant_flights)} flights in date range")
+            results["flights_downloaded"] = len(relevant_flights)
+            
+            # Process each flight
+            for flight_data in relevant_flights:
+                try:
+                    flight_id = flight_data.get('flight_id') or flight_data.get('id')
+                    if not flight_id:
+                        continue
+                    
+                    # Get detailed flight track data
+                    logger.info(f"Getting track data for flight {flight_id}")
+                    track_data = await fr24_api_service.get_flight_track(flight_id)
+                    
+                    if not track_data or 'trail' not in track_data:
+                        logger.warning(f"No track data for flight {flight_id}")
+                        continue
+                    
+                    # Create flight log
+                    departure_time = datetime.fromtimestamp(
+                        flight_data.get('time', 0), tz=timezone.utc
+                    ) if flight_data.get('time') else datetime.now(timezone.utc)
+                    
+                    flight_log = flight_log_crud.create(
+                        db,
+                        obj_in=FlightLogCreate(
+                            aircraft_id=aircraft.id,
+                            flight_id=f"fr24_{flight_id}",
+                            callsign=flight_data.get('callsign'),
+                            departure_time=departure_time,
+                            departure_airport=flight_data.get('origin'),
+                            arrival_airport=flight_data.get('destination'),
+                            data_source="flightradar24_api",
+                        ),
+                    )
+                    results["flights_imported"] += 1
+                    
+                    # Process position trail
+                    trail = track_data.get('trail', [])
+                    for pos_data in trail:
+                        if len(pos_data) >= 6:  # Ensure we have all required fields
+                            timestamp = datetime.fromtimestamp(pos_data[0], tz=timezone.utc)
+                            
+                            position = flight_position_crud.create(
+                                db,
+                                obj_in=FlightPositionCreate(
+                                    flight_log_id=flight_log.id,
+                                    aircraft_id=aircraft.id,
+                                    timestamp=timestamp,
+                                    latitude=pos_data[1],
+                                    longitude=pos_data[2],
+                                    altitude_feet=pos_data[3],
+                                    ground_speed_knots=pos_data[4],
+                                    track_degrees=pos_data[5],
+                                    data_source="flightradar24_api",
+                                ),
+                            )
+                            results["total_positions"] += 1
+                    
+                    # Update flight with arrival time and duration
+                    if trail:
+                        last_pos = trail[-1]
+                        arrival_time = datetime.fromtimestamp(last_pos[0], tz=timezone.utc)
+                        duration_minutes = (arrival_time - departure_time).total_seconds() / 60
+                        
+                        flight_log_crud.update(
+                            db,
+                            db_obj=flight_log,
+                            obj_in={
+                                "arrival_time": arrival_time,
+                                "flight_duration_minutes": duration_minutes,
+                            }
+                        )
+                    
+                    logger.info(f"Imported flight {flight_id} with {len(trail)} positions")
+                    
+                except Exception as e:
+                    logger.error(f"Error processing flight {flight_id}: {e}")
+                    continue
+            
+            db.commit()
+            
+    except Exception as e:
+        logger.error(f"Download/import error: {e}")
+        results["errors"].append(str(e))
+        db.rollback()
+    finally:
+        db.close()
+        
+    return results
 
 
 @celery_app.task(bind=True, name="import_fr24_historical")

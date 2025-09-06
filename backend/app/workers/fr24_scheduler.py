@@ -71,25 +71,27 @@ def schedule_fr24_downloads(self) -> Dict[str, Any]:
                     ]
                     return
                 elif credit_percentage >= 90:
-                    # Only download most important aircraft, last 24 hours
+                    # Critical usage - minimal sampling
                     max_aircraft = 1
                     days_back = 1
-                    interval_hours = 12
+                    interval_hours = 2  # Still get some detail for priority aircraft
                 elif credit_percentage >= 80:
-                    # Limited downloads - top 2 aircraft, last 3 days
+                    # High usage - limited but detailed sampling
                     max_aircraft = 2
-                    days_back = 3
-                    interval_hours = 8
+                    days_back = 2
+                    interval_hours = 1  # Hourly sampling for better patterns
                 elif credit_percentage >= 60:
-                    # Moderate downloads - top 3 aircraft, last 7 days
+                    # Moderate usage - good coverage
                     max_aircraft = 3
-                    days_back = 7
-                    interval_hours = 6
+                    days_back = 3
+                    interval_minutes = 30  # 30-minute intervals
+                    interval_hours = 0.5
                 else:
-                    # Full downloads - all aircraft, last 14 days
-                    max_aircraft = len(sorted_aircraft)
-                    days_back = 14
-                    interval_hours = 4
+                    # Low usage - maximum detail
+                    max_aircraft = min(len(sorted_aircraft), 5)  # Up to 5 aircraft
+                    days_back = 7
+                    interval_minutes = 15  # 15-minute intervals for best surveillance detection
+                    interval_hours = 0.25
 
                 # Schedule downloads for selected aircraft
                 for i, aircraft in enumerate(sorted_aircraft[:max_aircraft]):
@@ -121,21 +123,21 @@ def schedule_fr24_downloads(self) -> Dict[str, Any]:
 
                     # Schedule the download task with a delay to spread out API calls
                     delay = i * 300  # 5 minutes between each aircraft
-                    logging.info("Importing historical")
+                    logging.info("Downloading and importing full flight tracks")
                     logging.info({
                       "registration": aircraft.registration,
                       "start_date": start_date.strftime("%Y-%m-%d"),
                       "end_date": end_date.strftime("%Y-%m-%d"),
-                      "interval_hours": interval_hours,
+                      "format": "kml",  # KML format has the most detailed position data
                       "delay": delay,
                     })
                     task = celery_app.send_task(
-                        "import_fr24_historical",
+                        "download_and_import_fr24_flights",
                         kwargs={
                             "registration": aircraft.registration,
                             "start_date": start_date.strftime("%Y-%m-%d"),
                             "end_date": end_date.strftime("%Y-%m-%d"),
-                            "interval_hours": interval_hours,
+                            "format": "kml",  # Full flight tracks with all positions
                         },
                         countdown=delay,
                     )
