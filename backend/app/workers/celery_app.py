@@ -37,15 +37,24 @@ celery_app.conf.update(
     task_time_limit=30 * 60,  # 30 minutes
     task_soft_time_limit=25 * 60,  # 25 minutes
     beat_schedule={
-        # Live tracking updates removed - using FlightRadar24 API only
         # Analysis tasks
         "analyze-recent-patterns": {
             "task": "app.workers.analysis_tasks.analyze_recent_patterns",
             "schedule": 300.0,  # Every 5 minutes
         },
-        # Data management
+        "analyze-flight-patterns": {
+            "task": "app.workers.analysis_tasks.analyze_flight_patterns",
+            "schedule": 3600.0,  # Every hour
+            "kwargs": {
+                "start_date": (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%d"),
+                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "analysis_types": ["surveillance", "hovering", "circling"],
+            },
+        },
+        
+        # Data import and management
         "cleanup-old-imports": {
-            "task": "app.workers.data_import_tasks.cleanup_old_imports_task",
+            "task": "cleanup_old_imports",  # matches @celery_app.task name
             "schedule": 86400.0,  # Every 24 hours
             "kwargs": {"days_old": 30},
         },
@@ -53,6 +62,7 @@ celery_app.conf.update(
             "task": "app.workers.tracking_tasks.cleanup_old_positions",
             "schedule": 86400.0,  # Every 24 hours
         },
+        
         # FlightRadar24 management
         "monitor-credit-usage": {
             "task": "app.workers.tracking_tasks.monitor_fr24_credits",
@@ -60,22 +70,69 @@ celery_app.conf.update(
         },
         "schedule-fr24-downloads": {
             "task": "app.workers.fr24_scheduler.schedule_fr24_downloads",
-            "schedule": 1800.0,  # Every 30 minutes - dynamically schedules downloads based on credits
+            "schedule": 3600.0,  # Every hour - dynamically schedules downloads based on credits
         },
-        # Aircraft registry sync (weekly)
+        "import-fr24-historical": {
+            "task": "import_fr24_historical",  # matches @celery_app.task name in data_import_tasks
+            "schedule": 7200.0,  # Every 2 hours
+            "kwargs": {
+                "registration": "N622FB",  # Primary aircraft
+                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
+                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                "interval_hours": 6,
+            },
+        },
+        
+        # Aircraft registry sync
         "sync-aircraft-registry": {
             "task": "app.workers.tracking_tasks.sync_aircraft_registry",
             "schedule": 604800.0,  # Every week (7 days)
         },
-        # Weekly reports
+        
+        # File processing
+        "process-pending-imports": {
+            "task": "process_file_import",  # matches @celery_app.task name
+            "schedule": 600.0,  # Every 10 minutes - check for pending file imports
+            "kwargs": {
+                "file_paths": [],
+                "import_id": "scheduled_check",
+            },
+        },
+        
+        # Cost analysis and reports
         "generate-weekly-cost-analysis": {
             "task": "app.workers.analysis_tasks.generate_cost_analysis",
             "schedule": 604800.0,  # Every week (7 days)
             "kwargs": {
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=7)).strftime(
-                    "%Y-%m-%d"
-                ),
+                "start_date": (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d"),
                 "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            },
+        },
+        "generate-daily-cost-analysis": {
+            "task": "app.workers.analysis_tasks.generate_cost_analysis",
+            "schedule": 86400.0,  # Every 24 hours
+            "kwargs": {
+                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
+                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            },
+        },
+        
+        # Legal document generation
+        "generate-weekly-legal-reports": {
+            "task": "app.workers.legal_tasks.generate_legal_document",
+            "schedule": 604800.0,  # Every week
+            "kwargs": {
+                "document_id": 1,  # Placeholder - would be dynamically created
+            },
+        },
+        
+        # Backup historical data collection
+        "backfill-historical-data-monthly": {
+            "task": "app.workers.fr24_scheduler.backfill_historical_data",  # full task name path
+            "schedule": 2592000.0,  # Every 30 days
+            "kwargs": {
+                "registration": "N622FB",
+                "months_back": 1,
             },
         },
     },

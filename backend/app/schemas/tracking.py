@@ -45,6 +45,9 @@ class LiveTrackingData(BaseModel):
     is_circling: bool = Field(default=False, description="Currently circling")
     over_residential: bool = Field(default=False, description="Over residential area")
     privacy_concern: bool = Field(default=False, description="Privacy concern flag")
+    
+    # Cost information
+    hourly_cost_estimate: float = Field(default=2160.0, description="Hourly operating cost estimate")
 
 
 class TrackingAlert(BaseModel):

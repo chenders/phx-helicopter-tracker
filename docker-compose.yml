@@ -60,7 +60,7 @@ services:
       - REDIS_URL=redis://redis:6379
       - SECRET_KEY=dev_secret_key_change_in_production
       - FR24_API_KEY_SANDBOX=0198ea4a-3b3f-7058-a837-32dedeafde4a|xevJZrQpBR14umXZ3whpPja3vucKspevkBV4vOjme1e687ad
-      - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b d98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
+      - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
       - FR24_API_ENVIRONMENT=production
       - FR24_MONTHLY_CREDIT_LIMIT=500000
     volumes:
@@ -69,7 +69,7 @@ services:
     depends_on:
       - db
       - redis
-    command: celery -A app.workers.celery_app worker --loglevel=info
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4
 
   celery-beat:
     build:
@@ -89,7 +89,7 @@ services:
     depends_on:
       - db
       - redis
-    command: celery -A app.workers.celery_app beat --loglevel=info
+    command: celery -A app.workers.celery_app beat --loglevel=debug
 
   flower:
     build:
@@ -101,11 +101,13 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
       - REDIS_URL=redis://redis:6379
       - SECRET_KEY=dev_secret_key_change_in_production
+      - FLOWER_UNAUTHENTICATED_API=true
     volumes:
       - ./backend:/app
     depends_on:
       - redis
       - celery
+      - celery-beat
     command: celery -A app.workers.celery_app flower --port=5555
 
   frontend:

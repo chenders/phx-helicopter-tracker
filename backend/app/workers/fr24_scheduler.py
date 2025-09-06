@@ -24,6 +24,7 @@ def schedule_fr24_downloads(self) -> Dict[str, Any]:
 
     This runs every 2 hours and determines what data to download next
     """
+    logging.info("Starting FlightRadar24 downloads")
     db = SessionLocal()
     results = {"scheduled_tasks": [], "skipped_due_to_credits": [], "errors": []}
 
@@ -120,7 +121,14 @@ def schedule_fr24_downloads(self) -> Dict[str, Any]:
 
                     # Schedule the download task with a delay to spread out API calls
                     delay = i * 300  # 5 minutes between each aircraft
-
+                    logging.info("Importing historical")
+                    logging.info({
+                      "registration": aircraft.registration,
+                      "start_date": start_date.strftime("%Y-%m-%d"),
+                      "end_date": end_date.strftime("%Y-%m-%d"),
+                      "interval_hours": interval_hours,
+                      "delay": delay,
+                    })
                     task = celery_app.send_task(
                         "import_fr24_historical",
                         kwargs={
@@ -153,7 +161,7 @@ def schedule_fr24_downloads(self) -> Dict[str, Any]:
                     results["skipped_due_to_credits"] = [
                         a.registration for a in sorted_aircraft[max_aircraft:]
                     ]
-
+                logging.info(f"Skipped due to credits: {results}")
         loop.run_until_complete(check_and_schedule())
         loop.close()
 
@@ -166,7 +174,7 @@ def schedule_fr24_downloads(self) -> Dict[str, Any]:
     return results
 
 
-@celery_app.task(bind=True, name="backfill_historical_data")
+@celery_app.task(bind=True, name="app.workers.fr24_scheduler.backfill_historical_data")
 def backfill_historical_data(
     self, registration: str, months_back: int = 12
 ) -> Dict[str, Any]:

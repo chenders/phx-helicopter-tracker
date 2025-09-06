@@ -197,7 +197,7 @@ def get_aircraft_status(
 
 # Statistics and monitoring endpoints
 @router.get("/stats", response_model=TrackingStats)
-def get_tracking_statistics(*, db: Session = Depends(get_db)) -> TrackingStats:
+async def get_tracking_statistics(*, db: Session = Depends(get_db)) -> TrackingStats:
     """Get tracking system statistics"""
     from app.crud.aircraft import aircraft_crud
     from app.crud.flights import flight_log_crud
@@ -232,13 +232,25 @@ def get_tracking_statistics(*, db: Session = Depends(get_db)) -> TrackingStats:
         if f.surveillance_likelihood and f.surveillance_likelihood > 0.5
     )
 
-    # Calculate costs (estimated $600/hour for helicopter operations)
+    # Calculate costs (estimated $2160/hour for helicopter operations - actual Phoenix PD rate)
     total_hours = sum(
         (f.arrival_time - f.departure_time).total_seconds() / 3600
         for f in todays_flights
         if f.arrival_time and f.departure_time
     )
-    total_cost = total_hours * 600  # $600 per flight hour estimate
+    total_cost = total_hours * 2160  # $2160 per flight hour (actual Phoenix PD estimate)
+    
+    # Get LIVE tracking data to count currently active flights
+    try:
+        # Call the live endpoint directly using the same logic
+        live_tracking_data = fr24_official_api.get_phoenix_pd_live()
+        current_active_flights = len(live_tracking_data) if live_tracking_data else 0
+        helicopters_currently_in_air = current_active_flights
+    except Exception as e:
+        import logging
+        logging.warning(f"Could not get live tracking for stats: {e}")
+        current_active_flights = 0
+        helicopters_currently_in_air = 0
 
     # Calculate stats
     return TrackingStats(
@@ -252,10 +264,10 @@ def get_tracking_statistics(*, db: Session = Depends(get_db)) -> TrackingStats:
         flights_today=len(todays_flights),
         surveillance_flights_today=surveillance_count,
         total_flight_hours_today=total_hours,
-        helicopters_in_air=0,  # Would need real-time data
+        helicopters_in_air=helicopters_currently_in_air,  # Now using real-time data
         # Dashboard-specific fields
-        active_flights=0,  # Currently active flights (would need real-time data)
-        surveillance_events_today=surveillance_count,
+        active_flights=current_active_flights,  # Now using real-time data
+        surveillance_incidents_today=surveillance_count,
         total_cost_today=total_cost,
         pattern_alerts=0,  # Would need pattern analysis data
     )
