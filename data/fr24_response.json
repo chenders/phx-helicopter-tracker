@@ -1,0 +1,74 @@
+{
+  "data": [
+    {
+      "fr24_id": "3bf8eb7d",
+      "hex": null,
+      "callsign": null,
+      "lat": 23.62326,
+      "lon": 129.55415,
+      "track": 215,
+      "alt": 45000,
+      "gspeed": 479,
+      "vspeed": 0,
+      "squawk": "0",
+      "timestamp": "2025-08-30T04:25:13Z",
+      "source": "ADSB"
+    },
+    {
+      "fr24_id": "3bf912f6",
+      "hex": null,
+      "callsign": null,
+      "lat": -7.0717,
+      "lon": 111.91943,
+      "track": 99,
+      "alt": 45000,
+      "gspeed": 434,
+      "vspeed": 0,
+      "squawk": "0",
+      "timestamp": "2025-08-30T04:25:14Z",
+      "source": "ADSB"
+    },
+    {
+      "fr24_id": "3bf8ea29",
+      "hex": null,
+      "callsign": null,
+      "lat": 6.6377,
+      "lon": 105.33118,
+      "track": 211,
+      "alt": 47000,
+      "gspeed": 515,
+      "vspeed": 0,
+      "squawk": "0",
+      "timestamp": "2025-08-30T04:25:06Z",
+      "source": "ADSB"
+    },
+    {
+      "fr24_id": "3bf844e9",
+      "hex": "424690",
+      "callsign": "VPBXV",
+      "lat": 31.17194,
+      "lon": 126.4984,
+      "track": 22,
+      "alt": 44975,
+      "gspeed": 482,
+      "vspeed": -64,
+      "squawk": "3113",
+      "timestamp": "2025-08-30T04:25:14Z",
+      "source": "ADSB"
+    },
+    {
+      "fr24_id": "3bf8ceec",
+      "hex": null,
+      "callsign": null,
+      "lat": -32.91023,
+      "lon": 133.23746,
+      "track": 93,
+      "alt": 45000,
+      "gspeed": 562,
+      "vspeed": 0,
+      "squawk": "0",
+      "timestamp": "2025-08-30T04:25:14Z",
+      "source": "ADSB"
+    }
+  ]
+}

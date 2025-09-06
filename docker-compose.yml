@@ -1,0 +1,140 @@
+services:
+  db:
+    image: timescale/timescaledb:latest-pg15
+    environment:
+      POSTGRES_DB: phoenix_helicopters
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
+      - REDIS_URL=redis://redis:6379
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - SECRET_KEY=dev_secret_key_change_in_production
+      - FR24_USERNAME=${FR24_USERNAME}
+      - FR24_PASSWORD=${FR24_PASSWORD}
+      - FR24_API_KEY_SANDBOX=0198ea4a-3b3f-7058-a837-32dedeafde4a|xevJZrQpBR14umXZ3whpPja3vucKspevkBV4vOjme1e687ad
+      - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
+      - FR24_API_ENVIRONMENT=production
+      - FR24_MONTHLY_CREDIT_LIMIT=500000
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=dev_secret_key_change_in_production
+      - FR24_API_KEY_SANDBOX=0198ea4a-3b3f-7058-a837-32dedeafde4a|xevJZrQpBR14umXZ3whpPja3vucKspevkBV4vOjme1e687ad
+      - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b d98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
+      - FR24_API_ENVIRONMENT=production
+      - FR24_MONTHLY_CREDIT_LIMIT=500000
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    depends_on:
+      - db
+      - redis
+    command: celery -A app.workers.celery_app worker --loglevel=info
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=dev_secret_key_change_in_production
+      - FR24_API_KEY_SANDBOX=0198ea4a-3b3f-7058-a837-32dedeafde4a|xevJZrQpBR14umXZ3whpPja3vucKspevkBV4vOjme1e687ad
+      - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
+      - FR24_API_ENVIRONMENT=production
+      - FR24_MONTHLY_CREDIT_LIMIT=500000
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    depends_on:
+      - db
+      - redis
+    command: celery -A app.workers.celery_app beat --loglevel=info
+
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5555:5555"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=dev_secret_key_change_in_production
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+      - celery
+    command: celery -A app.workers.celery_app flower --port=5555
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+      - REACT_APP_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
