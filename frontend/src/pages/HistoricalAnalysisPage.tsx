@@ -121,7 +121,7 @@ export function HistoricalAnalysisPage() {
   const [pathsReady, setPathsReady] = useState(false)
 
   const { data: historicalData, isLoading: dataLoading } = useHistoricalData(timeRange, selectedAircraft)
-  
+
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
     libraries: libraries,
@@ -138,15 +138,17 @@ export function HistoricalAnalysisPage() {
 
   // Ensure paths are ready after both map and data are loaded
   useEffect(() => {
-    if (map && historicalData?.flight_paths?.length > 0 && isLoaded) {
+    if (showFlightPaths && map && historicalData?.flight_paths?.length > 0 && isLoaded) {
       console.log('Map and data ready, setting pathsReady to true')
       // Small delay to ensure Google Maps is fully initialized
       const timer = setTimeout(() => {
         setPathsReady(true)
       }, 100)
       return () => clearTimeout(timer)
+    } else {
+      setPathsReady(false);
     }
-  }, [map, historicalData, isLoaded])
+  }, [map, historicalData, isLoaded, showFlightPaths])
 
   if (dataLoading || !isLoaded) {
     return (
@@ -171,7 +173,7 @@ export function HistoricalAnalysisPage() {
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Historical Flight Analysis</h1>
         <p className="text-gray-600 dark:text-gray-300">
-          Comprehensive analysis of Phoenix PD helicopter surveillance patterns over time, 
+          Comprehensive analysis of Phoenix PD helicopter surveillance patterns over time,
           imported from FlightRadar24 Gold subscription data and other public sources.
         </p>
       </div>
@@ -231,12 +233,12 @@ export function HistoricalAnalysisPage() {
               <input
                 type="checkbox"
                 checked={showFlightPaths}
-                onChange={(e) => setShowFlightPaths(e.target.checked)}
+                onChange={(e) => setShowFlightPaths(!showFlightPaths)}
                 className="mr-2"
               />
               <span className="text-sm text-gray-700 dark:text-gray-300">Show Flight Paths</span>
             </label>
-            
+
             <label className="flex items-center">
               <input
                 type="checkbox"
@@ -246,7 +248,7 @@ export function HistoricalAnalysisPage() {
               />
               <span className="text-sm text-gray-700 dark:text-gray-300">Surveillance Heatmap</span>
             </label>
-            
+
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm ml-auto">
               <div className="flex items-center">
                 <div className="w-3 h-3 rounded-full mr-1" style={{ backgroundColor: '#00ffff' }}></div>
@@ -300,7 +302,7 @@ export function HistoricalAnalysisPage() {
       {viewMode === 'map' && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
           <h2 className="text-xl font-semibold mb-2">Historical Flight Paths</h2>
-          
+
           <GoogleMap
             mapContainerStyle={mapContainerStyle}
             center={phoenixCenter}
@@ -310,21 +312,21 @@ export function HistoricalAnalysisPage() {
             onUnmount={onMapUnmount}
           >
               {/* Historical Flight Markers with helicopter icons */}
-              {historicalData?.flights?.map((flight: any) => {
+              {!showFlightPaths && historicalData?.flights?.map((flight: any) => {
                 // Custom helicopter path (top-down view)
                 const helicopterPath = 'M 0,-10 L -5,-5 L -5,5 L -2,8 L -2,10 L 2,10 L 2,8 L 5,5 L 5,-5 L 0,-10 M -8,0 L 8,0 M 0,-8 L 0,8'
-                
+
                 // Use bright colors for high contrast against dark map
                 let fillColor = '#00ffff' // Cyan for normal
                 let strokeColor = '#ffffff' // White stroke for visibility
                 let scale = 1.0
-                
+
                 if (flight.is_surveillance) {
                   fillColor = '#ff0000' // Bright red for surveillance
                   strokeColor = '#ffff00' // Yellow stroke for extra visibility
                   scale = 1.2
                 }
-                
+
                 return (
                   <Marker
                     key={flight.id}
@@ -344,27 +346,26 @@ export function HistoricalAnalysisPage() {
               })}
 
               {/* Flight Paths with bright colors */}
-              {pathsReady && historicalData?.flight_paths?.map((path: any, index: number) => {
+              {showFlightPaths && pathsReady && historicalData?.flight_paths?.map((path: any, index: number) => {
                 // Use bright colors for flight paths - high contrast against dark map
                 let pathColor = '#00ffff' // Bright cyan for default
                 let strokeWeight = 3
-                
+
                 if (path.is_surveillance) {
                   pathColor = '#ff0000' // Bright red for surveillance
                   strokeWeight = 4
                 }
-                
+
                 return (
                   <Polyline
-                    key={`path-${path.flight_id}-${showFlightPaths}`}
+                    key={`path-${path.flight_id}`}
                     path={path.coordinates}
                     options={{
                       strokeColor: pathColor,
-                      strokeOpacity: showFlightPaths ? 0.9 : 0,
+                      strokeOpacity: 0.9,
                       strokeWeight: strokeWeight,
                       geodesic: true,
                       zIndex: path.is_surveillance ? 1000 : 100,
-                      visible: showFlightPaths,
                     }}
                   />
                 )
