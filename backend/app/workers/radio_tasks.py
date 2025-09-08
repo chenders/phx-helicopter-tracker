@@ -7,6 +7,7 @@ import json
 import time
 import logging
 import requests
+import random
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from pathlib import Path
@@ -299,7 +300,7 @@ def download_broadcastify_archives(
 def transcribe_radio_archives(
     self,
     directory_path: str = str(RADIO_DATA_PATH),
-    model_name: str = "base",
+    model_name: str = None,  # None means random selection
     batch_size: int = 10,
 ) -> Dict[str, Any]:
     """
@@ -307,7 +308,7 @@ def transcribe_radio_archives(
 
     Args:
         directory_path: Path to directory containing MP3 files
-        model_name: Whisper model to use (tiny, base, small, medium, large)
+        model_name: Whisper model to use (tiny, base, small, medium, large) or None for random
         batch_size: Maximum number of files to process in one run
 
     Returns:
@@ -316,8 +317,15 @@ def transcribe_radio_archives(
     transcribed_files = []
     skipped_files = []
     errors = []
+    model_performance = {}  # Track performance by model
 
     try:
+        # If no model specified, randomly select one for testing effectiveness
+        available_models = ["tiny", "base", "small", "medium", "large"]
+        if model_name is None:
+            model_name = random.choice(available_models)
+            logger.info(f"Randomly selected Whisper model: {model_name}")
+        
         # Load Whisper model
         current_task.update_state(
             state="PROCESSING",
@@ -325,6 +333,7 @@ def transcribe_radio_archives(
                 "status": f"Loading Whisper model: {model_name}",
                 "transcribed": 0,
                 "skipped": 0,
+                "selected_model": model_name,
             },
         )
 
@@ -364,22 +373,39 @@ def transcribe_radio_archives(
 
                 logger.info(f"Transcribing: {mp3_file.name}")
 
-                # Transcribe with Whisper
+                # Track transcription start time for performance metrics
+                transcription_start = time.time()
+
+                # Transcribe with Whisper - optimized for accuracy
                 result = model.transcribe(
                     str(mp3_file),
-                    fp16=False,  # Use FP32 for better compatibility
-                    language="en",
-                    task="transcribe",
+                    fp16=False,  # Use FP32 for better accuracy on CPU
+                    language="en",  # Explicitly specify English
+                    task="transcribe",  # Transcribe, not translate
                     verbose=False,
-                    temperature=0,  # More deterministic results
-                    condition_on_previous_text=False,  # Faster processing
+                    temperature=0,  # Most deterministic results for accuracy
+                    best_of=5,  # Use best of 5 candidates for better accuracy (slower)
+                    beam_size=5,  # Beam search for better accuracy (slower)
+                    patience=1.0,  # Default patience for beam search
+                    length_penalty=1.0,  # Default length penalty
+                    suppress_tokens="",  # Don't suppress any tokens
+                    condition_on_previous_text=True,  # Better context (slower but more accurate)
+                    initial_prompt="This is a police radio communication recording.",  # Context hint
+                    word_timestamps=False,  # We don't need word-level timestamps
                 )
 
-                # Prepare transcription data with timestamps
+                # Track transcription time
+                transcription_time = time.time() - transcription_start
+
+                # Prepare transcription data with timestamps and model info
                 transcription_data = {
                     "filename": mp3_file.name,
                     "transcribed_at": datetime.now().isoformat(),
                     "model": model_name,
+                    "model_performance": {
+                        "transcription_time_seconds": round(transcription_time, 2),
+                        "file_size_mb": round(mp3_file.stat().st_size / (1024 * 1024), 2),
+                    },
                     "text": result["text"],
                     "segments": [],
                 }
@@ -406,6 +432,8 @@ def transcribe_radio_archives(
                     f.write(f"Transcription of: {mp3_file.name}\n")
                     f.write(f"Transcribed at: {transcription_data['transcribed_at']}\n")
                     f.write(f"Model: {model_name}\n")
+                    f.write(f"Transcription time: {transcription_data['model_performance']['transcription_time_seconds']}s\n")
+                    f.write(f"File size: {transcription_data['model_performance']['file_size_mb']}MB\n")
                     f.write("=" * 80 + "\n\n")
 
                     # Write segments with timestamps
@@ -424,11 +452,29 @@ def transcribe_radio_archives(
                     f.write(result["text"])
 
                 transcribed_files.append(str(mp3_file))
-                logger.info(f"Transcribed: {mp3_file.name}")
+                logger.info(f"Transcribed: {mp3_file.name} using model '{model_name}' in {transcription_time:.2f}s")
+
+                # Track model performance
+                if model_name not in model_performance:
+                    model_performance[model_name] = {
+                        "files_processed": 0,
+                        "total_time": 0,
+                        "avg_time": 0,
+                    }
+                model_performance[model_name]["files_processed"] += 1
+                model_performance[model_name]["total_time"] += transcription_time
 
             except Exception as e:
                 logger.error(f"Error transcribing {mp3_file.name}: {str(e)}")
                 errors.append(f"Error transcribing {mp3_file.name}: {str(e)}")
+
+        # Calculate average times for performance tracking
+        for model_key in model_performance:
+            if model_performance[model_key]["files_processed"] > 0:
+                model_performance[model_key]["avg_time"] = (
+                    model_performance[model_key]["total_time"] / 
+                    model_performance[model_key]["files_processed"]
+                )
 
         # Final state update
         current_task.update_state(
@@ -438,6 +484,8 @@ def transcribe_radio_archives(
                 "transcribed": len(transcribed_files),
                 "skipped": len(skipped_files),
                 "errors": len(errors),
+                "model_used": model_name,
+                "model_performance": model_performance,
             },
         )
 
@@ -448,6 +496,8 @@ def transcribe_radio_archives(
             "errors": errors,
             "total_transcribed": len(transcribed_files),
             "total_skipped": len(skipped_files),
+            "model_used": model_name,
+            "model_performance": model_performance,
         }
 
     except Exception as exc:

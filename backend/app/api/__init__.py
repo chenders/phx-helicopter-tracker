@@ -11,6 +11,7 @@ from app.api.endpoints import (
     task_monitoring,
     patterns,
     rate_limit_status,
+    manual_fr24,
 )
 
 api_router = APIRouter()
@@ -33,4 +34,7 @@ api_router.include_router(
 api_router.include_router(patterns.router, prefix="/patterns", tags=["patterns"])
 api_router.include_router(
     rate_limit_status.router, prefix="/monitoring", tags=["monitoring"]
+)
+api_router.include_router(
+    manual_fr24.router, prefix="/manual-fr24", tags=["manual_fr24"]
 )

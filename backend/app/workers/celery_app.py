@@ -38,18 +38,18 @@ celery_app.conf.update(
     task_time_limit=30 * 60,  # 30 minutes (default)
     task_soft_time_limit=25 * 60,  # 25 minutes (default)
     beat_schedule={
-        # Analysis tasks - REDUCED FREQUENCY
-        "analyze-recent-patterns": {
-            "task": "app.workers.analysis_tasks.analyze_recent_patterns",
-            "schedule": 1800.0,  # Every 30 minutes (was 5 minutes)
-        },
-        "analyze-and-score-flights": {
-            "task": "app.workers.analysis_tasks.analyze_and_score_flights",
-            "schedule": 3600.0,  # Every hour (was 10 minutes)
-        },
+        # Analysis tasks - DISABLED OR HEAVILY REDUCED
+        # "analyze-recent-patterns": {
+        #     "task": "app.workers.analysis_tasks.analyze_recent_patterns",
+        #     "schedule": 1800.0,  # Every 30 minutes (was 5 minutes)
+        # },
+        # "analyze-and-score-flights": {
+        #     "task": "app.workers.analysis_tasks.analyze_and_score_flights",
+        #     "schedule": 3600.0,  # Every hour (was 10 minutes)
+        # },
         "analyze-flight-patterns": {
             "task": "app.workers.analysis_tasks.analyze_flight_patterns",
-            "schedule": 7200.0,  # Every 2 hours (was 1 hour)
+            "schedule": 86400.0,  # Once per day (was 2 hours)
             "kwargs": {
                 "start_date": (
                     datetime.now(timezone.utc) - timedelta(hours=24)
@@ -73,74 +73,71 @@ celery_app.conf.update(
             "task": "app.workers.tracking_tasks.monitor_fr24_credits",
             "schedule": 3600.0,  # Every hour
         },
-        "schedule-fr24-downloads": {
-            "task": "app.workers.fr24_scheduler.schedule_fr24_downloads",
-            "schedule": 7200.0,  # Every 2 hours (was 1 hour) - dynamically schedules downloads
-        },
-        # Distributed helicopter data collection - one per 3 hours for each aircraft
-        "download-fr24-N621FB": {
-            "task": "download_and_import_fr24_flights",
-            "schedule": 21600.0,  # Every 6 hours
-            "kwargs": {
-                "registration": "N621FB",
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
-                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "format": "kml",
-            },
-        },
-        "download-fr24-N622FB": {
-            "task": "download_and_import_fr24_flights",
-            "schedule": 21600.0,  # Every 6 hours, offset by 1 hour
-            "kwargs": {
-                "registration": "N622FB",
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
-                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "format": "kml",
-            },
-            "options": {"eta": datetime.now(timezone.utc) + timedelta(hours=1)},
-        },
-        "download-fr24-N623FB": {
-            "task": "download_and_import_fr24_flights",
-            "schedule": 21600.0,  # Every 6 hours, offset by 2 hours
-            "kwargs": {
-                "registration": "N623FB",
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
-                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "format": "kml",
-            },
-            "options": {"eta": datetime.now(timezone.utc) + timedelta(hours=2)},
-        },
-        "download-fr24-N624FB": {
-            "task": "download_and_import_fr24_flights",
-            "schedule": 21600.0,  # Every 6 hours, offset by 3 hours
-            "kwargs": {
-                "registration": "N624FB",
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
-                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "format": "kml",
-            },
-            "options": {"eta": datetime.now(timezone.utc) + timedelta(hours=3)},
-        },
-        "download-fr24-N625FB": {
-            "task": "download_and_import_fr24_flights",
-            "schedule": 21600.0,  # Every 6 hours, offset by 4 hours
-            "kwargs": {
-                "registration": "N625FB",
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
-                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "format": "kml",
-            },
-            "options": {"eta": datetime.now(timezone.utc) + timedelta(hours=4)},
-        },
+        # FR24 downloads - DISABLED TO PREVENT RATE LIMITING
+        # "schedule-fr24-downloads": {
+        #     "task": "app.workers.fr24_scheduler.schedule_fr24_downloads",
+        #     "schedule": 86400.0,  # Once per day when enabled
+        # },
+        # Individual helicopter downloads - DISABLED
+        # "download-fr24-N621FB": {
+        #     "task": "download_and_import_fr24_flights",
+        #     "schedule": 86400.0,  # Once per day when enabled
+        #     "kwargs": {
+        #         "registration": "N621FB",
+        #         "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
+        #         "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        #         "format": "kml",
+        #     },
+        # },
+        # "download-fr24-N622FB": {
+        #     "task": "download_and_import_fr24_flights",
+        #     "schedule": 86400.0,  # Once per day when enabled
+        #     "kwargs": {
+        #         "registration": "N622FB",
+        #         "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
+        #         "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        #         "format": "kml",
+        #     },
+        # },
+        # "download-fr24-N623FB": {
+        #     "task": "download_and_import_fr24_flights",
+        #     "schedule": 86400.0,  # Once per day when enabled
+        #     "kwargs": {
+        #         "registration": "N623FB",
+        #         "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
+        #         "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        #         "format": "kml",
+        #     },
+        # },
+        # "download-fr24-N624FB": {
+        #     "task": "download_and_import_fr24_flights",
+        #     "schedule": 86400.0,  # Once per day when enabled
+        #     "kwargs": {
+        #         "registration": "N624FB",
+        #         "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
+        #         "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        #         "format": "kml",
+        #     },
+        # },
+        # "download-fr24-N625FB": {
+        #     "task": "download_and_import_fr24_flights",
+        #     "schedule": 86400.0,  # Once per day when enabled
+        #     "kwargs": {
+        #         "registration": "N625FB",
+        #         "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
+        #         "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        #         "format": "kml",
+        #     },
+        # },
         # Aircraft registry sync
         "sync-aircraft-registry": {
             "task": "app.workers.tracking_tasks.sync_aircraft_registry",
             "schedule": 604800.0,  # Every week (7 days)
         },
-        # File processing
+        # File processing - REDUCED FREQUENCY
         "process-pending-imports": {
             "task": "process_file_import",  # matches @celery_app.task name
-            "schedule": 600.0,  # Every 10 minutes - check for pending file imports
+            "schedule": 3600.0,  # Every hour (was 10 minutes) - check for pending file imports
             "kwargs": {
                 "file_paths": [],
                 "import_id": "scheduled_check",
@@ -175,15 +172,15 @@ celery_app.conf.update(
                 "document_id": 1,  # Placeholder - would be dynamically created
             },
         },
-        # Backup historical data collection
-        "backfill-historical-data-monthly": {
-            "task": "app.workers.fr24_scheduler.backfill_historical_data",  # full task name path
-            "schedule": 2592000.0,  # Every 30 days
-            "kwargs": {
-                "registration": "N622FB",
-                "months_back": 1,
-            },
-        },
+        # Backup historical data collection - DISABLED
+        # "backfill-historical-data-monthly": {
+        #     "task": "app.workers.fr24_scheduler.backfill_historical_data",
+        #     "schedule": 2592000.0,  # Every 30 days
+        #     "kwargs": {
+        #         "registration": "N622FB",
+        #         "months_back": 1,
+        #     },
+        # },
         # Radio archive tasks - REDUCED FREQUENCY
         "download-broadcastify-archives": {
             "task": "download_broadcastify_archives",
@@ -198,7 +195,7 @@ celery_app.conf.update(
             "task": "transcribe_radio_archives",
             "schedule": 7200.0,  # Every 2 hours (was 30 minutes)
             "kwargs": {
-                "model_name": "tiny",  # Use tiny model for faster processing
+                # model_name not specified - will randomly select for testing
                 "batch_size": 1,  # Process 1 file at a time (was 2)
             },
             "options": {
