@@ -10,6 +10,7 @@ from app.api.endpoints import (
     historical_import,
     task_monitoring,
     patterns,
+    rate_limit_status,
 )
 
 api_router = APIRouter()
@@ -30,3 +31,6 @@ api_router.include_router(
     task_monitoring.router, prefix="/tasks", tags=["task_monitoring"]
 )
 api_router.include_router(patterns.router, prefix="/patterns", tags=["patterns"])
+api_router.include_router(
+    rate_limit_status.router, prefix="/monitoring", tags=["monitoring"]
+)

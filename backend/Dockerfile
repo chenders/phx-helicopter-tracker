@@ -1,5 +1,9 @@
 FROM python:3.12-slim
 
+# Prevent Python from generating .pyc files and __pycache__ directories
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
 # Install system dependencies

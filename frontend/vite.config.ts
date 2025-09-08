@@ -20,7 +20,8 @@ export default defineConfig({
         target: process.env.BACKEND_URL || 'http://backend:9000',
         changeOrigin: true,
       }
-    }
+    },
+    allowedHosts: ["middledude"],
   },
   build: {
     outDir: 'dist',

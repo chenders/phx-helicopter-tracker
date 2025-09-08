@@ -41,6 +41,8 @@ services:
       - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
       - FR24_API_ENVIRONMENT=production
       - FR24_MONTHLY_CREDIT_LIMIT=500000
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
     volumes:
       - ./backend:/app
       - ./data:/app/data
@@ -63,6 +65,8 @@ services:
       - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
       - FR24_API_ENVIRONMENT=production
       - FR24_MONTHLY_CREDIT_LIMIT=500000
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
     volumes:
       - ./backend:/app
       - ./data:/app/data
@@ -85,6 +89,8 @@ services:
       - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
       - FR24_API_ENVIRONMENT=production
       - FR24_MONTHLY_CREDIT_LIMIT=500000
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
     volumes:
       - ./backend:/app
       - ./data:/app/data
@@ -106,6 +112,8 @@ services:
       - REDIS_URL=redis://redis:6379
       - SECRET_KEY=dev_secret_key_change_in_production
       - FLOWER_UNAUTHENTICATED_API=true
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
     volumes:
       - ./backend:/app
     depends_on:

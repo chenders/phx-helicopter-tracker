@@ -13,6 +13,7 @@ from app.schemas.tracking import LiveTrackingData
 from app.core.config import settings
 from app.services.flight_path_tracker import flight_path_tracker
 from app.services.cache_service import cache_service
+from app.services.fr24_rate_limiter import fr24_rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -56,35 +57,61 @@ class FR24OfficialAPI:
             0.5  # Minimum 0.5 seconds between API calls (120 requests/minute)
         )
 
+    @fr24_rate_limiter.wait_and_request
+    def _make_api_request(self, url: str, params: Dict[str, Any]) -> Optional[requests.Response]:
+        """Make rate-limited API request"""
+        try:
+            response = requests.get(
+                url, headers=self.headers, params=params, timeout=10
+            )
+            return response
+        except Exception as e:
+            logger.error(f"API request failed: {e}")
+            return None
+
     def get_flight_positions_by_bounds(self) -> List[Dict[str, Any]]:
         """Get all flights in Phoenix area using bounds"""
+        # Check cache first (5 minute cache for bounds queries)
+        cache_key = "fr24_phoenix_area_flights"
+        cached_data = cache_service.get(cache_key, max_age=300)
+        if cached_data:
+            logger.info(f"Returning cached data for Phoenix area flights")
+            return cached_data
+        
         try:
             url = f"{self.base_url}/api/live/flight-positions/light"
             params = {"bounds": self.phoenix_bounds}
 
             logger.info(f"Requesting flights in bounds: {self.phoenix_bounds}")
-            response = requests.get(
-                url, headers=self.headers, params=params, timeout=10
-            )
-
+            
+            # Use rate-limited request
+            response = self._make_api_request(url, params)
+            
+            if response is None:
+                # Rate limiter returned None - we're at limit
+                logger.warning("Rate limit prevented request - returning cached data if available")
+                # Try to return any cached data even if expired
+                old_data = cache_service.get(cache_key, max_age=3600)  # Accept up to 1 hour old
+                return old_data if old_data else []
+            
             if response.status_code == 200:
                 data = response.json()
                 flights = data.get("data", [])
                 logger.info(f"Found {len(flights)} flights in Phoenix area")
+                # Cache the successful response
+                cache_service.set(cache_key, flights, ttl=300)
                 return flights
             elif response.status_code == 401:
                 logger.error("FR24 API authentication failed - check API token")
             elif response.status_code == 402:
                 logger.error("FR24 API payment required - check subscription")
             elif response.status_code == 429:
-                # Rate limit exceeded - return empty but don't log as error
-                logger.warning(
-                    "FR24 API rate limit exceeded - returning cached or empty data"
-                )
-                # Try to return any cached data even if expired
-                old_cache = cache_service.cache.get(cache_key)
-                if old_cache:
-                    return old_cache[0]  # Return the value part of the tuple
+                # Rate limit hit despite our limiter - adjust parameters
+                logger.warning("FR24 API returned 429 despite rate limiting - adjusting limits")
+                fr24_rate_limiter.min_delay *= 1.5  # Increase delay
+                # Try to return any cached data
+                old_data = cache_service.get(cache_key, max_age=3600)
+                return old_data if old_data else []
             else:
                 logger.error(f"FR24 API error {response.status_code}: {response.text}")
 
