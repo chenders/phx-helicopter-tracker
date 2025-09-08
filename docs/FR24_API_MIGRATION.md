@@ -313,7 +313,7 @@ async def warm_cache():
 
 ### Monitoring Dashboard
 - Credit usage: http://localhost:3000/dashboard
-- API status: http://localhost:8000/api/v1/tracking/sources/status
+- API status: http://localhost:9000/api/v1/tracking/sources/status
 - Celery tasks: http://localhost:5555 (Flower, if configured)
 
 ## Security Considerations

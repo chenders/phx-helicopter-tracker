@@ -29,7 +29,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "8001:8000"
+      - "8001:9000"
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
       - REDIS_URL=redis://redis:6379
@@ -49,7 +49,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 9000
 
   celery:
     build:
@@ -63,13 +63,14 @@ services:
       - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
       - FR24_API_ENVIRONMENT=production
       - FR24_MONTHLY_CREDIT_LIMIT=500000
-
     volumes:
       - ./backend:/app
       - ./data:/app/data
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=4
 
   celery-beat:
@@ -84,13 +85,14 @@ services:
       - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
       - FR24_API_ENVIRONMENT=production
       - FR24_MONTHLY_CREDIT_LIMIT=500000
-
     volumes:
       - ./backend:/app
       - ./data:/app/data
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
     command: celery -A app.workers.celery_app beat --loglevel=debug
 
   flower:
@@ -107,9 +109,12 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      - redis
-      - celery
-      - celery-beat
+      redis:
+        condition: service_started
+      celery:
+        condition: service_started
+      celery-beat:
+        condition: service_started
     command: celery -A app.workers.celery_app flower --port=5555
 
   frontend:
@@ -119,19 +124,20 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8080
+      - REACT_APP_API_URL=http://localhost:9080
       - REACT_APP_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      - backend
+      backend:
+        condition: service_started
     restart: unless-stopped
 
   nginx:
     image: nginx:alpine
     ports:
-      - "8080:80"
+      - "9080:80"
     volumes:
       - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
     depends_on:

@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -14,18 +14,33 @@ RUN apt-get update && apt-get install -y \
     libproj-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# Copy requirements file
 COPY requirements.txt .
+
+# Install all Python dependencies with pip
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Install OpenAI Whisper with CPU-only torch
+# First uninstall any GPU torch that might have been installed
+RUN pip uninstall -y torch torchvision torchaudio && \
+    pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
+    pip install --no-cache-dir openai-whisper==20231117
+
+# Verify whisper and celery are installed correctly
+RUN python -c "import whisper; print(f'Whisper version: {whisper.__version__}')" && \
+    python -c "import celery; print(f'Celery version: {celery.__version__}')"
 
 # Copy application code
 COPY . .
 
-# Create data directory
+# Create necessary directories
 RUN mkdir -p /app/data
 
+# Ensure the app module is in Python path
+ENV PYTHONPATH=/app:$PYTHONPATH
+
 # Expose port
-EXPOSE 8000
+EXPOSE 9000
 
 # Default command (overridden by docker compose)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000"]

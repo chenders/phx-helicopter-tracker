@@ -2,3 +2,21 @@
 .env
 __pycache__
 .DS_Store
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.vitest/
+
+# Backend
+backend/__pycache__/
+backend/*.pyc
+backend/.pytest_cache/
+backend/celerybeat-schedule*
+backend/poetry.lock
+
+# Data directories
+data/
+*.log
+*.pid

@@ -31,8 +31,8 @@ if [ ! -f .env ]; then
     echo "Creating .env file..."
     cat > .env << EOL
 # API Configuration
-VITE_API_URL=http://localhost:8000
-VITE_WS_URL=ws://localhost:8000
+VITE_API_URL=http://localhost:9000
+VITE_WS_URL=ws://localhost:9000
 
 # Google Maps API Key (optional, for map features)
 VITE_GOOGLE_MAPS_API_KEY=
@@ -49,7 +49,7 @@ echo ""
 echo "Frontend setup complete!"
 echo ""
 echo "Next steps:"
-echo "1. Make sure the backend is running on port 8000"
+echo "1. Make sure the backend is running on port 9000"
 echo "2. Update .env file with your API keys if needed"
 echo "3. Run the development server: npm run dev"
 echo "4. Open http://localhost:5173 in your browser"
