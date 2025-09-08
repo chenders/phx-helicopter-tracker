@@ -7,9 +7,7 @@ import json
 import sys
 from datetime import datetime, timezone, timedelta
 
-sys.path.insert(
-    0, "/Users/chris/Source/phx-plan-a-helicopters/backend"
-)
+sys.path.insert(0, "/Users/chris/Source/phx-plan-a-helicopters/backend")
 
 from app.db.database import SessionLocal
 from app.models.aircraft import Aircraft

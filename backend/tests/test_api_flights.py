@@ -26,7 +26,7 @@ class TestFlightAPI:
         """Test getting flight by ID"""
         # First verify the flight exists in our session
         assert sample_flight_log.id is not None
-        
+
         response = client.get(f"/api/v1/flights/logs/{sample_flight_log.id}")
         assert response.status_code == 200
         data = response.json()
@@ -63,7 +63,7 @@ class TestFlightAPI:
         assert "total" in data
 
         # All flights should be for the specified aircraft
-        for flight in data['flights']:
+        for flight in data["flights"]:
             assert flight["aircraft_id"] == sample_flight_log.aircraft_id
 
     def test_get_flights_by_date_range(self, client: TestClient, db_session: Session):
@@ -90,7 +90,7 @@ class TestFlightAPI:
         assert "total" in data
 
         # All flights should have high surveillance score
-        for flight in data['flights']:
+        for flight in data["flights"]:
             if flight["surveillance_likelihood"]:
                 assert flight["surveillance_likelihood"] >= 0.7
 
@@ -161,9 +161,7 @@ class TestFlightAPI:
             "data_source": "test",
         }
 
-        response = client.post(
-            f"/api/v1/flights/positions", json=position_data
-        )
+        response = client.post(f"/api/v1/flights/positions", json=position_data)
         assert response.status_code == 200
         data = response.json()
         assert data["flight_log_id"] == sample_flight_log.id

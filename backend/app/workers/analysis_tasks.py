@@ -354,85 +354,97 @@ def _generate_cost_analysis(
 def analyze_and_score_flights():
     """Analyze flights without surveillance scores and update them"""
     db = SessionLocal()
-    
+
     try:
         from app.schemas.flights import FlightLogUpdate
-        
+
         # Get flights that need analysis (no surveillance score)
-        flights = db.query(flight_log_crud.model).filter(
-            flight_log_crud.model.surveillance_likelihood.is_(None)
-        ).limit(50).all()  # Process in batches
-        
+        flights = (
+            db.query(flight_log_crud.model)
+            .filter(flight_log_crud.model.surveillance_likelihood.is_(None))
+            .limit(50)
+            .all()
+        )  # Process in batches
+
         if not flights:
             return {"message": "No flights need scoring", "flights_processed": 0}
-        
+
         flights_processed = 0
         flights_scored_surveillance = 0
-        
+
         for flight in flights:
             # Get all positions for this flight
             positions = flight_position_crud.get_by_flight(db, flight_log_id=flight.id)
-            
+
             if not positions:
                 continue
-                
+
             # Calculate flight duration from positions
             if len(positions) > 1:
                 first_pos = min(positions, key=lambda p: p.timestamp)
                 last_pos = max(positions, key=lambda p: p.timestamp)
-                duration_minutes = (last_pos.timestamp - first_pos.timestamp).total_seconds() / 60
-                
+                duration_minutes = (
+                    last_pos.timestamp - first_pos.timestamp
+                ).total_seconds() / 60
+
                 # Update arrival time and duration
                 flight_update = FlightLogUpdate(
                     arrival_time=last_pos.timestamp,
-                    flight_duration_minutes=duration_minutes
+                    flight_duration_minutes=duration_minutes,
                 )
             else:
                 # Single position - estimate 30 minute flight
                 flight_update = FlightLogUpdate(
                     arrival_time=positions[0].timestamp + timedelta(minutes=30),
-                    flight_duration_minutes=30.0
+                    flight_duration_minutes=30.0,
                 )
-            
+
             # Analyze surveillance patterns
             surveillance_score = 0.0
             privacy_level = 0
-            
+
             # Check for hovering (even with limited data)
             hovering_positions = [p for p in positions if p.is_hovering]
             if hovering_positions:
                 surveillance_score += 0.3
                 privacy_level += 1
-            
+
             # Check for low altitude
-            low_altitude = [p for p in positions if p.altitude_feet and p.altitude_feet < 500]
+            low_altitude = [
+                p for p in positions if p.altitude_feet and p.altitude_feet < 500
+            ]
             if low_altitude:
                 surveillance_score += 0.3
                 privacy_level += 1
-                
+
             # Check for circling patterns (need at least 3 positions)
             if len(positions) >= 3:
                 # Simple check: if positions are close together spatially
-                lat_variance = max(p.latitude for p in positions) - min(p.latitude for p in positions)
-                lon_variance = max(p.longitude for p in positions) - min(p.longitude for p in positions)
-                
+                lat_variance = max(p.latitude for p in positions) - min(
+                    p.latitude for p in positions
+                )
+                lon_variance = max(p.longitude for p in positions) - min(
+                    p.longitude for p in positions
+                )
+
                 if lat_variance < 0.05 and lon_variance < 0.05:  # Roughly 5km area
                     surveillance_score += 0.2
                     privacy_level += 1
-            
+
             # Check for residential areas (Phoenix metro area)
             residential_positions = [
-                p for p in positions 
+                p
+                for p in positions
                 if 33.3 < p.latitude < 33.7 and -112.3 < p.longitude < -111.8
             ]
             if residential_positions:
                 surveillance_score += 0.2
                 privacy_level += 1
-            
+
             # Update flight with scores
             flight_update.surveillance_likelihood = min(surveillance_score, 1.0)
             flight_update.privacy_concern_level = min(privacy_level, 5)
-            
+
             # Add pattern notes
             patterns = []
             if hovering_positions:
@@ -441,32 +453,32 @@ def analyze_and_score_flights():
                 patterns.append("low altitude flight")
             if residential_positions:
                 patterns.append("residential overflight")
-                
+
             if patterns:
                 flight_update.pattern_notes = ", ".join(patterns)
-                
+
             # Calculate estimated cost
             flight_duration_hours = (flight_update.flight_duration_minutes or 30) / 60
             flight_update.estimated_cost = flight_duration_hours * 2160.0
-            
+
             # Update the flight
             flight_log_crud.update(db, db_obj=flight, obj_in=flight_update)
             flights_processed += 1
-            
+
             if surveillance_score > 0.5:
                 flights_scored_surveillance += 1
-                
+
         db.commit()
-        
+
         result = {
             "flights_processed": flights_processed,
             "flights_scored_surveillance": flights_scored_surveillance,
-            "timestamp": datetime.now(timezone.utc).isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-        
+
         logger.info(f"Flight scoring complete: {result}")
         return result
-        
+
     except Exception as e:
         logger.error(f"Error scoring flights: {e}")
         db.rollback()

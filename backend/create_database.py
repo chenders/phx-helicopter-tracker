@@ -7,9 +7,11 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.exc import ProgrammingError
 
 
-async def create_database(database_name: str, host: str = "localhost", port: int = 5433):
+async def create_database(
+    database_name: str, host: str = "localhost", port: int = 5433
+):
     """Create a PostgreSQL database if it doesn't exist.
-    
+
     Args:
         database_name: Name of the database to create
         host: PostgreSQL host
@@ -17,17 +19,17 @@ async def create_database(database_name: str, host: str = "localhost", port: int
     """
     # Connect to the default 'postgres' database to create other databases
     admin_url = f"postgresql+asyncpg://postgres:postgres@{host}:{port}/postgres"
-    
+
     engine = create_async_engine(admin_url, isolation_level="AUTOCOMMIT")
-    
+
     async with engine.connect() as conn:
         # Check if database exists
         result = await conn.execute(
             text("SELECT 1 FROM pg_database WHERE datname = :dbname"),
-            {"dbname": database_name}
+            {"dbname": database_name},
         )
         exists = result.scalar() is not None
-        
+
         if not exists:
             # Create the database
             # Note: Can't use parameters for database name in CREATE DATABASE
@@ -36,17 +38,17 @@ async def create_database(database_name: str, host: str = "localhost", port: int
             print(f"✓ Created database: {database_name}")
         else:
             print(f"✓ Database already exists: {database_name}")
-    
+
     await engine.dispose()
 
 
 async def create_all_databases():
     """Create all required databases for the application."""
     databases = [
-        "phoenix_helicopters",      # Main application database
+        "phoenix_helicopters",  # Main application database
         "phoenix_helicopters_test",  # Test database
     ]
-    
+
     for db_name in databases:
         try:
             await create_database(db_name)

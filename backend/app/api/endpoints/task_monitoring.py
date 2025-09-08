@@ -71,11 +71,11 @@ def get_monitoring_dashboard(
         # Get FR24 credit stats directly from the service
         from app.services.flightradar24_api_service import fr24_api_service
         import asyncio
-        
+
         async def get_credits():
             await fr24_api_service.initialize()
             return await fr24_api_service.credit_manager.get_usage_stats()
-        
+
         credit_usage = asyncio.run(get_credits())
     except Exception:
         pass

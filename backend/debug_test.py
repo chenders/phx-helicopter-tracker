@@ -2,11 +2,13 @@
 
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi.testclient import TestClient
 from app.main import app
 from tests.conftest import override_get_db, TestingSessionLocal
+
 
 # Set up the test client with database override
 def override_get_db_debug():
@@ -16,6 +18,7 @@ def override_get_db_debug():
     finally:
         db.close()
 
+
 app.dependency_overrides[app.db.database.get_db] = override_get_db_debug
 
 client = TestClient(app)
@@ -23,7 +26,7 @@ client = TestClient(app)
 # Test data
 aircraft_data = {
     "registration": "N9TEST",
-    "icao_code": "N9TEST", 
+    "icao_code": "N9TEST",
     "make": "Test",
     "model": "TestModel",
     "is_phoenix_pd": False,

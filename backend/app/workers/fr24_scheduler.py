@@ -33,7 +33,15 @@ def schedule_fr24_downloads(self) -> Dict[str, Any]:
         aircraft_list = aircraft_crud.get_phoenix_pd_aircraft(db, active_only=True)
 
         # Priority order for aircraft (most important first) - from .env file
-        priority_registrations = ["N622FB", "N623FB", "N624FB", "N625FB", "N626FB", "N627FB", "N628FB"]
+        priority_registrations = [
+            "N622FB",
+            "N623FB",
+            "N624FB",
+            "N625FB",
+            "N626FB",
+            "N627FB",
+            "N628FB",
+        ]
 
         # Sort aircraft by priority
         sorted_aircraft = sorted(
@@ -90,7 +98,9 @@ def schedule_fr24_downloads(self) -> Dict[str, Any]:
                     # Low usage - maximum detail
                     max_aircraft = min(len(sorted_aircraft), 5)  # Up to 5 aircraft
                     days_back = 7
-                    interval_minutes = 15  # 15-minute intervals for best surveillance detection
+                    interval_minutes = (
+                        15  # 15-minute intervals for best surveillance detection
+                    )
                     interval_hours = 0.25
 
                 # Schedule downloads for selected aircraft
@@ -107,8 +117,14 @@ def schedule_fr24_downloads(self) -> Dict[str, Any]:
                         db, hours=720, phoenix_pd_only=False  # Last 30 days
                     )
                     # Filter for this aircraft and get the latest
-                    aircraft_flights = [f for f in recent_flights if f.aircraft_id == aircraft.id]
-                    latest_flight = max(aircraft_flights, key=lambda f: f.departure_time) if aircraft_flights else None
+                    aircraft_flights = [
+                        f for f in recent_flights if f.aircraft_id == aircraft.id
+                    ]
+                    latest_flight = (
+                        max(aircraft_flights, key=lambda f: f.departure_time)
+                        if aircraft_flights
+                        else None
+                    )
 
                     if latest_flight and latest_flight.departure_time:
                         # Start from where we left off
@@ -124,13 +140,15 @@ def schedule_fr24_downloads(self) -> Dict[str, Any]:
                     # Schedule the download task with a delay to spread out API calls
                     delay = i * 300  # 5 minutes between each aircraft
                     logging.info("Downloading and importing full flight tracks")
-                    logging.info({
-                      "registration": aircraft.registration,
-                      "start_date": start_date.strftime("%Y-%m-%d"),
-                      "end_date": end_date.strftime("%Y-%m-%d"),
-                      "format": "kml",  # KML format has the most detailed position data
-                      "delay": delay,
-                    })
+                    logging.info(
+                        {
+                            "registration": aircraft.registration,
+                            "start_date": start_date.strftime("%Y-%m-%d"),
+                            "end_date": end_date.strftime("%Y-%m-%d"),
+                            "format": "kml",  # KML format has the most detailed position data
+                            "delay": delay,
+                        }
+                    )
                     task = celery_app.send_task(
                         "download_and_import_fr24_flights",
                         kwargs={
@@ -164,6 +182,7 @@ def schedule_fr24_downloads(self) -> Dict[str, Any]:
                         a.registration for a in sorted_aircraft[max_aircraft:]
                     ]
                 logging.info(f"Skipped due to credits: {results}")
+
         loop.run_until_complete(check_and_schedule())
         loop.close()
 

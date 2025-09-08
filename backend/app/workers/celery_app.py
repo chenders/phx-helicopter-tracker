@@ -13,6 +13,7 @@ celery_app = Celery(
         "app.workers.legal_tasks",
         "app.workers.data_import_tasks",
         "app.workers.fr24_scheduler",
+        "app.workers.radio_tasks",
     ],
 )
 
@@ -34,8 +35,8 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     task_acks_late=True,
     worker_max_tasks_per_child=1000,
-    task_time_limit=30 * 60,  # 30 minutes
-    task_soft_time_limit=25 * 60,  # 25 minutes
+    task_time_limit=30 * 60,  # 30 minutes (default)
+    task_soft_time_limit=25 * 60,  # 25 minutes (default)
     beat_schedule={
         # Analysis tasks
         "analyze-recent-patterns": {
@@ -50,12 +51,13 @@ celery_app.conf.update(
             "task": "app.workers.analysis_tasks.analyze_flight_patterns",
             "schedule": 3600.0,  # Every hour
             "kwargs": {
-                "start_date": (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%d"),
+                "start_date": (
+                    datetime.now(timezone.utc) - timedelta(hours=24)
+                ).strftime("%Y-%m-%d"),
                 "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 "analysis_types": ["surveillance", "hovering", "circling"],
             },
         },
-        
         # Data import and management
         "cleanup-old-imports": {
             "task": "cleanup_old_imports",  # matches @celery_app.task name
@@ -66,7 +68,6 @@ celery_app.conf.update(
             "task": "app.workers.tracking_tasks.cleanup_old_positions",
             "schedule": 86400.0,  # Every 24 hours
         },
-        
         # FlightRadar24 management
         "monitor-credit-usage": {
             "task": "app.workers.tracking_tasks.monitor_fr24_credits",
@@ -81,18 +82,18 @@ celery_app.conf.update(
             "schedule": 7200.0,  # Every 2 hours
             "kwargs": {
                 "registration": "N622FB",  # Primary aircraft
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
+                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime(
+                    "%Y-%m-%d"
+                ),
                 "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 "format": "kml",  # KML has the most detailed position data
             },
         },
-        
         # Aircraft registry sync
         "sync-aircraft-registry": {
             "task": "app.workers.tracking_tasks.sync_aircraft_registry",
             "schedule": 604800.0,  # Every week (7 days)
         },
-        
         # File processing
         "process-pending-imports": {
             "task": "process_file_import",  # matches @celery_app.task name
@@ -102,13 +103,14 @@ celery_app.conf.update(
                 "import_id": "scheduled_check",
             },
         },
-        
         # Cost analysis and reports
         "generate-weekly-cost-analysis": {
             "task": "app.workers.analysis_tasks.generate_cost_analysis",
             "schedule": 604800.0,  # Every week (7 days)
             "kwargs": {
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d"),
+                "start_date": (datetime.now(timezone.utc) - timedelta(days=7)).strftime(
+                    "%Y-%m-%d"
+                ),
                 "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             },
         },
@@ -116,11 +118,12 @@ celery_app.conf.update(
             "task": "app.workers.analysis_tasks.generate_cost_analysis",
             "schedule": 86400.0,  # Every 24 hours
             "kwargs": {
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
+                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime(
+                    "%Y-%m-%d"
+                ),
                 "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             },
         },
-        
         # Legal document generation
         "generate-weekly-legal-reports": {
             "task": "app.workers.legal_tasks.generate_legal_document",
@@ -129,7 +132,6 @@ celery_app.conf.update(
                 "document_id": 1,  # Placeholder - would be dynamically created
             },
         },
-        
         # Backup historical data collection
         "backfill-historical-data-monthly": {
             "task": "app.workers.fr24_scheduler.backfill_historical_data",  # full task name path
@@ -137,6 +139,36 @@ celery_app.conf.update(
             "kwargs": {
                 "registration": "N622FB",
                 "months_back": 1,
+            },
+        },
+        # Radio archive tasks
+        "download-broadcastify-archives": {
+            "task": "download_broadcastify_archives",
+            "schedule": 3600.0,  # Every hour
+            "kwargs": {
+                "feed_id": "12145",  # Phoenix Police
+                "max_downloads": 10,  # Limit per run to be respectful
+                "days_back": 3,  # Check last 3 days
+            },
+        },
+        "transcribe-radio-archives": {
+            "task": "transcribe_radio_archives",
+            "schedule": 1800.0,  # Every 30 minutes
+            "kwargs": {
+                "model_name": "tiny",  # Use tiny model for faster processing
+                "batch_size": 2,  # Process 2 files at a time to avoid timeouts
+            },
+            "options": {
+                "time_limit": 7200,  # 2 hour limit for this specific scheduled task
+                "soft_time_limit": 6600,  # 1 hour 50 minutes soft limit
+            },
+        },
+        "cleanup-old-radio-archives": {
+            "task": "cleanup_old_radio_archives",
+            "schedule": 86400.0,  # Every 24 hours
+            "kwargs": {
+                "days_old": 30,  # Keep archives for 30 days
+                "keep_transcriptions": True,  # Keep transcriptions even after deleting MP3s
             },
         },
     },

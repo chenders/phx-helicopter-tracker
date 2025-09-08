@@ -20,29 +20,43 @@ phoenix_lon_min, phoenix_lon_max = -112.4, -111.9
 
 phoenix_flights = []
 for flight in flights:
-    if (phoenix_lat_min <= flight.latitude <= phoenix_lat_max and 
-        phoenix_lon_min <= flight.longitude <= phoenix_lon_max):
+    if (
+        phoenix_lat_min <= flight.latitude <= phoenix_lat_max
+        and phoenix_lon_min <= flight.longitude <= phoenix_lon_max
+    ):
         phoenix_flights.append(flight)
         print(f"Found aircraft in Phoenix area:")
-        print(f"  - Registration: {flight.registration if hasattr(flight, 'registration') else 'N/A'}")
+        print(
+            f"  - Registration: {flight.registration if hasattr(flight, 'registration') else 'N/A'}"
+        )
         print(f"  - Callsign: {flight.callsign}")
         print(f"  - Position: {flight.latitude:.4f}, {flight.longitude:.4f}")
         print(f"  - Altitude: {flight.altitude} ft")
         print(f"  - Speed: {flight.ground_speed} kts")
-        print(f"  - Aircraft: {flight.aircraft_code if hasattr(flight, 'aircraft_code') else 'N/A'}")
+        print(
+            f"  - Aircraft: {flight.aircraft_code if hasattr(flight, 'aircraft_code') else 'N/A'}"
+        )
         print()
 
 print(f"\n✅ Found {len(phoenix_flights)} aircraft in Phoenix area")
 
 # Test 2: Try to get specific aircraft by registration
 print("\n📡 Trying to find specific registrations...")
-phoenix_pd_helis = ["N622FB", "N623FB", "N624FB", "N625FB", "N626FB", "N627FB", "N628FB"]
+phoenix_pd_helis = [
+    "N622FB",
+    "N623FB",
+    "N624FB",
+    "N625FB",
+    "N626FB",
+    "N627FB",
+    "N628FB",
+]
 
 for reg in phoenix_pd_helis:
     print(f"Searching for {reg}...")
     # Search through all flights for matching registration
     for flight in flights:
-        if hasattr(flight, 'registration') and flight.registration == reg:
+        if hasattr(flight, "registration") and flight.registration == reg:
             print(f"  ✅ FOUND {reg}!")
             print(f"     - Position: {flight.latitude:.4f}, {flight.longitude:.4f}")
             print(f"     - Altitude: {flight.altitude} ft")

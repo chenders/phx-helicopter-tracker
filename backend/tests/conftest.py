@@ -56,13 +56,13 @@ def db_session():
     """Create a database session with transaction rollback for isolation."""
     # Create a connection
     connection = test_engine.connect()
-    
+
     # Begin a transaction
     transaction = connection.begin()
-    
+
     # Create a session bound to the connection
     session = TestingSessionLocal(bind=connection)
-    
+
     try:
         yield session
     finally:
@@ -75,16 +75,16 @@ def db_session():
 @pytest.fixture(scope="function")
 def client(db_session):
     """Create a test client with database session override."""
-    
+
     def override_get_db():
         try:
             yield db_session
         finally:
             pass  # Session cleanup is handled in db_session fixture
-    
+
     # Override the dependency
     app.dependency_overrides[get_db] = override_get_db
-    
+
     try:
         with TestClient(app) as test_client:
             yield test_client
@@ -104,15 +104,15 @@ def event_loop():
 @pytest.fixture(scope="function")
 async def async_client(db_session):
     """Create an async test client with database session override."""
-    
+
     def override_get_db():
         try:
             yield db_session
         finally:
             pass
-    
+
     app.dependency_overrides[get_db] = override_get_db
-    
+
     try:
         async with AsyncClient(app=app, base_url="http://test") as ac:
             yield ac
@@ -294,10 +294,10 @@ def clean_db(db_session):
     """Ensure a completely clean database state."""
     # This fixture can be used when you need to ensure
     # no residual data exists from previous tests
-    
+
     # Clear all tables in reverse dependency order
     for table in reversed(Base.metadata.sorted_tables):
         db_session.execute(table.delete())
     db_session.commit()
-    
+
     yield db_session

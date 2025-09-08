@@ -27,12 +27,23 @@ phoenix_pd_regs = ["N622FB", "N623FB", "N624FB", "N625FB", "N626FB", "N627FB", "
 for flight in flights:
     # Check if it's a helicopter by aircraft type or other indicators
     is_helicopter = False
-    registration = getattr(flight, 'registration', None)
-    aircraft_type = getattr(flight, 'aircraft_code', None)
-    
+    registration = getattr(flight, "registration", None)
+    aircraft_type = getattr(flight, "aircraft_code", None)
+
     # Common helicopter codes
-    helicopter_codes = ['H25B', 'EC35', 'EC45', 'B407', 'AS50', 'AS55', 'R44', 'R66', 'B06', 'B06T']
-    
+    helicopter_codes = [
+        "H25B",
+        "EC35",
+        "EC45",
+        "B407",
+        "AS50",
+        "AS55",
+        "R44",
+        "R66",
+        "B06",
+        "B06T",
+    ]
+
     if aircraft_type and any(code in str(aircraft_type) for code in helicopter_codes):
         is_helicopter = True
     elif registration and registration in phoenix_pd_regs:
@@ -41,7 +52,7 @@ for flight in flights:
         # Low altitude could indicate helicopter
         if flight.ground_speed and flight.ground_speed < 200:
             is_helicopter = True
-    
+
     if is_helicopter or registration in phoenix_pd_regs:
         helicopters.append(flight)
         print(f"\n🚁 Found helicopter/low-altitude aircraft:")
@@ -52,7 +63,7 @@ for flight in flights:
         print(f"  Altitude: {flight.altitude} ft")
         print(f"  Speed: {flight.ground_speed} kts")
         print(f"  Heading: {flight.heading}°")
-        
+
         # Check if it's Phoenix PD
         if registration in phoenix_pd_regs:
             print(f"  ✅ THIS IS PHOENIX PD HELICOPTER!")
@@ -72,4 +83,6 @@ for reg in phoenix_pd_regs:
     except:
         pass
 
-print("\n💡 Note: Helicopters may not always transmit ADS-B data or may use different identifiers")
+print(
+    "\n💡 Note: Helicopters may not always transmit ADS-B data or may use different identifiers"
+)

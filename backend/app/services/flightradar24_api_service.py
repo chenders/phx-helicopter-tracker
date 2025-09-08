@@ -379,9 +379,7 @@ class FlightRadar24APIService:
             params["registrations"] = ",".join(registrations)
 
         # Use live feed endpoint - this is the correct FR24 API endpoint
-        data = await self._make_api_request(
-            "live/feed/light", params, "live_feed"
-        )
+        data = await self._make_api_request("live/feed/light", params, "live_feed")
 
         if not data:
             return []
@@ -521,7 +519,7 @@ class FlightRadar24APIService:
                     origin=flight_data.get("origin"),
                     destination=flight_data.get("destination"),
                 )
-                
+
                 # Only add if we have valid coordinates
                 if position.latitude != 0 and position.longitude != 0:
                     positions.append(position)

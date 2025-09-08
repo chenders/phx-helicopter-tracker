@@ -42,24 +42,37 @@ async def get_live_tracking_data(
         # Use official FR24 API for real-time data
         if phoenix_pd_only:
             tracking_data = fr24_official_api.get_phoenix_pd_live()
-            
+
             # Apply filters
             if active_only:
-                tracking_data = [d for d in tracking_data if d.latitude != 0 and d.longitude != 0]
+                tracking_data = [
+                    d for d in tracking_data if d.latitude != 0 and d.longitude != 0
+                ]
             if min_altitude is not None:
-                tracking_data = [d for d in tracking_data if d.altitude_feet and d.altitude_feet >= min_altitude]
+                tracking_data = [
+                    d
+                    for d in tracking_data
+                    if d.altitude_feet and d.altitude_feet >= min_altitude
+                ]
             if max_altitude is not None:
-                tracking_data = [d for d in tracking_data if d.altitude_feet and d.altitude_feet <= max_altitude]
-                
+                tracking_data = [
+                    d
+                    for d in tracking_data
+                    if d.altitude_feet and d.altitude_feet <= max_altitude
+                ]
+
             if tracking_data:
                 import logging
-                logging.getLogger(__name__).info(f"Found {len(tracking_data)} Phoenix PD aircraft via SDK")
+
+                logging.getLogger(__name__).info(
+                    f"Found {len(tracking_data)} Phoenix PD aircraft via SDK"
+                )
                 return tracking_data
-        
+
         # Fall back to the original service if SDK doesn't find anything
         if data_source == "fr24_api":
             unified_tracking_service.primary_source = TrackingSource.FR24_API
-        
+
         tracking_data = await unified_tracking_service.get_live_tracking_data(
             phoenix_pd_only=phoenix_pd_only,
             active_only=active_only,
@@ -238,8 +251,10 @@ async def get_tracking_statistics(*, db: Session = Depends(get_db)) -> TrackingS
         for f in todays_flights
         if f.arrival_time and f.departure_time
     )
-    total_cost = total_hours * 2160  # $2160 per flight hour (actual Phoenix PD estimate)
-    
+    total_cost = (
+        total_hours * 2160
+    )  # $2160 per flight hour (actual Phoenix PD estimate)
+
     # Get LIVE tracking data to count currently active flights
     try:
         # Call the live endpoint directly using the same logic
@@ -248,6 +263,7 @@ async def get_tracking_statistics(*, db: Session = Depends(get_db)) -> TrackingS
         helicopters_currently_in_air = current_active_flights
     except Exception as e:
         import logging
+
         logging.warning(f"Could not get live tracking for stats: {e}")
         current_active_flights = 0
         helicopters_currently_in_air = 0

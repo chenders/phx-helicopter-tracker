@@ -54,8 +54,9 @@ class TestAircraftAPI:
     def test_create_aircraft(self, client: TestClient, db_session: Session):
         """Test creating a new aircraft"""
         from datetime import datetime
+
         unique_reg = f"N{datetime.now().microsecond}T"
-        
+
         aircraft_data = {
             "registration": unique_reg,
             "icao_code": unique_reg[-6:],  # ICAO code limited to 6 chars
@@ -111,14 +112,15 @@ class TestAircraftAPI:
     def test_delete_aircraft(self, client: TestClient, db_session: Session):
         """Test deleting aircraft"""
         from datetime import datetime
+
         unique_reg = f"N{datetime.now().microsecond}D"
-        
+
         # Create aircraft to delete
         aircraft_data = {
-            "registration": unique_reg, 
+            "registration": unique_reg,
             "icao_code": unique_reg[-6:],  # ICAO code limited to 6 chars
-            "make": "Test", 
-            "model": "ToDelete"
+            "make": "Test",
+            "model": "ToDelete",
         }
         create_response = client.post("/api/v1/aircraft/", json=aircraft_data)
         if create_response.status_code != 200:
@@ -146,7 +148,9 @@ class TestAircraftAPI:
         self, client: TestClient, db_session: Session, sample_aircraft: Aircraft
     ):
         """Test updating aircraft last seen timestamp"""
-        response = client.post(f"/api/v1/aircraft/{sample_aircraft.id}/update-last-seen")
+        response = client.post(
+            f"/api/v1/aircraft/{sample_aircraft.id}/update-last-seen"
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["last_seen"] is not None

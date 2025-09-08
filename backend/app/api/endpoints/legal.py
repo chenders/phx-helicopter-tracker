@@ -81,19 +81,21 @@ def generate_legal_document_direct(
     """Generate legal document directly (creates and generates in one step)"""
     from app.schemas.legal import LegalDocumentCreate, DocumentType, DocumentFormat
     from datetime import timedelta
-    
+
     # Validate document type
     try:
         doc_type = DocumentType(request.document_type)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Invalid document type: {request.document_type}")
-    
+        raise HTTPException(
+            status_code=400, detail=f"Invalid document type: {request.document_type}"
+        )
+
     # Validate format
     try:
         doc_format = DocumentFormat(request.format)
     except ValueError:
         doc_format = DocumentFormat.PDF
-    
+
     # Parse time range if provided
     start_date = None
     end_date = None
@@ -103,7 +105,7 @@ def generate_legal_document_direct(
             days = int(request.time_range.replace("last_", "").replace("_days", ""))
             end_date = datetime.now(timezone.utc)
             start_date = end_date - timedelta(days=days)
-    
+
     # Create document
     document_in = LegalDocumentCreate(
         title=f"{request.document_type.replace('_', ' ').title()} - {datetime.now(timezone.utc).strftime('%Y-%m-%d')}",
@@ -114,17 +116,17 @@ def generate_legal_document_direct(
         export_format=doc_format,
         include_raw_data=request.include_exhibits,
     )
-    
+
     document = legal_document_crud.create(db, obj_in=document_in)
-    
+
     # Update status to generating
     legal_document_crud.update_generation_status(
         db, document_id=document.id, status="generating"
     )
-    
+
     # TODO: Queue background task for document generation
     # background_tasks.add_task(generate_document_task, document.id, "normal", None)
-    
+
     return {
         "message": "Document generation started",
         "document_id": document.id,
@@ -132,6 +134,7 @@ def generate_legal_document_direct(
         "status": "generating",
         "estimated_completion": "5-15 minutes",
     }
+
 
 @router.post("/documents/{document_id}/generate")
 def generate_legal_document(

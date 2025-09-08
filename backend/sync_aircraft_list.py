@@ -4,6 +4,7 @@ Script to sync aircraft list from .env with database
 """
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.db.database import SessionLocal
@@ -14,28 +15,29 @@ from app.schemas.aircraft import AircraftCreate
 # Phoenix PD helicopter registrations from .env
 PHOENIX_PD_HELICOPTERS = [
     "N622FB",
-    "N623FB", 
+    "N623FB",
     "N624FB",
     "N625FB",
     "N626FB",
     "N627FB",
-    "N628FB"
+    "N628FB",
 ]
+
 
 def sync_aircraft():
     """Ensure all Phoenix PD helicopters are in the database and active"""
     db = SessionLocal()
-    
+
     print("🚁 Syncing Phoenix PD Helicopter Fleet")
     print("=" * 50)
-    
+
     try:
         for registration in PHOENIX_PD_HELICOPTERS:
             # Check if aircraft exists
-            existing = db.query(Aircraft).filter(
-                Aircraft.registration == registration
-            ).first()
-            
+            existing = (
+                db.query(Aircraft).filter(Aircraft.registration == registration).first()
+            )
+
             if existing:
                 # Update to ensure it's marked as Phoenix PD and active
                 if not existing.is_phoenix_pd or not existing.is_active:
@@ -64,34 +66,40 @@ def sync_aircraft():
                     hourly_operating_cost=2160.0,
                     purchase_cost=3500000.0,
                     annual_maintenance_cost=150000.0,
-                    is_active=True
+                    is_active=True,
                 )
-                
+
                 new_aircraft = aircraft_crud.create(db, obj_in=aircraft_data)
                 print(f"➕ Created new aircraft: {registration}")
-        
+
         # List all Phoenix PD aircraft after sync
         print(f"\n{'='*50}")
         print("📋 Final Phoenix PD Fleet Status:")
-        
-        all_phx_pd = db.query(Aircraft).filter(
-            Aircraft.is_phoenix_pd == True
-        ).order_by(Aircraft.registration).all()
-        
+
+        all_phx_pd = (
+            db.query(Aircraft)
+            .filter(Aircraft.is_phoenix_pd == True)
+            .order_by(Aircraft.registration)
+            .all()
+        )
+
         for aircraft in all_phx_pd:
             status = "✅ ACTIVE" if aircraft.is_active else "⚠️  INACTIVE"
             in_list = "📍" if aircraft.registration in PHOENIX_PD_HELICOPTERS else "❓"
-            print(f"  {in_list} {aircraft.registration}: {aircraft.make} {aircraft.model} - {status}")
-        
+            print(
+                f"  {in_list} {aircraft.registration}: {aircraft.make} {aircraft.model} - {status}"
+            )
+
         print(f"\nTotal Phoenix PD aircraft: {len(all_phx_pd)}")
         print(f"Active aircraft: {len([a for a in all_phx_pd if a.is_active])}")
         print(f"Expected from .env: {len(PHOENIX_PD_HELICOPTERS)}")
-        
+
     except Exception as e:
         print(f"❌ Error: {e}")
         db.rollback()
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     sync_aircraft()
