@@ -21,7 +21,8 @@ export default defineConfig({
         changeOrigin: true,
       }
     },
-    allowedHosts: ["middledude", "helos.maxandbramble.org"],
+    // Allow all hosts to connect in development
+    allowedHosts: "all",
   },
   build: {
     outDir: 'dist',

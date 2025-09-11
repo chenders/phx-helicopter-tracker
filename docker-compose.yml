@@ -22,7 +22,7 @@ services:
     image: redis:7-alpine
     ports:
       - "6380:6379"
-    command: redis-server --appendonly yes --bind 0.0.0.0 --protected-mode no
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
 
@@ -36,13 +36,15 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
       - REDIS_URL=redis://redis:6379
       - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
-      - SECRET_KEY=dev_secret_key_change_in_production
+      - SECRET_KEY=${SECRET_KEY:-dev_secret_key_change_in_production}
       - FR24_USERNAME=${FR24_USERNAME}
       - FR24_PASSWORD=${FR24_PASSWORD}
-      - FR24_API_KEY_SANDBOX=0198ea4a-3b3f-7058-a837-32dedeafde4a|xevJZrQpBR14umXZ3whpPja3vucKspevkBV4vOjme1e687ad
-      - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
-      - FR24_API_ENVIRONMENT=production
-      - FR24_MONTHLY_CREDIT_LIMIT=500000
+      - FR24_API_KEY_SANDBOX=${FR24_API_KEY_SANDBOX}
+      - FR24_API_KEY_PRODUCTION=${FR24_API_KEY_PRODUCTION}
+      - FR24_API_ENVIRONMENT=${FR24_API_ENVIRONMENT}
+      - FR24_MONTHLY_CREDIT_LIMIT=${FR24_MONTHLY_CREDIT_LIMIT}
+      - BROADCASTIFY_USERNAME=${BROADCASTIFY_USERNAME}
+      - BROADCASTIFY_PASSWORD=${BROADCASTIFY_PASSWORD}
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
     volumes:
@@ -62,11 +64,13 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
       - REDIS_URL=redis://redis:6379
-      - SECRET_KEY=dev_secret_key_change_in_production
-      - FR24_API_KEY_SANDBOX=0198ea4a-3b3f-7058-a837-32dedeafde4a|xevJZrQpBR14umXZ3whpPja3vucKspevkBV4vOjme1e687ad
-      - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
-      - FR24_API_ENVIRONMENT=production
-      - FR24_MONTHLY_CREDIT_LIMIT=500000
+      - SECRET_KEY=${SECRET_KEY:-dev_secret_key_change_in_production}
+      - FR24_API_KEY_SANDBOX=${FR24_API_KEY_SANDBOX}
+      - FR24_API_KEY_PRODUCTION=${FR24_API_KEY_PRODUCTION}
+      - FR24_API_ENVIRONMENT=${FR24_API_ENVIRONMENT}
+      - FR24_MONTHLY_CREDIT_LIMIT=${FR24_MONTHLY_CREDIT_LIMIT}
+      - BROADCASTIFY_USERNAME=${BROADCASTIFY_USERNAME}
+      - BROADCASTIFY_PASSWORD=${BROADCASTIFY_PASSWORD}
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
     volumes:
@@ -86,11 +90,13 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
       - REDIS_URL=redis://redis:6379
-      - SECRET_KEY=dev_secret_key_change_in_production
-      - FR24_API_KEY_SANDBOX=0198ea4a-3b3f-7058-a837-32dedeafde4a|xevJZrQpBR14umXZ3whpPja3vucKspevkBV4vOjme1e687ad
-      - FR24_API_KEY_PRODUCTION=0198f8ec-7e4c-70e6-b98f-54d1704798b9|I3LmVyOqSVjc8Hsvw8bNkML5guofmFdvOD75YsOCbb1ab15b
-      - FR24_API_ENVIRONMENT=production
-      - FR24_MONTHLY_CREDIT_LIMIT=500000
+      - SECRET_KEY=${SECRET_KEY:-dev_secret_key_change_in_production}
+      - FR24_API_KEY_SANDBOX=${FR24_API_KEY_SANDBOX}
+      - FR24_API_KEY_PRODUCTION=${FR24_API_KEY_PRODUCTION}
+      - FR24_API_ENVIRONMENT=${FR24_API_ENVIRONMENT}
+      - FR24_MONTHLY_CREDIT_LIMIT=${FR24_MONTHLY_CREDIT_LIMIT}
+      - BROADCASTIFY_USERNAME=${BROADCASTIFY_USERNAME}
+      - BROADCASTIFY_PASSWORD=${BROADCASTIFY_PASSWORD}
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
     volumes:
@@ -112,8 +118,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
       - REDIS_URL=redis://redis:6379
-      - SECRET_KEY=dev_secret_key_change_in_production
-      - FLOWER_UNAUTHENTICATED_API=true
+      - SECRET_KEY=${SECRET_KEY:-dev_secret_key_change_in_production}
+      - FLOWER_UNAUTHENTICATED_API=${FLOWER_UNAUTHENTICATED_API:-false}
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
     volumes:
@@ -134,7 +140,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://middledude:9080
+      - REACT_APP_API_URL=http://${APP_HOSTNAME:-localhost}:9080
       - REACT_APP_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
     volumes:
       - ./frontend:/app

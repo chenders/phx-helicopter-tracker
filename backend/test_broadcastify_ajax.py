@@ -5,10 +5,14 @@ Test Broadcastify AJAX API endpoint for archives
 import requests
 import json
 from datetime import datetime, timedelta
+from test_config import BROADCASTIFY_USERNAME, BROADCASTIFY_PASSWORD, validate_broadcastify_credentials
 
-# Credentials
-USERNAME = "chris@waitingforthefuture.org"
-PASSWORD = "qjt4KRC_mem4rqu8brg"
+# Validate credentials are available
+validate_broadcastify_credentials()
+
+# Use credentials from environment
+USERNAME = BROADCASTIFY_USERNAME
+PASSWORD = BROADCASTIFY_PASSWORD
 BASE_URL = "https://www.broadcastify.com"
 FEED_ID = "12145"
 

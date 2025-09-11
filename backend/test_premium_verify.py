@@ -6,10 +6,12 @@ import requests
 from bs4 import BeautifulSoup
 import json
 from datetime import datetime
+from test_config import BROADCASTIFY_USERNAME, BROADCASTIFY_PASSWORD, validate_broadcastify_credentials
 
-# Credentials
-USERNAME = "chris@waitingforthefuture.org"
-PASSWORD = "qjt4KRC_mem4rqu8brg"
+# Use credentials from environment
+validate_broadcastify_credentials()
+USERNAME = BROADCASTIFY_USERNAME
+PASSWORD = BROADCASTIFY_PASSWORD
 BASE_URL = "https://www.broadcastify.com"
 FEED_ID = "12145"
 

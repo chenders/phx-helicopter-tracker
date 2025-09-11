@@ -20,9 +20,9 @@ from app.db.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
-# Broadcastify credentials
-BROADCASTIFY_USERNAME = "chris@waitingforthefuture.org"
-BROADCASTIFY_PASSWORD = "qjt4KRC_mem4rqu8brg"
+# Broadcastify credentials from environment
+BROADCASTIFY_USERNAME = os.getenv("BROADCASTIFY_USERNAME", "")
+BROADCASTIFY_PASSWORD = os.getenv("BROADCASTIFY_PASSWORD", "")
 BROADCASTIFY_BASE_URL = "https://www.broadcastify.com"
 PHOENIX_PD_FEED_ID = "12145"
 
