@@ -320,9 +320,27 @@ def transcribe_radio_archives(
     model_performance = {}  # Track performance by model
 
     try:
+        # Check if another transcription task is already running
+        inspector = celery_app.control.inspect()
+        active_tasks = inspector.active()
+        
+        if active_tasks:
+            for worker, tasks in active_tasks.items():
+                for task in tasks:
+                    if task['name'] == 'transcribe_radio_archives' and task['id'] != self.request.id:
+                        logger.warning(f"Another transcription task is already running: {task['id']}. Skipping.")
+                        return {
+                            "skipped": True,
+                            "reason": "Another transcription task is already running",
+                            "existing_task_id": task['id']
+                        }
+        
+        # Force batch_size to 1 to ensure single file processing
+        batch_size = 1
+        
         # Always use base model for consistency and quality
         model_name = "base"
-        logger.info(f"Using Whisper model: {model_name}")
+        logger.info(f"Starting transcription: Processing ONLY 1 file with Whisper model: {model_name}")
 
         # Load Whisper model
         current_task.update_state(
@@ -351,10 +369,16 @@ def transcribe_radio_archives(
             else:
                 skipped_files.append(str(mp3_file))
 
-        # Limit to batch size
+        # CRITICAL: Limit to batch size - FORCE TO 1 FILE ONLY
+        # Override any batch_size parameter to ensure single file processing
+        batch_size = 1
         files_to_process = files_to_process[:batch_size]
 
-        logger.info(f"Found {len(files_to_process)} files to transcribe")
+        if len(files_to_process) > 1:
+            logger.error("ERROR: Attempted to process more than 1 file. Forcing to 1.")
+            files_to_process = files_to_process[:1]
+
+        logger.info(f"Processing EXACTLY {len(files_to_process)} file (max 1 per run)")
 
         for idx, mp3_file in enumerate(files_to_process, 1):
             try:
@@ -489,85 +513,4 @@ def transcribe_radio_archives(
         raise exc
 
 
-@celery_app.task(bind=True, name="cleanup_old_radio_archives")
-def cleanup_old_radio_archives(
-    self,
-    directory_path: str = str(RADIO_DATA_PATH),
-    days_old: int = 30,
-    keep_transcriptions: bool = True,
-) -> Dict[str, Any]:
-    """
-    Clean up old radio archive files
-
-    Args:
-        directory_path: Path to directory containing archive files
-        days_old: Delete files older than this many days
-        keep_transcriptions: If True, keep transcription files even if MP3 is deleted
-
-    Returns:
-        Dictionary with cleanup results
-    """
-    deleted_files = []
-    kept_files = []
-    errors = []
-
-    try:
-        cutoff_date = datetime.now() - timedelta(days=days_old)
-
-        # Get all MP3 files
-        mp3_files = list(Path(directory_path).glob("*.mp3"))
-
-        for mp3_file in mp3_files:
-            try:
-                # Check file age
-                file_mtime = datetime.fromtimestamp(mp3_file.stat().st_mtime)
-
-                if file_mtime < cutoff_date:
-                    # Check if transcription exists
-                    json_file = mp3_file.with_suffix(".json")
-                    txt_file = mp3_file.with_suffix(".txt")
-
-                    if keep_transcriptions and (
-                        json_file.exists() or txt_file.exists()
-                    ):
-                        # Delete only the MP3, keep transcriptions
-                        mp3_file.unlink()
-                        deleted_files.append(str(mp3_file))
-                        logger.info(
-                            f"Deleted old MP3 (kept transcription): {mp3_file.name}"
-                        )
-                    else:
-                        # Delete everything
-                        mp3_file.unlink()
-                        deleted_files.append(str(mp3_file))
-
-                        if json_file.exists():
-                            json_file.unlink()
-                            deleted_files.append(str(json_file))
-
-                        if txt_file.exists():
-                            txt_file.unlink()
-                            deleted_files.append(str(txt_file))
-
-                        logger.info(
-                            f"Deleted old archive and transcriptions: {mp3_file.name}"
-                        )
-                else:
-                    kept_files.append(str(mp3_file))
-
-            except Exception as e:
-                logger.error(f"Error processing {mp3_file.name}: {str(e)}")
-                errors.append(f"Error processing {mp3_file.name}: {str(e)}")
-
-        return {
-            "status": "success",
-            "deleted_files": deleted_files,
-            "kept_files": kept_files,
-            "errors": errors,
-            "total_deleted": len(deleted_files),
-            "total_kept": len(kept_files),
-        }
-
-    except Exception as exc:
-        logger.error(f"Cleanup task failed: {str(exc)}", exc_info=True)
-        raise exc
+# REMOVED cleanup_old_radio_archives task - we want to keep all radio archives permanently

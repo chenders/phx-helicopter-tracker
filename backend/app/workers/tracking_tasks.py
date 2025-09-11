@@ -303,26 +303,4 @@ async def _monitor_credits_async() -> Dict[str, Any]:
         return stats
 
 
-@celery_app.task
-def cleanup_old_positions():
-    """Clean up old position data to manage database size"""
-    db = SessionLocal()
-    result = {"positions_deleted": 0, "cutoff_date": None}
-
-    try:
-        # Keep position data for last 90 days
-        cutoff_date = datetime.now(timezone.utc) - timedelta(days=90)
-        result["cutoff_date"] = cutoff_date.isoformat()
-
-        # TODO: Implement position cleanup
-        # This would delete old flight positions while keeping
-        # flight logs for legal/analysis purposes
-
-        logger.info(f"Would clean up positions older than {cutoff_date}")
-
-    except Exception as e:
-        logger.error(f"Error in position cleanup: {e}")
-    finally:
-        db.close()
-
-    return result
+# REMOVED cleanup_old_positions task - we want to keep all position data permanently
