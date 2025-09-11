@@ -31,8 +31,8 @@ if [ ! -f .env ]; then
     echo "Creating .env file..."
     cat > .env << EOL
 # API Configuration
-VITE_API_URL=http://localhost:9000
-VITE_WS_URL=ws://localhost:9000
+VITE_API_URL=http://middledude:9000
+VITE_WS_URL=ws://middledude:9000
 
 # Google Maps API Key (optional, for map features)
 VITE_GOOGLE_MAPS_API_KEY=

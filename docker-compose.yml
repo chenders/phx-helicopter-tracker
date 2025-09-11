@@ -5,11 +5,13 @@ services:
       POSTGRES_DB: phoenix_helicopters
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST_AUTH_METHOD: "md5"
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: postgres -c listen_addresses='*'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 30s
@@ -20,7 +22,7 @@ services:
     image: redis:7-alpine
     ports:
       - "6380:6379"
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --bind 0.0.0.0 --protected-mode no
     volumes:
       - redis_data:/data
 
@@ -123,7 +125,7 @@ services:
         condition: service_started
       celery-beat:
         condition: service_started
-    command: celery -A app.workers.celery_app flower --port=5555
+    command: celery -A app.workers.celery_app flower --port=5555 --address=0.0.0.0
 
   frontend:
     build:
@@ -132,7 +134,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:9080
+      - REACT_APP_API_URL=http://middledude:9080
       - REACT_APP_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
     volumes:
       - ./frontend:/app
@@ -156,3 +158,10 @@ services:
 volumes:
   postgres_data:
   redis_data:
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

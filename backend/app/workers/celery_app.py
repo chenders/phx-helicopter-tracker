@@ -129,6 +129,23 @@ celery_app.conf.update(
         #         "format": "kml",
         #     },
         # },
+        # Radio archive tasks
+        "download-radio-archives": {
+            "task": "download_broadcastify_archives",
+            "schedule": 3600.0,  # Every hour
+            "kwargs": {
+                "max_downloads": 5,
+                "days_back": 2,
+            },
+        },
+        "transcribe-radio-archives": {
+            "task": "transcribe_radio_archives",
+            "schedule": 1800.0,  # Every 30 minutes
+            "kwargs": {
+                "batch_size": 3,
+                "model_name": "base",
+            },
+        },
         # Aircraft registry sync
         "sync-aircraft-registry": {
             "task": "app.workers.tracking_tasks.sync_aircraft_registry",

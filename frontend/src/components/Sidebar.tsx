@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router-dom'
 export const Sidebar = () => {
   const location = useLocation()
   const [isCollapsed, setIsCollapsed] = useState(false)
-  
+
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '🏠' },
     { path: '/live', label: 'Live Tracking', icon: '📡' },
@@ -12,6 +12,7 @@ export const Sidebar = () => {
     { path: '/patterns', label: 'Patterns', icon: '🔍' },
     { path: '/costs', label: 'Cost Analysis', icon: '💰' },
     { path: '/legal', label: 'Legal Docs', icon: '⚖️' },
+    { path: '/radio', label: 'Radio Archives', icon: '📻' },
     { path: '/data-sources', label: 'Data Sources', icon: '💾' },
     { path: '/tasks', label: 'Tasks', icon: '⚙️' },
   ]
@@ -30,7 +31,7 @@ export const Sidebar = () => {
               </div>
             )}
           </Link>
-          
+
           {/* Collapse/Expand Button */}
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}

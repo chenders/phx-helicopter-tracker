@@ -1,0 +1,21 @@
+#!/bin/bash
+# Setup script to configure access via middledude hostname
+
+echo "Phoenix PD Helicopter Tracker - Network Configuration"
+echo "======================================================"
+echo ""
+echo "To access this application from 'middledude' hostname, add this to your /etc/hosts file:"
+echo ""
+echo "# Phoenix PD Helicopter Tracker"
+echo "<SERVER_IP>    middledude"
+echo ""
+echo "Replace <SERVER_IP> with the actual IP address of the server running Docker."
+echo ""
+echo "Service endpoints will be available at:"
+echo "  - API: http://middledude:8001"
+echo "  - Database: middledude:5433"
+echo "  - Redis: middledude:6380"
+echo "  - Flower (Celery monitoring): http://middledude:5555"
+echo "  - Frontend (via nginx): http://middledude:9080"
+echo ""
+echo "All services are configured to accept connections from any hostname."

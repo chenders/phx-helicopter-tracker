@@ -14,7 +14,24 @@ export function useWebSocket(): WebSocketHook {
   const reconnectTimeoutRef = useRef<number>()
 
   const connect = () => {
-    const wsUrl = 'ws://localhost:8001/ws'
+    // Dynamically determine WebSocket URL based on current hostname
+    const getWsUrl = () => {
+      // Use secure WebSocket if page is served over HTTPS
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const hostname = window.location.hostname
+
+      // If accessed via nginx proxy (port 9080), use it for WebSocket too
+      if (window.location.port === '9080') {
+        return `${protocol}//${hostname}:9080/ws`
+      }
+
+      // Otherwise use direct backend port
+      return `${protocol}//${hostname}:8001/ws`
+    }
+
+    const wsUrl = getWsUrl()
+    console.log('Connecting to WebSocket:', wsUrl)
+
     const ws = new WebSocket(wsUrl)
 
     setSocket(ws)

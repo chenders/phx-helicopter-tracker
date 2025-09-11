@@ -12,6 +12,7 @@ from app.api.endpoints import (
     patterns,
     rate_limit_status,
     manual_fr24,
+    radio,
 )
 
 api_router = APIRouter()
@@ -38,3 +39,4 @@ api_router.include_router(
 api_router.include_router(
     manual_fr24.router, prefix="/manual-fr24", tags=["manual_fr24"]
 )
+api_router.include_router(radio.router, prefix="/radio", tags=["radio"])

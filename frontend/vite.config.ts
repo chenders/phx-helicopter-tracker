@@ -21,7 +21,7 @@ export default defineConfig({
         changeOrigin: true,
       }
     },
-    allowedHosts: ["middledude"],
+    allowedHosts: ["middledude", "helos.maxandbramble.org"],
   },
   build: {
     outDir: 'dist',

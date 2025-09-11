@@ -12,18 +12,18 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('theme')
-    return (saved as Theme) || 'light'
+    return (saved as Theme) || 'flightradar'
   })
 
   useEffect(() => {
     localStorage.setItem('theme', theme)
-    
+
     // Remove all theme classes
     document.documentElement.classList.remove('light', 'dark', 'flightradar')
-    
+
     // Add current theme class
     document.documentElement.classList.add(theme)
-    
+
     // For dark and flightradar themes, add dark class for Tailwind dark mode
     if (theme === 'dark' || theme === 'flightradar') {
       document.documentElement.classList.add('dark')

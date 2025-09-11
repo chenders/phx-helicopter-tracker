@@ -1,7 +1,27 @@
 import axios from 'axios'
 
 // Configure axios with backend URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+// Use window.location.hostname to dynamically use the current hostname
+const getApiBaseUrl = () => {
+  // If VITE_API_URL is set, use it
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  
+  // Otherwise, use the current hostname with the API port
+  const protocol = window.location.protocol
+  const hostname = window.location.hostname
+  const port = 8001 // Direct API port, or 9080 for nginx proxy
+  
+  // If accessed via nginx proxy (port 9080), use relative URLs
+  if (window.location.port === '9080') {
+    return ''  // Use relative URLs, nginx will proxy to backend
+  }
+  
+  return `${protocol}//${hostname}:${port}`
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 axios.defaults.baseURL = API_BASE_URL
 axios.defaults.headers.common['Content-Type'] = 'application/json'

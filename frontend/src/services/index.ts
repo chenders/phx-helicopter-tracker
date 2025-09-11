@@ -1,5 +1,25 @@
 // API services
-export const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001'
+// Dynamically determine API URL based on current hostname
+const getApiBaseUrl = () => {
+  // If REACT_APP_API_URL is set, use it (for backwards compatibility)
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL
+  }
+  
+  // Otherwise, use the current hostname with the API port
+  const protocol = window.location.protocol
+  const hostname = window.location.hostname
+  
+  // If accessed via nginx proxy (port 9080), use relative URLs
+  if (window.location.port === '9080') {
+    return ''  // Use relative URLs, nginx will proxy to backend
+  }
+  
+  // Otherwise use direct backend port
+  return `${protocol}//${hostname}:8001`
+}
+
+export const API_BASE_URL = getApiBaseUrl()
 
 // Basic fetch wrapper
 export const apiClient = {

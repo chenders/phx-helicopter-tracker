@@ -9,6 +9,7 @@ import { CostAnalysisPage } from './pages/CostAnalysisPage'
 import { LegalDocumentsPage } from './pages/LegalDocumentsPage'
 import { DataSourcesPage } from './pages/DataSourcesPage'
 import { TaskMonitoringPage } from './pages/TaskMonitoringPage'
+import { RadioPage } from './pages/RadioPage'
 import './App.css'
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
           <Route path="/legal" element={<LegalDocumentsPage />} />
           <Route path="/data-sources" element={<DataSourcesPage />} />
           <Route path="/tasks" element={<TaskMonitoringPage />} />
+          <Route path="/radio" element={<RadioPage />} />
         </Routes>
       </main>
     </div>
