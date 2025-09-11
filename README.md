@@ -206,10 +206,9 @@ DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
 # Redis
 REDIS_URL=redis://redis:6379
 
-# FlightRadar24
-FR24_USERNAME=your_username
-FR24_PASSWORD=your_password
+# FlightRadar24 API
 FR24_API_KEY_PRODUCTION=your_api_key
+FR24_API_KEY_SANDBOX=your_sandbox_key  # optional
 FR24_MONTHLY_CREDIT_LIMIT=500000
 
 # Optional

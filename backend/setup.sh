@@ -49,8 +49,8 @@ REDIS_URL=redis://localhost:6379
 # External API keys (add your keys here)
 ADSB_EXCHANGE_API_KEY=
 GOOGLE_MAPS_API_KEY=
-FR24_USERNAME=
-FR24_PASSWORD=
+FR24_API_KEY_PRODUCTION=
+FR24_API_KEY_SANDBOX=
 
 # CORS settings
 BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost:3001","http://localhost:5173"]

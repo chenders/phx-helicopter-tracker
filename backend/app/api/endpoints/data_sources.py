@@ -19,7 +19,8 @@ import csv
 from pathlib import Path
 
 from app.api.deps import get_db
-from app.services.flightradar24_downloader import fr24_downloader, DownloadRequest
+# Web scraping downloader removed - using API instead
+# from app.services.flightradar24_downloader import fr24_downloader, DownloadRequest
 from app.workers.data_import_tasks import (
     process_file_import_task,
     get_import_task_status,
@@ -226,168 +227,14 @@ def get_import_status(*, import_id: str) -> dict:
         }
 
 
-# FlightRadar24 Automated Download
-@router.post("/flightradar24/download")
-async def download_flightradar24_data(
-    *,
-    background_tasks: BackgroundTasks,
-    aircraft_registration: str = Query(
-        ..., description="Aircraft registration (e.g., N624FB)"
-    ),
-    start_date: str = Query(..., description="Download start date (YYYY-MM-DD)"),
-    end_date: str = Query(..., description="Download end date (YYYY-MM-DD)"),
-    format: str = Query(
-        "json", regex="^(json|csv|kml)$", description="Download format"
-    ),
-) -> StreamingResponse:
-    """Download historical flight data directly from FlightRadar24 Gold"""
-
-    try:
-        # Parse and validate dates
-        try:
-            start_datetime = datetime.strptime(start_date, "%Y-%m-%d")
-            end_datetime = datetime.strptime(end_date, "%Y-%m-%d")
-        except ValueError as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid date format. Expected YYYY-MM-DD format. Error: {str(e)}",
-            )
-
-        # Validate date range
-        if end_datetime <= start_datetime:
-            raise HTTPException(
-                status_code=400, detail="End date must be after start date"
-            )
-
-        if (end_datetime - start_datetime).days > 365:
-            raise HTTPException(
-                status_code=400, detail="Date range cannot exceed 365 days"
-            )
-
-        # Create download request
-        request = DownloadRequest(
-            aircraft_registration=aircraft_registration,
-            start_date=start_datetime,
-            end_date=end_datetime,
-            format=format,
-        )
-
-        # Download data from FlightRadar24
-        result = await fr24_downloader.download_aircraft_history(request)
-
-        if not result.success:
-            raise HTTPException(
-                status_code=400,
-                detail=result.error_message
-                or "Failed to download data from FlightRadar24",
-            )
-
-        if not result.data:
-            raise HTTPException(
-                status_code=404, detail="No data found for the specified parameters"
-            )
-
-        # Determine content type
-        if format == "json":
-            media_type = "application/json"
-        elif format == "csv":
-            media_type = "text/csv"
-        else:  # kml
-            media_type = "application/vnd.google-earth.kml+xml"
-
-        # Stream the file back to the user
-        file_stream = io.BytesIO(result.data)
-
-        return StreamingResponse(
-            io.BytesIO(result.data),
-            media_type=media_type,
-            headers={
-                "Content-Disposition": f"attachment; filename={result.filename}",
-                "X-Flights-Count": str(result.flights_count or 0),
-            },
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
-
-
-@router.post("/flightradar24/download-multiple")
-async def download_multiple_aircraft_data(
-    *,
-    background_tasks: BackgroundTasks,
-    aircraft_registrations: List[str] = Query(
-        ..., description="Aircraft registrations"
-    ),
-    start_date: datetime = Query(..., description="Download start date"),
-    end_date: datetime = Query(..., description="Download end date"),
-    format: str = Query(
-        "json", regex="^(json|csv|kml)$", description="Download format"
-    ),
-) -> dict:
-    """Download historical flight data for multiple aircraft from FlightRadar24 Gold"""
-
-    try:
-        # Validate inputs
-        if not aircraft_registrations:
-            raise HTTPException(
-                status_code=400, detail="No aircraft registrations provided"
-            )
-
-        if len(aircraft_registrations) > 10:
-            raise HTTPException(
-                status_code=400, detail="Maximum 10 aircraft per request"
-            )
-
-        if end_date <= start_date:
-            raise HTTPException(
-                status_code=400, detail="End date must be after start date"
-            )
-
-        if (end_date - start_date).days > 365:
-            raise HTTPException(
-                status_code=400, detail="Date range cannot exceed 365 days"
-            )
-
-        # Create download requests
-        requests = [
-            DownloadRequest(
-                aircraft_registration=reg,
-                start_date=start_date,
-                end_date=end_date,
-                format=format,
-            )
-            for reg in aircraft_registrations
-        ]
-
-        # Queue background task for multiple downloads
-        download_id = (
-            f"multi_fr24_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
-        )
-
-        # TODO: Add background task to process downloads
-        # background_tasks.add_task(process_multiple_fr24_downloads, requests, download_id)
-
-        return {
-            "message": f"Download initiated for {len(aircraft_registrations)} aircraft",
-            "download_id": download_id,
-            "aircraft": aircraft_registrations,
-            "date_range": {"start": start_date, "end": end_date},
-            "format": format,
-            "status": "processing",
-            "estimated_completion": f"{len(aircraft_registrations) * 5}-{len(aircraft_registrations) * 15} minutes",
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Download request failed: {str(e)}"
-        )
-
-
-# Removed ADS-B Exchange endpoints - not actively used
+# FlightRadar24 Web Scraping Download endpoints - REMOVED
+# Use the API-based historical import instead (/api/historical/import/historical)
+# The API provides more reliable access to historical data without requiring web scraping
+# Previous endpoints:
+#   - POST /flightradar24/download (single aircraft)
+#   - POST /flightradar24/download-multiple (multiple aircraft)
+# Were removed because they relied on web scraping with FR24_USERNAME/PASSWORD
+# The official API is more reliable and doesn't require these credentials
 
 
 # FlightRadar24 Integration

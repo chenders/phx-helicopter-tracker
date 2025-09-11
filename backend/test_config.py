@@ -12,9 +12,7 @@ load_dotenv()
 BROADCASTIFY_USERNAME = os.getenv("BROADCASTIFY_USERNAME", "")
 BROADCASTIFY_PASSWORD = os.getenv("BROADCASTIFY_PASSWORD", "")
 
-# FlightRadar24 credentials
-FR24_USERNAME = os.getenv("FR24_USERNAME", "")
-FR24_PASSWORD = os.getenv("FR24_PASSWORD", "")
+# FlightRadar24 API keys (web scraping credentials removed)
 FR24_API_KEY_SANDBOX = os.getenv("FR24_API_KEY_SANDBOX", "")
 FR24_API_KEY_PRODUCTION = os.getenv("FR24_API_KEY_PRODUCTION", "")
 FR24_API_ENVIRONMENT = os.getenv("FR24_API_ENVIRONMENT", "sandbox")
@@ -33,8 +31,8 @@ def validate_broadcastify_credentials():
         raise ValueError("Broadcastify credentials not found in environment variables. Please set BROADCASTIFY_USERNAME and BROADCASTIFY_PASSWORD in your .env file.")
     return True
 
-def validate_fr24_credentials():
-    """Check if FlightRadar24 credentials are set."""
-    if not FR24_USERNAME or not FR24_PASSWORD:
-        raise ValueError("FlightRadar24 credentials not found in environment variables. Please set FR24_USERNAME and FR24_PASSWORD in your .env file.")
+def validate_fr24_api_keys():
+    """Check if FlightRadar24 API keys are set."""
+    if not FR24_API_KEY_PRODUCTION and not FR24_API_KEY_SANDBOX:
+        raise ValueError("FlightRadar24 API keys not found in environment variables. Please set FR24_API_KEY_PRODUCTION or FR24_API_KEY_SANDBOX in your .env file.")
     return True

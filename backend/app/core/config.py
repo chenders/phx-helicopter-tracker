@@ -19,8 +19,7 @@ class Settings(BaseSettings):
 
     # External API keys
     GOOGLE_MAPS_API_KEY: Optional[str] = None
-    FR24_USERNAME: Optional[str] = None
-    FR24_PASSWORD: Optional[str] = None
+    # FR24_USERNAME and FR24_PASSWORD removed - using API access instead
 
     # FlightRadar24 API Configuration
     FR24_API_KEY_SANDBOX: Optional[str] = None
