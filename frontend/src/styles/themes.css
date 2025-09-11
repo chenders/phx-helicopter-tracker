@@ -1,5 +1,5 @@
-/* FlightRadar24-inspired theme variables */
-.flightradar {
+/* Darker theme variables (formerly FlightRadar) */
+.darker {
   /* Primary colors - inspired by FR24's dark aviation theme */
   --color-bg-primary: 15 23 42; /* slate-950 */
   --color-bg-secondary: 30 41 59; /* slate-800 */
@@ -31,73 +31,73 @@
 }
 
 /* Apply theme colors to Tailwind classes */
-.flightradar {
+.darker {
   /* Background colors */
   --tw-bg-opacity: 1;
 }
 
-.flightradar .bg-white {
+.darker .bg-white {
   background-color: rgb(var(--color-bg-primary) / var(--tw-bg-opacity));
 }
 
-.flightradar .bg-gray-50 {
+.darker .bg-gray-50 {
   background-color: rgb(var(--color-bg-primary) / var(--tw-bg-opacity));
 }
 
-.flightradar .bg-gray-100 {
+.darker .bg-gray-100 {
   background-color: rgb(var(--color-bg-secondary) / var(--tw-bg-opacity));
 }
 
-.flightradar .bg-gray-200 {
+.darker .bg-gray-200 {
   background-color: rgb(var(--color-bg-tertiary) / var(--tw-bg-opacity));
 }
 
 /* Text colors */
-.flightradar .text-gray-900 {
+.darker .text-gray-900 {
   color: rgb(var(--color-text-primary));
 }
 
-.flightradar .text-gray-800 {
+.darker .text-gray-800 {
   color: rgb(var(--color-text-primary));
 }
 
-.flightradar .text-gray-700 {
+.darker .text-gray-700 {
   color: rgb(var(--color-text-secondary));
 }
 
-.flightradar .text-gray-600 {
+.darker .text-gray-600 {
   color: rgb(var(--color-text-muted));
 }
 
-.flightradar .text-gray-500 {
+.darker .text-gray-500 {
   color: rgb(var(--color-text-dim));
 }
 
 /* Border colors */
-.flightradar .border-gray-200 {
+.darker .border-gray-200 {
   border-color: rgb(var(--color-border-primary));
 }
 
-.flightradar .border-gray-300 {
+.darker .border-gray-300 {
   border-color: rgb(var(--color-border-secondary));
 }
 
 /* Custom scrollbar for FlightRadar theme */
-.flightradar ::-webkit-scrollbar {
+.darker ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-.flightradar ::-webkit-scrollbar-track {
+.darker ::-webkit-scrollbar-track {
   background: rgb(30 41 59);
 }
 
-.flightradar ::-webkit-scrollbar-thumb {
+.darker ::-webkit-scrollbar-thumb {
   background: rgb(71 85 105);
   border-radius: 4px;
 }
 
-.flightradar ::-webkit-scrollbar-thumb:hover {
+.darker ::-webkit-scrollbar-thumb:hover {
   background: rgb(100 116 139);
 }
 
@@ -117,106 +117,106 @@
   }
 }
 
-.flightradar .radar-pulse {
+.darker .radar-pulse {
   animation: radar-pulse 2s ease-in-out infinite;
 }
 
 /* Map overlay adjustments for FlightRadar theme */
-.flightradar .map-overlay {
+.darker .map-overlay {
   background: linear-gradient(180deg, 
     rgba(15, 23, 42, 0.9) 0%, 
     rgba(30, 41, 59, 0.7) 100%);
 }
 
 /* Card styles for FlightRadar theme */
-.flightradar .card {
+.darker .card {
   background: rgb(30 41 59);
   border: 1px solid rgb(71 85 105);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
-.flightradar .card:hover {
+.darker .card:hover {
   border-color: rgb(6 182 212);
   box-shadow: 0 10px 15px -3px rgba(6, 182, 212, 0.1);
 }
 
 /* Button styles for FlightRadar theme */
-.flightradar .btn-primary {
+.darker .btn-primary {
   background: linear-gradient(135deg, rgb(6 182 212), rgb(14 165 233));
   color: white;
   border: 1px solid rgba(6, 182, 212, 0.3);
 }
 
-.flightradar .btn-primary:hover {
+.darker .btn-primary:hover {
   background: linear-gradient(135deg, rgb(8 145 178), rgb(2 132 199));
   box-shadow: 0 4px 6px -1px rgba(6, 182, 212, 0.3);
 }
 
 /* Status indicators */
-.flightradar .status-active {
+.darker .status-active {
   color: rgb(34 197 94);
   text-shadow: 0 0 10px rgba(34, 197, 94, 0.5);
 }
 
-.flightradar .status-warning {
+.darker .status-warning {
   color: rgb(251 146 60);
   text-shadow: 0 0 10px rgba(251, 146, 60, 0.5);
 }
 
-.flightradar .status-danger {
+.darker .status-danger {
   color: rgb(239 68 68);
   text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
 }
 
 /* Input styles for FlightRadar theme */
-.flightradar input,
-.flightradar textarea,
-.flightradar select {
+.darker input,
+.darker textarea,
+.darker select {
   background-color: rgb(15 23 42);
   border-color: rgb(71 85 105);
   color: rgb(236 254 255);
 }
 
-.flightradar input:focus,
-.flightradar textarea:focus,
-.flightradar select:focus {
+.darker input:focus,
+.darker textarea:focus,
+.darker select:focus {
   border-color: rgb(6 182 212);
   box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.1);
 }
 
 /* Table styles for FlightRadar theme */
-.flightradar table {
+.darker table {
   background-color: rgb(30 41 59);
 }
 
-.flightradar thead {
+.darker thead {
   background-color: rgb(15 23 42);
   border-bottom: 2px solid rgb(6 182 212);
 }
 
-.flightradar tbody tr {
+.darker tbody tr {
   border-bottom: 1px solid rgb(71 85 105);
 }
 
-.flightradar tbody tr:hover {
+.darker tbody tr:hover {
   background-color: rgba(6, 182, 212, 0.05);
 }
 
 /* Navigation adjustments for FlightRadar theme */
-.flightradar nav {
+.darker nav {
   background: linear-gradient(180deg, rgb(15 23 42) 0%, rgb(30 41 59) 100%);
   border-bottom: 1px solid rgb(6 182 212);
 }
 
 /* Tooltip styles */
-.flightradar .tooltip {
+.darker .tooltip {
   background-color: rgb(15 23 42);
   border: 1px solid rgb(6 182 212);
   color: rgb(236 254 255);
 }
 
 /* Loading spinner with aviation theme */
-.flightradar .spinner {
+.darker .spinner {
   border-color: rgb(71 85 105);
   border-top-color: rgb(6 182 212);
 }

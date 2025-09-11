@@ -423,7 +423,7 @@ export function RadioPage() {
         </h2>
         
         {loading ? (
-          <div className="text-center py-8 text-gray-500">Loading archives...</div>
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading archives...</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -619,7 +619,7 @@ export function RadioPage() {
                             
                             {/* Loading Transcript */}
                             {archive.has_transcription && (!transcription || selectedArchive !== archive.filename) && (
-                              <div className="text-center py-4 text-gray-500">
+                              <div className="text-center py-4 text-gray-500 dark:text-gray-400">
                                 Loading transcript...
                               </div>
                             )}

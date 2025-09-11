@@ -22,7 +22,7 @@ export default defineConfig({
       }
     },
     // Allow all hosts to connect in development
-    allowedHosts: "all",
+    allowedHosts: true,
   },
   build: {
     outDir: 'dist',

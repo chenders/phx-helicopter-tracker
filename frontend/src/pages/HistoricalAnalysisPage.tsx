@@ -301,7 +301,7 @@ export function HistoricalAnalysisPage() {
       {/* Main Content */}
       {viewMode === 'map' && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
-          <h2 className="text-xl font-semibold mb-2">Historical Flight Paths</h2>
+          <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Historical Flight Paths</h2>
 
           <GoogleMap
             mapContainerStyle={mapContainerStyle}
@@ -407,7 +407,7 @@ export function HistoricalAnalysisPage() {
       {viewMode === 'timeline' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
-            <h3 className="text-lg font-semibold mb-2">Surveillance Activity Timeline</h3>
+            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Surveillance Activity Timeline</h3>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={historicalData?.timeline_data || []}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -421,7 +421,7 @@ export function HistoricalAnalysisPage() {
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
-            <h3 className="text-lg font-semibold mb-2">Daily Activity Pattern</h3>
+            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Daily Activity Pattern</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={historicalData?.hourly_pattern || []}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -440,7 +440,7 @@ export function HistoricalAnalysisPage() {
         <div className="space-y-3">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
-              <h3 className="text-lg font-semibold mb-2">Surveillance Intensity by Area</h3>
+              <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Surveillance Intensity by Area</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={historicalData?.area_analysis || []}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -453,7 +453,7 @@ export function HistoricalAnalysisPage() {
             </div>
 
             <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
-              <h3 className="text-lg font-semibold mb-2">Duration vs Altitude Analysis</h3>
+              <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Duration vs Altitude Analysis</h3>
               <ResponsiveContainer width="100%" height={300}>
                 <ScatterChart data={historicalData?.duration_altitude_analysis || []}>
                   <CartesianGrid />
@@ -467,18 +467,18 @@ export function HistoricalAnalysisPage() {
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
-            <h3 className="text-lg font-semibold mb-2">Pattern Analysis Results</h3>
+            <h3 className="text-lg font-semibold mb-2 text-gray-900 dark:text-white">Pattern Analysis Results</h3>
             <div className="space-y-4">
               {historicalData?.pattern_insights?.map((insight: any, index: number) => (
                 <div key={index} className={`p-4 border-l-4 rounded ${
-                  insight.severity === 'high' ? 'border-red-500 bg-red-50' :
-                  insight.severity === 'medium' ? 'border-orange-500 bg-orange-50' :
-                  'border-blue-500 bg-blue-50'
+                  insight.severity === 'high' ? 'border-red-500 bg-red-50 dark:bg-red-900/30' :
+                  insight.severity === 'medium' ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/30' :
+                  'border-blue-500 bg-blue-50 dark:bg-blue-900/30'
                 }`}>
-                  <h4 className="font-semibold">{insight.title}</h4>
-                  <p className="text-sm mt-1">{insight.description}</p>
+                  <h4 className="font-semibold text-gray-900 dark:text-white">{insight.title}</h4>
+                  <p className="text-sm mt-1 text-gray-700 dark:text-gray-300">{insight.description}</p>
                   {insight.legal_implications && (
-                    <div className="text-xs mt-2 font-medium">
+                    <div className="text-xs mt-2 font-medium text-gray-600 dark:text-gray-400">
                       Legal Implications: {insight.legal_implications}
                     </div>
                   )}
@@ -491,10 +491,10 @@ export function HistoricalAnalysisPage() {
 
       {/* Data Summary */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
-        <h2 className="text-xl font-semibold mb-2">Historical Data Summary</h2>
+        <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Historical Data Summary</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           <div>
-            <h3 className="font-semibold mb-2">Data Sources</h3>
+            <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Data Sources</h3>
             <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
               <li>• FlightRadar24 Gold: {historicalData?.sources?.flightradar24 || 0} flights</li>
               <li>• Public Records: {historicalData?.sources?.public_records || 0} documents</li>
@@ -502,7 +502,7 @@ export function HistoricalAnalysisPage() {
           </div>
 
           <div>
-            <h3 className="font-semibold mb-2">Time Coverage</h3>
+            <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Time Coverage</h3>
             <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
               <li>• Earliest Flight: {historicalData?.time_range?.start || 'N/A'}</li>
               <li>• Latest Flight: {historicalData?.time_range?.end || 'N/A'}</li>
@@ -511,7 +511,7 @@ export function HistoricalAnalysisPage() {
           </div>
 
           <div>
-            <h3 className="font-semibold mb-2">Legal Readiness</h3>
+            <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Legal Readiness</h3>
             <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
               <li>• Court-ready incidents: {historicalData?.legal_readiness?.court_ready || 0}</li>
               <li>• Verified violations: {historicalData?.legal_readiness?.verified || 0}</li>

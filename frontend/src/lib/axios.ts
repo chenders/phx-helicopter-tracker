@@ -7,18 +7,18 @@ const getApiBaseUrl = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL
   }
-  
+
   // Otherwise, use the current hostname with the API port
   const protocol = window.location.protocol
   const hostname = window.location.hostname
-  const port = 8001 // Direct API port, or 9080 for nginx proxy
-  
+  const port = window.location.hostname == "localhost" ? 9001 : 80; // Direct API port, or 9080 for nginx proxy
+
   // If accessed via nginx proxy (port 9080), use relative URLs
   if (window.location.port === '9080') {
     return ''  // Use relative URLs, nginx will proxy to backend
   }
-  
-  return `${protocol}//${hostname}:${port}`
+
+  return `${protocol}//${hostname}`
 }
 
 const API_BASE_URL = getApiBaseUrl()

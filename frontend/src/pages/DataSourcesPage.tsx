@@ -20,16 +20,16 @@ export function DataSourcesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Data Sources & Integration</h1>
-        <p className="text-gray-600 mb-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Data Sources & Integration</h1>
+        <p className="text-gray-600 dark:text-gray-300 mb-4">
           Comprehensive data collection from multiple sources including real-time ADS-B tracking, 
           FlightRadar24 historical data, and Phoenix PD public records for complete surveillance documentation.
         </p>
         
-        <div className="bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
-          <h3 className="font-semibold text-purple-800 mb-2">Multi-Source Intelligence Gathering</h3>
-          <p className="text-sm text-purple-700">
+        <div className="bg-purple-50 dark:bg-purple-900/30 border-l-4 border-purple-500 p-4 rounded">
+          <h3 className="font-semibold text-purple-800 dark:text-purple-300 mb-2">Multi-Source Intelligence Gathering</h3>
+          <p className="text-sm text-purple-700 dark:text-purple-200">
             System integrates public flight tracking data, official records requests, and community 
             reports to build comprehensive evidence for legal challenges to unconstitutional surveillance.
             All data sources are legally obtained and court-admissible.
@@ -38,15 +38,15 @@ export function DataSourcesPage() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg shadow-sm">
-        <div className="border-b border-gray-200">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+        <div className="border-b border-gray-200 dark:border-gray-600">
           <nav className="flex space-x-8 p-6">
             <button
               onClick={() => setActiveTab('sources')}
               className={`pb-2 border-b-2 font-medium text-sm ${
                 activeTab === 'sources'
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
               Data Sources
@@ -56,7 +56,7 @@ export function DataSourcesPage() {
               className={`pb-2 border-b-2 font-medium text-sm ${
                 activeTab === 'records'
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
               Public Records
@@ -66,7 +66,7 @@ export function DataSourcesPage() {
               className={`pb-2 border-b-2 font-medium text-sm ${
                 activeTab === 'integration'
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
               Data Integration
@@ -77,26 +77,26 @@ export function DataSourcesPage() {
         {/* Data Sources Tab */}
         {activeTab === 'sources' && (
           <div className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Active Data Sources</h2>
+            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Active Data Sources</h2>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Real-time Sources */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Real-time Flight Tracking</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Real-time Flight Tracking</h3>
                 
-                <div className="border border-gray-200 rounded-lg p-4">
+                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
                   <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-medium">FlightRadar24 API</h4>
+                    <h4 className="font-medium text-gray-900 dark:text-white">FlightRadar24 API</h4>
                     <div className="flex items-center">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                       <span className="text-sm text-green-600">Active</span>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-600 mb-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                     Real-time aircraft tracking via FlightRadar24 API. Provides live position data 
                     when Phoenix PD helicopters are actively flying.
                   </p>
-                  <div className="text-sm">
+                  <div className="text-sm text-gray-900 dark:text-gray-300">
                     <div>Aircraft tracked: N624FB, N623PD, N625FB, N626FB, N627FB</div>
                     <div>Update frequency: 5 seconds (when active)</div>
                     <div>Coverage: Worldwide with ADS-B coverage</div>
@@ -108,21 +108,21 @@ export function DataSourcesPage() {
 
               {/* Historical Sources */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Historical Data Sources</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Historical Data Sources</h3>
                 
-                <div className="border border-gray-200 rounded-lg p-4">
+                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
                   <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-medium">FlightRadar24 Gold Subscription</h4>
+                    <h4 className="font-medium text-gray-900 dark:text-white">FlightRadar24 Gold Subscription</h4>
                     <div className="flex items-center">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                       <span className="text-sm text-green-600">Active</span>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-600 mb-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                     Gold subscription providing up to 1 year of historical flight data. 
                     Download flight paths in CSV and KML formats for evidence collection.
                   </p>
-                  <div className="text-sm">
+                  <div className="text-sm text-gray-900 dark:text-gray-300">
                     <div>Historical range: 365 days</div>
                     <div>Export formats: CSV, KML</div>
                     <div>Data points: Position, altitude, speed, heading, timestamps</div>
@@ -130,19 +130,19 @@ export function DataSourcesPage() {
                   </div>
                 </div>
 
-                <div className="border border-gray-200 rounded-lg p-4">
+                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
                   <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-medium">Public Records & FOIA Requests</h4>
+                    <h4 className="font-medium text-gray-900 dark:text-white">Public Records & FOIA Requests</h4>
                     <div className="flex items-center">
                       <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
                       <span className="text-sm text-blue-600">In Progress</span>
                     </div>
                   </div>
-                  <p className="text-sm text-gray-600 mb-3">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                     Official documents obtained through Arizona Open Records Law requests 
                     including flight logs, policies, and budget documents.
                   </p>
-                  <div className="text-sm">
+                  <div className="text-sm text-gray-900 dark:text-gray-300">
                     <div>Pending requests: 3</div>
                     <div>Completed requests: 1</div>
                     <div>Documents obtained: Budget allocations, SOPs (pending)</div>
@@ -153,21 +153,21 @@ export function DataSourcesPage() {
 
             {/* System Capabilities */}
             <div className="mt-8">
-              <h3 className="text-lg font-semibold mb-4">System Capabilities</h3>
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">System Capabilities</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-4">
                   <div className="text-2xl font-bold text-green-600">5</div>
-                  <div className="text-sm text-green-700">Phoenix PD Helicopters Tracked</div>
+                  <div className="text-sm text-green-700 dark:text-green-300">Phoenix PD Helicopters Tracked</div>
                 </div>
                 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
                   <div className="text-2xl font-bold text-blue-600">365</div>
-                  <div className="text-sm text-blue-700">Days of Historical Data Available</div>
+                  <div className="text-sm text-blue-700 dark:text-blue-300">Days of Historical Data Available</div>
                 </div>
                 
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
                   <div className="text-2xl font-bold text-purple-600">60k</div>
-                  <div className="text-sm text-purple-700">Monthly API Credits</div>
+                  <div className="text-sm text-purple-700 dark:text-purple-300">Monthly API Credits</div>
                 </div>
               </div>
             </div>
@@ -178,7 +178,7 @@ export function DataSourcesPage() {
         {activeTab === 'records' && (
           <div className="p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold">Public Records Requests</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Public Records Requests</h2>
               <button
                 onClick={() => setShowRequestForm(!showRequestForm)}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"
@@ -188,17 +188,17 @@ export function DataSourcesPage() {
             </div>
 
             {showRequestForm && (
-              <div className="mb-8 p-6 border border-gray-200 rounded-lg">
-                <h3 className="text-lg font-semibold mb-4">Submit Public Records Request</h3>
+              <div className="mb-8 p-6 border border-gray-200 dark:border-gray-600 rounded-lg">
+                <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Submit Public Records Request</h3>
                 <form onSubmit={handlePublicRecordsRequest} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Request Type
                     </label>
                     <select
                       value={requestType}
                       onChange={(e) => setRequestType(e.target.value)}
-                      className="w-full border border-gray-300 rounded px-3 py-2"
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       required
                     >
                       <option value="">Select request type</option>
@@ -214,46 +214,46 @@ export function DataSourcesPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Specific Details
                     </label>
                     <textarea
                       rows={4}
                       placeholder="Specify exact documents, date ranges, aircraft registrations, or other details"
-                      className="w-full border border-gray-300 rounded px-3 py-2"
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                       required
                     />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         Start Date
                       </label>
                       <input
                         type="date"
-                        className="w-full border border-gray-300 rounded px-3 py-2"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         End Date
                       </label>
                       <input
                         type="date"
-                        className="w-full border border-gray-300 rounded px-3 py-2"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Legal Justification
                     </label>
                     <textarea
                       rows={3}
                       placeholder="Explain the public interest and legal basis for the request"
-                      className="w-full border border-gray-300 rounded px-3 py-2"
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                     />
                   </div>
 
@@ -269,7 +269,7 @@ export function DataSourcesPage() {
 
             {/* Existing Requests */}
             <div>
-              <h3 className="text-lg font-semibold mb-4">Request Status</h3>
+              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Request Status</h3>
               <div className="space-y-4">
                 {[
                   {
@@ -294,19 +294,19 @@ export function DataSourcesPage() {
                     description: 'SOPs for helicopter surveillance operations'
                   }
                 ].map((request) => (
-                  <div key={request.id} className="border border-gray-200 rounded-lg p-4">
+                  <div key={request.id} className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <div className="font-medium">{request.type}</div>
-                        <div className="text-sm text-gray-600 mt-1">{request.description}</div>
-                        <div className="text-sm text-gray-500 mt-1">
+                        <div className="font-medium text-gray-900 dark:text-white">{request.type}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">{request.description}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                           Request ID: {request.id} • Submitted: {request.date}
                         </div>
                       </div>
                       <div className={`px-3 py-1 rounded text-sm ${
-                        request.status === 'Completed' ? 'bg-green-100 text-green-800' :
-                        request.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-blue-100 text-blue-800'
+                        request.status === 'Completed' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
+                        request.status === 'In Progress' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
+                        'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
                       }`}>
                         {request.status}
                       </div>
@@ -321,48 +321,48 @@ export function DataSourcesPage() {
         {/* Data Integration Tab */}
         {activeTab === 'integration' && (
           <div className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Data Integration & Analysis</h2>
+            <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Data Integration & Analysis</h2>
             
             <div className="space-y-6">
               {/* Integration Status */}
               <div>
-                <h3 className="text-lg font-semibold mb-4">Integration Pipeline</h3>
+                <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Integration Pipeline</h3>
                 <div className="space-y-4">
-                  <div className="flex items-center p-4 bg-green-50 rounded-lg">
+                  <div className="flex items-center p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
                     <div className="text-green-600 mr-4">✅</div>
                     <div className="flex-1">
-                      <div className="font-medium">Real-time Data Ingestion</div>
-                      <div className="text-sm text-gray-600">
+                      <div className="font-medium text-gray-900 dark:text-white">Real-time Data Ingestion</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
                         FlightRadar24 API data processed when helicopters are actively flying
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center p-4 bg-green-50 rounded-lg">
+                  <div className="flex items-center p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
                     <div className="text-green-600 mr-4">✅</div>
                     <div className="flex-1">
-                      <div className="font-medium">Historical Data Import</div>
-                      <div className="text-sm text-gray-600">
+                      <div className="font-medium text-gray-900 dark:text-white">Historical Data Import</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
                         KML and CSV files from FlightRadar24 imported and analyzed
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center p-4 bg-green-50 rounded-lg">
+                  <div className="flex items-center p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
                     <div className="text-green-600 mr-4">✅</div>
                     <div className="flex-1">
-                      <div className="font-medium">Pattern Detection</div>
-                      <div className="text-sm text-gray-600">
+                      <div className="font-medium text-gray-900 dark:text-white">Pattern Detection</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
                         Automated detection of hovering, circling, and surveillance patterns
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center p-4 bg-green-50 rounded-lg">
+                  <div className="flex items-center p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
                     <div className="text-green-600 mr-4">✅</div>
                     <div className="flex-1">
-                      <div className="font-medium">Legal Documentation</div>
-                      <div className="text-sm text-gray-600">
+                      <div className="font-medium text-gray-900 dark:text-white">Legal Documentation</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
                         Automated generation of surveillance reports with constitutional analysis
                       </div>
                     </div>
@@ -372,32 +372,32 @@ export function DataSourcesPage() {
 
               {/* Data Flow */}
               <div>
-                <h3 className="text-lg font-semibold mb-4">Data Flow Architecture</h3>
-                <div className="bg-gray-50 p-6 rounded-lg">
+                <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Data Flow Architecture</h3>
+                <div className="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg">
                   <div className="text-center">
-                    <div className="text-sm text-gray-600 mb-4">Raw Data Sources</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">Raw Data Sources</div>
                     <div className="flex justify-center space-x-4 mb-6">
-                      <div className="bg-blue-100 px-3 py-2 rounded text-sm">FlightRadar24 API</div>
-                      <div className="bg-blue-100 px-3 py-2 rounded text-sm">FR24 Gold Downloads</div>
-                      <div className="bg-blue-100 px-3 py-2 rounded text-sm">Public Records</div>
+                      <div className="bg-blue-100 dark:bg-blue-900/30 px-3 py-2 rounded text-sm text-gray-900 dark:text-white">FlightRadar24 API</div>
+                      <div className="bg-blue-100 dark:bg-blue-900/30 px-3 py-2 rounded text-sm text-gray-900 dark:text-white">FR24 Gold Downloads</div>
+                      <div className="bg-blue-100 dark:bg-blue-900/30 px-3 py-2 rounded text-sm text-gray-900 dark:text-white">Public Records</div>
                     </div>
                     <div className="text-2xl mb-4">⬇️</div>
-                    <div className="bg-yellow-100 px-4 py-2 rounded mb-4">Data Processing & Validation</div>
+                    <div className="bg-yellow-100 dark:bg-yellow-900/30 px-4 py-2 rounded mb-4 text-gray-900 dark:text-white">Data Processing & Validation</div>
                     <div className="text-2xl mb-4">⬇️</div>
-                    <div className="bg-green-100 px-4 py-2 rounded mb-4">Pattern Analysis & AI</div>
+                    <div className="bg-green-100 dark:bg-green-900/30 px-4 py-2 rounded mb-4 text-gray-900 dark:text-white">Pattern Analysis & AI</div>
                     <div className="text-2xl mb-4">⬇️</div>
-                    <div className="bg-purple-100 px-4 py-2 rounded">Legal Documentation & Reports</div>
+                    <div className="bg-purple-100 dark:bg-purple-900/30 px-4 py-2 rounded text-gray-900 dark:text-white">Legal Documentation & Reports</div>
                   </div>
                 </div>
               </div>
 
               {/* Quality Assurance */}
               <div>
-                <h3 className="text-lg font-semibold mb-4">Data Quality Assurance</h3>
+                <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">Data Quality Assurance</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <h4 className="font-medium mb-2">Validation Checks</h4>
-                    <ul className="text-sm text-gray-600 space-y-1">
+                    <h4 className="font-medium mb-2 text-gray-900 dark:text-white">Validation Checks</h4>
+                    <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                       <li>• Coordinate validation (Phoenix area bounds)</li>
                       <li>• Aircraft registration verification</li>
                       <li>• Timestamp consistency checks</li>
@@ -407,8 +407,8 @@ export function DataSourcesPage() {
                   </div>
 
                   <div>
-                    <h4 className="font-medium mb-2">Legal Compliance</h4>
-                    <ul className="text-sm text-gray-600 space-y-1">
+                    <h4 className="font-medium mb-2 text-gray-900 dark:text-white">Legal Compliance</h4>
+                    <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                       <li>• Public data source verification</li>
                       <li>• Chain of custody documentation</li>
                       <li>• Data integrity checksums</li>

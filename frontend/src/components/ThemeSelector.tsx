@@ -2,25 +2,18 @@ import { useState, useRef, useEffect } from 'react'
 import { useTheme, Theme } from '../contexts/ThemeContext'
 
 const themes = [
-  { 
-    id: 'light' as Theme, 
-    name: 'Light', 
-    icon: '☀️',
-    description: 'Classic light theme',
-    preview: 'bg-white text-gray-900'
-  },
-  { 
-    id: 'dark' as Theme, 
-    name: 'Dark', 
+  {
+    id: 'dark' as Theme,
+    name: 'Dark',
     icon: '🌙',
     description: 'Dark mode for night viewing',
     preview: 'bg-gray-900 text-gray-100'
   },
-  { 
-    id: 'flightradar' as Theme, 
-    name: 'FlightRadar', 
-    icon: '✈️',
-    description: 'Modern aviation theme',
+  {
+    id: 'darker' as Theme,
+    name: 'Darker',
+    icon: '🌑️',
+    description: 'Even darker',
     preview: 'bg-slate-950 text-cyan-50'
   },
 ]
@@ -33,20 +26,20 @@ export function ThemeSelector({ collapsed = false }: ThemeSelectorProps) {
   const { theme, setTheme } = useTheme()
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  
+
   const currentTheme = themes.find(t => t.id === theme) || themes[0]
-  
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false)
       }
     }
-    
+
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-  
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
@@ -70,7 +63,7 @@ export function ThemeSelector({ collapsed = false }: ThemeSelectorProps) {
           </>
         )}
       </button>
-      
+
       {isOpen && (
         <div className={`absolute ${collapsed ? 'left-full ml-2 bottom-0' : 'right-0 mt-2'} w-64 rounded-lg shadow-xl bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-50`}>
           <div className="p-2">

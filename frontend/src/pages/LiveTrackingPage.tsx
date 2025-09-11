@@ -307,17 +307,17 @@ export function LiveTrackingPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Live Flight Tracking</h1>
-            <p className="text-gray-600">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Live Flight Tracking</h1>
+            <p className="text-gray-600 dark:text-gray-300">
               Real-time Phoenix PD helicopter surveillance monitoring with constitutional violation detection
             </p>
           </div>
           <div className="text-right">
             <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
-              connectionStatus === 'connected' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              connectionStatus === 'connected' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
             }`}>
               <div className={`w-2 h-2 rounded-full mr-2 ${
                 connectionStatus === 'connected' ? 'bg-green-600' : 'bg-red-600'
@@ -329,14 +329,14 @@ export function LiveTrackingPage() {
       </div>
 
       {/* Controls */}
-      <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex items-center space-x-2">
-            <label className="text-sm font-medium">View:</label>
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</label>
             <select
               value={alertFilter}
               onChange={(e) => setAlertFilter(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-1 text-sm"
+              className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="all">All Flights</option>
               <option value="surveillance">Surveillance Only</option>
@@ -405,7 +405,7 @@ export function LiveTrackingPage() {
       </div>
 
       {/* Map */}
-      <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
         <LoadScript
           googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}
           libraries={libraries}
@@ -644,10 +644,10 @@ export function LiveTrackingPage() {
           {alerts && alerts.length > 0 ? (
             <div className="space-y-3">
               {alerts.slice(0, 5).map((alert: any, index: number) => (
-                <div key={alert.alert_id || alert.id || `alert-${index}`} className="p-3 border-l-4 border-red-500 bg-red-50 rounded">
-                  <div className="font-medium text-red-800">{alert.alert_type}</div>
-                  <div className="text-sm text-red-600">{alert.description}</div>
-                  <div className="text-xs text-red-500 mt-1">
+                <div key={alert.alert_id || alert.id || `alert-${index}`} className="p-3 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/30 rounded">
+                  <div className="font-medium text-red-800 dark:text-red-300">{alert.alert_type}</div>
+                  <div className="text-sm text-red-600 dark:text-red-400">{alert.description}</div>
+                  <div className="text-xs text-red-500 dark:text-red-400 mt-1">
                     {formatLocalTime(alert.timestamp)}
                   </div>
                 </div>
@@ -666,8 +666,8 @@ export function LiveTrackingPage() {
 
       {/* Real-time Updates */}
       {lastMessage && (
-        <div key="realtime-update" className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
-          <div className="text-sm text-blue-700">
+        <div key="realtime-update" className="bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 p-4 rounded">
+          <div className="text-sm text-blue-700 dark:text-blue-300">
             <strong>Real-time Update:</strong> {JSON.stringify(lastMessage)}
           </div>
         </div>

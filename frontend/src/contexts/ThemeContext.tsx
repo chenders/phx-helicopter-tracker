@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 
-export type Theme = 'light' | 'dark' | 'flightradar'
+export type Theme = 'dark' | 'darker'
 
 interface ThemeContextType {
   theme: Theme
@@ -12,24 +12,20 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = localStorage.getItem('theme')
-    return (saved as Theme) || 'flightradar'
+    return (saved as Theme) || 'darker'
   })
 
   useEffect(() => {
     localStorage.setItem('theme', theme)
 
     // Remove all theme classes
-    document.documentElement.classList.remove('light', 'dark', 'flightradar')
+    document.documentElement.classList.remove('dark', 'darker')
 
     // Add current theme class
     document.documentElement.classList.add(theme)
 
-    // For dark and flightradar themes, add dark class for Tailwind dark mode
-    if (theme === 'dark' || theme === 'flightradar') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
+    // Both themes use dark mode
+    document.documentElement.classList.add('dark')
   }, [theme])
 
   return (
