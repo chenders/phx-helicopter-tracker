@@ -17,12 +17,13 @@ import whisper
 
 from app.workers.celery_app import celery_app
 from app.db.database import SessionLocal
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 # Broadcastify credentials from environment
-BROADCASTIFY_USERNAME = os.getenv("BROADCASTIFY_USERNAME", "")
-BROADCASTIFY_PASSWORD = os.getenv("BROADCASTIFY_PASSWORD", "")
+BROADCASTIFY_USERNAME = settings.BROADCASTIFY_USERNAME
+BROADCASTIFY_PASSWORD = settings.BROADCASTIFY_PASSWORD
 BROADCASTIFY_BASE_URL = "https://www.broadcastify.com"
 PHOENIX_PD_FEED_ID = "12145"
 
@@ -323,7 +324,7 @@ def transcribe_radio_archives(
         # Check if another transcription task is already running
         inspector = celery_app.control.inspect()
         active_tasks = inspector.active()
-        
+
         if active_tasks:
             for worker, tasks in active_tasks.items():
                 for task in tasks:
@@ -334,10 +335,10 @@ def transcribe_radio_archives(
                             "reason": "Another transcription task is already running",
                             "existing_task_id": task['id']
                         }
-        
+
         # Force batch_size to 1 to ensure single file processing
         batch_size = 1
-        
+
         # Always use base model for consistency and quality
         model_name = "base"
         logger.info(f"Starting transcription: Processing ONLY 1 file with Whisper model: {model_name}")

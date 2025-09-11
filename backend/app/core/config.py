@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change_this_in_production"
 
     # Broadcastify
-    BROADCASTIFY_USERNAME: Optional[str] = os.getenv("BROADCASTIFY_USERNAME", None)
-    BROADCASTIFY_PASSWORD: Optional[str] = os.getenv("BROADCASTIFY_PASSWORD", None)
+    BROADCASTIFY_USERNAME: Optional[str] = None
+    BROADCASTIFY_PASSWORD: Optional[str] = None
 
     # Database settings
     DATABASE_URL: str = (
