@@ -4,7 +4,7 @@ from app.core.config import settings
 
 # Create Celery instance
 celery_app = Celery(
-    "phoenix_helicopter_tracker",
+    "phx_pd_helicopter_tracker",
     broker=getattr(settings, "REDIS_URL", "redis://localhost:6379/0"),
     backend=getattr(settings, "REDIS_URL", "redis://localhost:6379/0"),
     include=[

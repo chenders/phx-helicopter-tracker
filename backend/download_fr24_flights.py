@@ -14,7 +14,7 @@ from typing import List, Dict, Any
 
 # Add backend to path
 sys.path.insert(
-    0, "/Users/chris/Source/phx-pd-helicopters/plan-a-comprehensive/backend"
+    0, "/Users/chris/Source/phx-pd-helicopter-tracker/backend"
 )
 
 from app.services.flightradar24_api_service import FlightRadar24APIService
