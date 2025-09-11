@@ -340,12 +340,24 @@ def transcribe_radio_archives(
                             "existing_task_id": task['id']
                         }
 
-        # Force batch_size to 1 to ensure single file processing
-        batch_size = 1
+        # Check system load average to determine batch size
+        # Only process 2 files if load average is at or below 7
+        try:
+            load_avg_1min = os.getloadavg()[0]  # Get 1-minute load average
+            if load_avg_1min <= 7:
+                batch_size = 2
+                logger.info(f"System load average: {load_avg_1min:.2f} - Processing 2 files")
+            else:
+                batch_size = 1
+                logger.info(f"System load average: {load_avg_1min:.2f} - High load, processing only 1 file")
+        except:
+            # If we can't get load average, default to 1 file
+            batch_size = 1
+            logger.info("Could not determine load average - defaulting to 1 file")
 
         # Always use base model for consistency and quality
         model_name = "base"
-        logger.info(f"Starting transcription: Processing ONLY 1 file with Whisper model: {model_name}")
+        logger.info(f"Starting transcription: Processing up to {batch_size} files with Whisper model: {model_name}")
 
         # Load Whisper model
         current_task.update_state(
@@ -374,16 +386,11 @@ def transcribe_radio_archives(
             else:
                 skipped_files.append(str(mp3_file))
 
-        # CRITICAL: Limit to batch size - FORCE TO 1 FILE ONLY
-        # Override any batch_size parameter to ensure single file processing
-        batch_size = 1
+        # CRITICAL: Limit to batch size based on system load
+        # batch_size was already determined based on load average above
         files_to_process = files_to_process[:batch_size]
 
-        if len(files_to_process) > 1:
-            logger.error("ERROR: Attempted to process more than 1 file. Forcing to 1.")
-            files_to_process = files_to_process[:1]
-
-        logger.info(f"Processing EXACTLY {len(files_to_process)} file (max 1 per run)")
+        logger.info(f"Processing {len(files_to_process)} file(s) (max {batch_size} per run)")
 
         for idx, mp3_file in enumerate(files_to_process, 1):
             try:

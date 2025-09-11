@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import axios from '@/lib/axios'
-import { Play, Pause, Download, Search, Mic, Clock, Database, FileText, Volume2, TrendingUp, Loader2 } from 'lucide-react'
+import { Play, Pause, Download, Search, Mic, Clock, Database, FileText, Volume2, TrendingUp, Loader2, ScrollText } from 'lucide-react'
 
 interface RadioArchive {
   filename: string
@@ -59,6 +59,9 @@ export function RadioPage() {
   const [audioCurrentTime, setAudioCurrentTime] = useState(0)
   const [audioDuration, setAudioDuration] = useState(0)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(25)
+  const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const transcriptContainerRef = useRef<HTMLDivElement | null>(null)
   const activeSegmentRef = useRef<HTMLDivElement | null>(null)
@@ -70,7 +73,7 @@ export function RadioPage() {
 
   // Auto-scroll to keep active transcript segment in view
   useEffect(() => {
-    if (activeSegmentRef.current && transcriptContainerRef.current) {
+    if (autoScrollEnabled && activeSegmentRef.current && transcriptContainerRef.current) {
       const container = transcriptContainerRef.current
       const activeElement = activeSegmentRef.current
       
@@ -90,7 +93,7 @@ export function RadioPage() {
         })
       }
     }
-  }, [audioCurrentTime, playingAudio]) // Trigger when time updates
+  }, [audioCurrentTime, playingAudio, autoScrollEnabled]) // Trigger when time updates or auto-scroll changes
 
   const fetchArchives = async () => {
     try {
@@ -488,17 +491,56 @@ export function RadioPage() {
 
       {/* Archives Table with Expandable Rows */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-          Archive Files
-        </h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+            Archive Files
+          </h2>
+          
+          {/* Items per page selector */}
+          <div className="flex items-center space-x-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Show:</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value))
+                setCurrentPage(1) // Reset to first page when changing items per page
+              }}
+              className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+            >
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span className="text-sm text-gray-600 dark:text-gray-400">per page</span>
+          </div>
+        </div>
         
         {loading ? (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">Loading archives...</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead>
-                <tr>
+          <>
+            {/* Sort archives by date descending and paginate */}
+            {(() => {
+              // Sort archives by filename (which contains date/time) descending
+              const sortedArchives = [...archives].sort((a, b) => {
+                // Parse the date from filename (format: YYYYMMDD_timestamp_feedid.mp3)
+                const dateA = a.filename.substring(0, 8) + a.filename.substring(9, 19)
+                const dateB = b.filename.substring(0, 8) + b.filename.substring(9, 19)
+                return dateB.localeCompare(dateA) // Descending order
+              })
+              
+              // Calculate pagination
+              const totalPages = Math.ceil(sortedArchives.length / itemsPerPage)
+              const startIndex = (currentPage - 1) * itemsPerPage
+              const endIndex = startIndex + itemsPerPage
+              const paginatedArchives = sortedArchives.slice(startIndex, endIndex)
+              
+              return (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead>
+                        <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                     Date
                   </th>
@@ -515,9 +557,9 @@ export function RadioPage() {
                     Actions
                   </th>
                 </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {archives.map((archive) => {
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {paginatedArchives.map((archive) => {
                   const fileInfo = parseFilename(archive.filename)
                   // Calculate duration assuming 30 minutes per file (can be adjusted based on actual duration)
                   const duration = "~30 min"
@@ -648,13 +690,27 @@ export function RadioPage() {
                                       Transcript ({transcription.model || archive.transcription_model} model)
                                     </span>
                                   </div>
-                                  <button
-                                    onClick={() => downloadFile(archive.filename, 'txt')}
-                                    className="flex items-center space-x-2 text-green-400 hover:text-green-300"
-                                  >
-                                    <Download className="h-4 w-4" />
-                                    <span className="text-sm">Download TXT</span>
-                                  </button>
+                                  <div className="flex items-center space-x-4">
+                                    {/* Auto-scroll toggle */}
+                                    <label className="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer hover:text-gray-100 transition-colors">
+                                      <input
+                                        type="checkbox"
+                                        checked={autoScrollEnabled}
+                                        onChange={(e) => setAutoScrollEnabled(e.target.checked)}
+                                        className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                                      />
+                                      <ScrollText className={`h-4 w-4 ${autoScrollEnabled ? 'text-blue-400' : 'text-gray-500'}`} />
+                                      <span>Auto-scroll</span>
+                                    </label>
+                                    
+                                    <button
+                                      onClick={() => downloadFile(archive.filename, 'txt')}
+                                      className="flex items-center space-x-2 text-green-400 hover:text-green-300"
+                                    >
+                                      <Download className="h-4 w-4" />
+                                      <span className="text-sm">Download TXT</span>
+                                    </button>
+                                  </div>
                                 </div>
                                 
                                 <div 
@@ -709,10 +765,71 @@ export function RadioPage() {
                     )}
                   </React.Fragment>
                   )
-                })}
-              </tbody>
-            </table>
-          </div>
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4 px-4">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-600"
+                        >
+                          Previous
+                        </button>
+                        
+                        <div className="flex items-center space-x-1">
+                          {/* Show page numbers */}
+                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                            let pageNum
+                            if (totalPages <= 5) {
+                              pageNum = i + 1
+                            } else if (currentPage <= 3) {
+                              pageNum = i + 1
+                            } else if (currentPage >= totalPages - 2) {
+                              pageNum = totalPages - 4 + i
+                            } else {
+                              pageNum = currentPage - 2 + i
+                            }
+                            
+                            return (
+                              <button
+                                key={pageNum}
+                                onClick={() => setCurrentPage(pageNum)}
+                                className={`px-3 py-1 rounded-lg ${
+                                  currentPage === pageNum
+                                    ? 'bg-blue-500 text-white'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                }`}
+                              >
+                                {pageNum}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                          className="px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-600"
+                        >
+                          Next
+                        </button>
+                      </div>
+                      
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Showing {startIndex + 1}-{Math.min(endIndex, sortedArchives.length)} of {sortedArchives.length} files
+                      </div>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+          </>
         )}
       </div>
     </div>
