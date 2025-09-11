@@ -2,13 +2,14 @@
 Radio archives API endpoints
 Provides access to police radio recordings and transcriptions
 """
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
 import json
 import os
+import re
 
 from app.workers.radio_tasks import (
     download_broadcastify_archives,
@@ -285,9 +286,9 @@ async def trigger_transcription(
 
 
 @router.get("/archives/{filename}/audio")
-async def get_audio_file(filename: str):
+async def get_audio_file(filename: str, request: Request):
     """
-    Stream audio file for playback
+    Stream audio file for playback with Range request support for seeking
     """
     try:
         # Ensure filename ends with .mp3
@@ -298,10 +299,53 @@ async def get_audio_file(filename: str):
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="Audio file not found")
         
+        # Get file size
+        file_size = file_path.stat().st_size
+        
+        # Check for Range header
+        range_header = request.headers.get('range')
+        
+        if range_header:
+            # Parse range header (e.g., "bytes=0-1023")
+            range_match = re.match(r'bytes=(\d+)-(\d*)', range_header)
+            if range_match:
+                start = int(range_match.group(1))
+                end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
+                
+                # Ensure valid range
+                if start >= file_size:
+                    raise HTTPException(status_code=416, detail="Range Not Satisfiable")
+                
+                end = min(end, file_size - 1)
+                content_length = end - start + 1
+                
+                # Open file and seek to start position
+                with open(file_path, 'rb') as file_handle:
+                    file_handle.seek(start)
+                    # Read the requested range
+                    data = file_handle.read(content_length)
+                
+                # Return partial content response
+                return Response(
+                    content=data,
+                    status_code=206,
+                    headers={
+                        'Content-Type': 'audio/mpeg',
+                        'Content-Length': str(content_length),
+                        'Content-Range': f'bytes {start}-{end}/{file_size}',
+                        'Accept-Ranges': 'bytes',
+                    }
+                )
+        
+        # No range header, return full file with Accept-Ranges header
         return FileResponse(
             path=str(file_path),
             media_type="audio/mpeg",
-            filename=filename
+            filename=filename,
+            headers={
+                'Accept-Ranges': 'bytes',
+                'Content-Length': str(file_size)
+            }
         )
         
     except HTTPException:

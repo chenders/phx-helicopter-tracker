@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import axios from '@/lib/axios'
 import { Play, Pause, Download, Search, Mic, Clock, Database, FileText, Volume2, TrendingUp, Loader2 } from 'lucide-react'
 
@@ -60,11 +60,37 @@ export function RadioPage() {
   const [audioDuration, setAudioDuration] = useState(0)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const transcriptContainerRef = useRef<HTMLDivElement | null>(null)
+  const activeSegmentRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     fetchArchives()
     fetchStats()
   }, [])
+
+  // Auto-scroll to keep active transcript segment in view
+  useEffect(() => {
+    if (activeSegmentRef.current && transcriptContainerRef.current) {
+      const container = transcriptContainerRef.current
+      const activeElement = activeSegmentRef.current
+      
+      // Get positions
+      const containerRect = container.getBoundingClientRect()
+      const elementRect = activeElement.getBoundingClientRect()
+      
+      // Check if element is outside the visible area
+      const isAbove = elementRect.top < containerRect.top
+      const isBelow = elementRect.bottom > containerRect.bottom
+      
+      if (isAbove || isBelow) {
+        // Scroll the element into view, centered if possible
+        activeElement.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        })
+      }
+    }
+  }, [audioCurrentTime, playingAudio]) // Trigger when time updates
 
   const fetchArchives = async () => {
     try {
@@ -214,34 +240,58 @@ export function RadioPage() {
     }
   }
 
-  const handlePlayAudio = async (filename: string) => {
-    if (playingAudio === filename && audioRef.current) {
+  const handlePlayAudio = async (filename: string, seekToTime?: number) => {
+    console.log('handlePlayAudio called:', { filename, seekToTime, playingAudio, hasAudioRef: !!audioRef.current })
+    
+    if (playingAudio === filename && audioRef.current && seekToTime === undefined) {
+      console.log('Toggle play/pause for existing audio')
       if (audioRef.current.paused) {
         audioRef.current.play()
       } else {
         audioRef.current.pause()
       }
     } else {
+      console.log('Creating new audio element')
       if (audioRef.current) {
         audioRef.current.pause()
       }
+      
       const audio = new Audio(`/api/v1/radio/archives/${filename}/audio`)
       audioRef.current = audio
       
       audio.addEventListener('loadedmetadata', () => {
+        console.log('loadedmetadata event:', { duration: audio.duration, seekToTime })
         setAudioDuration(audio.duration)
+        
+        // If we need to seek, do it after metadata is loaded
+        if (seekToTime !== undefined && seekToTime > 0) {
+          console.log('Setting currentTime to:', seekToTime)
+          audio.currentTime = seekToTime
+          setAudioCurrentTime(seekToTime)
+        }
       })
       
       audio.addEventListener('timeupdate', () => {
         setAudioCurrentTime(audio.currentTime)
       })
       
+      audio.addEventListener('seeking', () => {
+        console.log('seeking event triggered, target time:', audio.currentTime)
+      })
+      
+      audio.addEventListener('seeked', () => {
+        console.log('seeked event complete, current time:', audio.currentTime)
+      })
+      
       audio.addEventListener('ended', () => {
+        console.log('audio ended')
         setPlayingAudio(null)
         setAudioCurrentTime(0)
       })
       
-      audio.play()
+      // Start playing immediately, we'll seek once it's ready
+      audio.play().catch(err => console.error('Play error:', err))
+      
       setPlayingAudio(filename)
       setExpandedRow(filename) // Expand the row when playing
       
@@ -276,6 +326,26 @@ export function RadioPage() {
     if (audioRef.current) {
       audioRef.current.currentTime = time
       setAudioCurrentTime(time)
+    }
+  }
+
+  const handleTranscriptClick = (startTime: number, filename: string) => {
+    console.log('handleTranscriptClick called:', { startTime, filename, playingAudio })
+    
+    // If audio is not playing this file, start it with seek
+    if (playingAudio !== filename) {
+      console.log('Starting new audio with seek')
+      handlePlayAudio(filename, startTime)
+    } else if (audioRef.current) {
+      // Audio already playing, just seek to the timestamp
+      console.log('Seeking existing audio to:', startTime)
+      audioRef.current.currentTime = startTime
+      setAudioCurrentTime(startTime)
+      
+      // Ensure audio is playing
+      if (audioRef.current.paused) {
+        audioRef.current.play()
+      }
     }
   }
 
@@ -587,27 +657,37 @@ export function RadioPage() {
                                   </button>
                                 </div>
                                 
-                                <div className="space-y-2 max-h-96 overflow-y-auto">
+                                <div 
+                                  ref={transcriptContainerRef}
+                                  className="space-y-2 max-h-96 overflow-y-auto"
+                                >
                                   {transcription.segments && transcription.segments.length > 0 ? (
-                                    transcription.segments.map((segment, idx) => (
-                                      <div
-                                        key={idx}
-                                        className={`flex items-start space-x-4 p-2 rounded ${
-                                          playingAudio === archive.filename &&
-                                          audioCurrentTime >= segment.start &&
-                                          audioCurrentTime <= segment.end
-                                            ? 'bg-blue-900 bg-opacity-30 border-l-4 border-blue-400'
-                                            : ''
-                                        }`}
-                                      >
-                                        <div className="text-sm text-blue-400 whitespace-nowrap">
-                                          [{formatTime(segment.start)} - {formatTime(segment.end)}]
+                                    transcription.segments.map((segment, idx) => {
+                                      const isActive = playingAudio === archive.filename &&
+                                        audioCurrentTime >= segment.start &&
+                                        audioCurrentTime <= segment.end
+                                      
+                                      return (
+                                        <div
+                                          key={idx}
+                                          ref={isActive ? activeSegmentRef : null}
+                                          onClick={() => handleTranscriptClick(segment.start, archive.filename)}
+                                          className={`flex items-start space-x-4 p-2 rounded cursor-pointer hover:bg-gray-800 transition-colors ${
+                                            isActive
+                                              ? 'bg-blue-900 bg-opacity-30 border-l-4 border-blue-400'
+                                              : ''
+                                          }`}
+                                          title="Click to jump to this timestamp"
+                                        >
+                                          <div className="text-sm text-blue-400 whitespace-nowrap hover:text-blue-300">
+                                            [{formatTime(segment.start)} - {formatTime(segment.end)}]
+                                          </div>
+                                          <div className="text-sm text-gray-300 flex-1">
+                                            {segment.text}
+                                          </div>
                                         </div>
-                                        <div className="text-sm text-gray-300 flex-1">
-                                          {segment.text}
-                                        </div>
-                                      </div>
-                                    ))
+                                      )
+                                    })
                                   ) : (
                                     <div className="text-gray-300 whitespace-pre-wrap">
                                       {transcription.text}

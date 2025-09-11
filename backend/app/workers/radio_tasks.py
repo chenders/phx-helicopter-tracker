@@ -22,13 +22,16 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # Broadcastify credentials from environment
-BROADCASTIFY_USERNAME = settings.BROADCASTIFY_USERNAME
-BROADCASTIFY_PASSWORD = settings.BROADCASTIFY_PASSWORD
+#BROADCASTIFY_USERNAME = settings.BROADCASTIFY_USERNAME
+#BROADCASTIFY_PASSWORD = settings.BROADCASTIFY_PASSWORD
+BROADCASTIFY_USERNAME = "chris@waitingforthefuture.org"
+BROADCASTIFY_PASSWORD = "qjt4KRC_mem4rqu8brg"
+logger.info(f"Using {BROADCASTIFY_USERNAME} / {BROADCASTIFY_PASSWORD}")
 BROADCASTIFY_BASE_URL = "https://www.broadcastify.com"
 PHOENIX_PD_FEED_ID = "12145"
 
 # Data paths
-RADIO_DATA_PATH = Path("../data/radio/phoenix_pd")
+RADIO_DATA_PATH = Path("./data/radio/phoenix_pd")
 RADIO_DATA_PATH.mkdir(parents=True, exist_ok=True)
 
 # Rate limiting settings
@@ -90,6 +93,7 @@ def download_broadcastify_archives(
             "action": "auth",
             "redirect": "",
         }
+        logger.warning(f"Login data: {login_data}")
 
         # Perform login
         response = session.post(login_url, data=login_data)

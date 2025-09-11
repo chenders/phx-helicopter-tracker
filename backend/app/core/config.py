@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change_this_in_production"
 
     # Broadcastify
-    BROADCASTIFY_USERNAME: Optional[str] = None
-    BROADCASTIFY_PASSWORD: Optional[str] = None
+    BROADCASTIFY_USERNAME: Optional[str] = "chris@waitingforthefuture.org"
+    BROADCASTIFY_PASSWORD: Optional[str] = "qjt4KRC_mem4rqu8brg"
 
     # Database settings
     DATABASE_URL: str = (
