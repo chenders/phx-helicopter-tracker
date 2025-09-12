@@ -416,13 +416,17 @@ export function TaskMonitoringPage() {
                       </div>
                       <div className="text-right">
                         <span className="text-sm font-medium text-gray-900 dark:text-white">
-                          {task.schedule < 60 
-                            ? `Every ${task.schedule}s`
-                            : task.schedule < 3600
-                            ? `Every ${Math.round(task.schedule / 60)} min`
-                            : task.schedule < 86400
-                            ? `Every ${Math.round(task.schedule / 3600)} hours`
-                            : `Every ${Math.round(task.schedule / 86400)} days`
+                          {typeof task.schedule === 'number' 
+                            ? task.schedule < 60 
+                              ? `Every ${task.schedule}s`
+                              : task.schedule < 3600
+                              ? `Every ${Math.round(task.schedule / 60)} min`
+                              : task.schedule < 86400
+                              ? `Every ${Math.round(task.schedule / 3600)} hour${Math.round(task.schedule / 3600) !== 1 ? 's' : ''}`
+                              : `Every ${Math.round(task.schedule / 86400)} day${Math.round(task.schedule / 86400) !== 1 ? 's' : ''}`
+                            : typeof task.schedule === 'object' && task.schedule?.seconds
+                            ? `Every ${task.schedule.seconds}s`
+                            : 'Custom schedule'
                           }
                         </span>
                         <div className="text-xs text-gray-500 dark:text-gray-400">

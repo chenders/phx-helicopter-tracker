@@ -14,6 +14,7 @@ celery_app = Celery(
         "app.workers.data_import_tasks",
         "app.workers.fr24_scheduler",
         "app.workers.radio_tasks",
+        "app.workers.test_task",
     ],
 )
 
@@ -213,3 +214,6 @@ celery_app.conf.update(
         # REMOVED cleanup-old-radio-archives - we want to keep all radio archives permanently
     },
 )
+
+# Import signal handlers for task monitoring
+from app.workers import task_monitoring_signals

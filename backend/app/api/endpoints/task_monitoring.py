@@ -38,8 +38,8 @@ def get_monitoring_dashboard(
     # Get recent tasks
     recent_tasks = task_history_crud.get_recent(db, limit=50)
 
-    # Get recent events (warnings and errors)
-    recent_events = task_event_crud.get_recent(db, limit=50, severity=2)
+    # Get recent events (all severity levels)
+    recent_events = task_event_crud.get_recent(db, limit=50)
 
     # Get task metrics
     task_metrics = task_metrics_crud.get_all(db)
