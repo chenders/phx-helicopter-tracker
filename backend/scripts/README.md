@@ -19,10 +19,6 @@ This directory contains utility scripts for testing, data import, and system mai
 - `--interval`: Minutes between position checks (default: 5)
 **Description**: Collects flight data for all aircraft in Phoenix area, useful for identifying non-PD surveillance aircraft.
 
-#### `import_fr24_positions.py`
-**Purpose**: Imports single position snapshots for active flights  
-**Usage**: `python import_fr24_positions.py`  
-**Description**: Legacy import script for position snapshots. Replaced by complete flight tracking.
 
 #### `import_recent_flights.py`
 **Purpose**: Imports recent flight history for specific aircraft  
@@ -53,7 +49,7 @@ This directory contains utility scripts for testing, data import, and system mai
 **Usage**: `python test_fr24_search_flights.py`  
 **Description**: Tests searching for flights by registration, area, or time period.
 
-#### `test_fr24_api.py` / `test_fr24_api_simple.py`
+#### `test_fr24_api.py`
 **Purpose**: Basic FR24 API connectivity tests  
 **Usage**: `python test_fr24_api.py`  
 **Description**: Validates API authentication and basic endpoint access.
@@ -78,15 +74,11 @@ This directory contains utility scripts for testing, data import, and system mai
 **Usage**: `python test_live_phoenix_pd.py`  
 **Description**: Real-time tracking validation for Phoenix PD helicopters.
 
-#### `test_fr24_direct.py` / `test_fr24_raw_api.py`
+#### `test_fr24_direct.py`
 **Purpose**: Direct API endpoint testing  
 **Usage**: `python test_fr24_direct.py`  
 **Description**: Low-level API testing without SDK wrapper.
 
-#### `test_fr24_parse.py`
-**Purpose**: Tests FR24 data parsing logic  
-**Usage**: `python test_fr24_parse.py`  
-**Description**: Validates parsing of FR24 response formats.
 
 #### `test_complete_fr24_integration.py`
 **Purpose**: End-to-end FR24 integration test  
@@ -156,10 +148,6 @@ This directory contains utility scripts for testing, data import, and system mai
 **Usage**: `python test_premium_verify.py`  
 **Description**: Validates access to premium API endpoints and data.
 
-#### `test_download_final.py`
-**Purpose**: Final download verification  
-**Usage**: `python test_download_final.py`  
-**Description**: Comprehensive test of all download capabilities.
 
 ---
 
@@ -205,8 +193,19 @@ docker compose exec backend python scripts/import_fr24_area_flights.py --hours 6
 ## Script Status
 
 - ✅ **Production Ready**: `import_complete_flights.py`, `test_complete_tracking.py`
-- ⚠️ **Legacy/Deprecated**: `import_fr24_positions.py` (replaced by complete tracking)
 - 🧪 **Testing Only**: All `test_*.py` scripts are for development/debugging
+- ❌ **Deprecated**: Scripts in `deprecated/` directory - DO NOT USE
+
+## Deprecated Scripts
+
+The following scripts have been moved to the `deprecated/` directory and should not be used:
+- `import_fr24_positions.py` - Replaced by `import_complete_flights.py`
+- `test_fr24_api_simple.py` - Use `test_fr24_api.py` instead
+- `test_fr24_parse.py` - Parsing now integrated into services
+- `test_fr24_raw_api.py` - Use `test_fr24_official.py` instead
+- `test_download_final.py` - Use `test_complete_tracking.py` instead
+
+See `deprecated/README.md` for details on why these were deprecated.
 
 ## Support
 
