@@ -26,7 +26,7 @@ export function useWebSocket(): WebSocketHook {
       }
 
       // Otherwise use direct backend port
-      return `${protocol}//${hostname}:8001/ws`
+      return `${protocol}//${hostname}/ws`
     }
 
     const wsUrl = getWsUrl()

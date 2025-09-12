@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Background -->
+  <rect width="32" height="32" rx="6" fill="#0f172a"/>
+  
+  <!-- Radar Circles (surveillance) -->
+  <circle cx="16" cy="18" r="10" stroke="#3b82f6" stroke-width="1" fill="none" opacity="0.3"/>
+  <circle cx="16" cy="18" r="13" stroke="#3b82f6" stroke-width="0.8" fill="none" opacity="0.2"/>
+  
+  <!-- Helicopter Simplified -->
+  <!-- Main Body -->
+  <ellipse cx="16" cy="16" rx="6" ry="4" fill="#dc2626"/>
+  
+  <!-- Tail Boom -->
+  <rect x="20" y="15" width="7" height="2" fill="#b91c1c"/>
+  
+  <!-- Tail Fin -->
+  <rect x="26" y="13" width="1" height="5" fill="#b91c1c"/>
+  
+  <!-- Main Rotor -->
+  <rect x="6" y="11" width="20" height="1" fill="#64748b"/>
+  <rect x="15.5" y="11" width="1" height="5" fill="#475569"/>
+  
+  <!-- Tail Rotor -->
+  <rect x="25" y="12.5" width="3" height="0.5" fill="#64748b"/>
+  
+  <!-- Cockpit Window -->
+  <ellipse cx="13.5" cy="16" rx="2" ry="1.5" fill="#38bdf8" opacity="0.8"/>
+  
+  <!-- Landing Skids -->
+  <rect x="12" y="19.5" width="8" height="0.8" rx="0.4" fill="#64748b"/>
+  
+  <!-- Search Light Beam (surveillance indicator) -->
+  <path d="M16 18 L11 26 L21 26 Z" fill="#fbbf24" opacity="0.4"/>
+  
+  <!-- Tracking Dot -->
+  <circle cx="16" cy="18" r="1" fill="#fbbf24"/>
+</svg>
