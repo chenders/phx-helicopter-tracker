@@ -23,7 +23,7 @@ class FlightLog(Base):
     aircraft_id = Column(Integer, ForeignKey("aircraft.id"), nullable=False, index=True)
 
     # Flight identification
-    flight_id = Column(String(50), unique=True, index=True)  # Internal tracking ID
+    flight_id = Column(String(100), unique=True, index=True)  # Internal tracking ID
     callsign = Column(String(20), index=True)  # Radio callsign if available
 
     # Flight times
@@ -43,7 +43,7 @@ class FlightLog(Base):
     fuel_consumed_gallons = Column(Float)
 
     # Data sources
-    data_source = Column(String(20), index=True)  # 'flightradar24', 'manual'
+    data_source = Column(String(50), index=True)  # 'flightradar24', 'flightradar24_historical', 'manual'
     raw_data = Column(JSONB)  # Store original tracking data
 
     # Flight pattern analysis

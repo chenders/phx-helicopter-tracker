@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 // TODO: Migrate to AdvancedMarkerElement when @react-google-maps/api supports it
 // For now, using deprecated Marker which is still supported and will receive 12+ months notice before removal
 import { GoogleMap, LoadScript, MarkerF, InfoWindow, HeatmapLayer, Polygon, Polyline } from '@react-google-maps/api'
-import { useRealtimeFlights } from '../hooks/useRealtimeFlights'
+import { useRealtimeFlightsDB, useLiveTrackingStats, forceAPIUpdate } from '../hooks/useRealtimeFlightsDB'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useSurveillanceAlerts } from '../hooks/useSurveillanceAlerts'
 import { formatLocalTime, formatRelativeTime } from '../utils/dateUtils'
@@ -180,7 +180,9 @@ export function LiveTrackingPage() {
     }
   }, [])
   
-  const { data: realtimeFlights, isLoading } = useRealtimeFlights()
+  const { data: realtimeFlights, isLoading, refetch: refetchFlights } = useRealtimeFlightsDB()
+  const { data: trackingStats } = useLiveTrackingStats()
+  const [isForceUpdating, setIsForceUpdating] = useState(false)
   const { lastMessage, connectionStatus } = useWebSocket()
   const { data: alerts } = useSurveillanceAlerts()
 
@@ -312,17 +314,18 @@ export function LiveTrackingPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Live Flight Tracking</h1>
             <p className="text-gray-600 dark:text-gray-300">
-              Real-time Phoenix PD helicopter surveillance monitoring with constitutional violation detection
+              Phoenix PD helicopter tracking from database (updated every 5 min) • No API calls
             </p>
           </div>
-          <div className="text-right">
-            <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${
-              connectionStatus === 'connected' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-            }`}>
-              <div className={`w-2 h-2 rounded-full mr-2 ${
-                connectionStatus === 'connected' ? 'bg-green-600' : 'bg-red-600'
-              }`}></div>
-              {connectionStatus === 'connected' ? 'Live Data Connected' : 'Connection Lost'}
+          <div className="text-right space-y-2">
+            {trackingStats && (
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Last DB Update: {trackingStats.minutes_since_update ? `${trackingStats.minutes_since_update} min ago` : 'Unknown'}
+              </div>
+            )}
+            <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300`}>
+              <div className="w-2 h-2 rounded-full mr-2 bg-blue-600"></div>
+              Database Mode (No API Calls)
             </div>
           </div>
         </div>
@@ -379,6 +382,31 @@ export function LiveTrackingPage() {
             className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
           >
             Reset View
+          </button>
+          
+          <button
+            onClick={async () => {
+              if (isForceUpdating) return
+              setIsForceUpdating(true)
+              try {
+                const result = await forceAPIUpdate()
+                alert(`Force update complete: ${result.positions_found} positions found (1 API credit used)`)
+                setTimeout(() => refetchFlights(), 1000)
+              } catch (error: any) {
+                alert(`Update failed: ${error.response?.data?.detail || error.message}`)
+              } finally {
+                setIsForceUpdating(false)
+              }
+            }}
+            disabled={isForceUpdating}
+            className={`px-3 py-1 text-sm rounded ${
+              isForceUpdating 
+                ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+                : 'bg-orange-500 text-white hover:bg-orange-600'
+            }`}
+            title="Makes an API call to FR24 for immediate update (uses credits)"
+          >
+            {isForceUpdating ? 'Updating...' : '⚡ Force API Update'}
           </button>
 
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
@@ -586,6 +614,45 @@ export function LiveTrackingPage() {
           </GoogleMap>
         </LoadScript>
       </div>
+
+      {/* Database Status Panel */}
+      {trackingStats && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+          <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Database Tracking Status</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-50 dark:bg-gray-700 rounded p-3">
+              <div className="text-sm text-gray-600 dark:text-gray-400">Active Aircraft</div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                {trackingStats.active_aircraft?.phoenix_pd || 0}
+              </div>
+              <div className="text-xs text-gray-500">Phoenix PD</div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded p-3">
+              <div className="text-sm text-gray-600 dark:text-gray-400">Last Update</div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                {trackingStats.minutes_since_update ? `${Math.round(trackingStats.minutes_since_update)}` : '?'}
+              </div>
+              <div className="text-xs text-gray-500">minutes ago</div>
+            </div>
+            <div className="bg-gray-50 dark:bg-gray-700 rounded p-3">
+              <div className="text-sm text-gray-600 dark:text-gray-400">Positions (15 min)</div>
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                {trackingStats.database_positions?.last_15_minutes || 0}
+              </div>
+              <div className="text-xs text-gray-500">in database</div>
+            </div>
+            <div className="bg-green-50 dark:bg-green-900/30 rounded p-3">
+              <div className="text-sm text-green-700 dark:text-green-400">API Credits Used</div>
+              <div className="text-2xl font-bold text-green-800 dark:text-green-300">0</div>
+              <div className="text-xs text-green-600 dark:text-green-400">Database mode</div>
+            </div>
+          </div>
+          <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+            <strong>Note:</strong> Flight positions are updated every 5 minutes when aircraft are active. Complete flight paths are downloaded when flights land.
+            This page uses stored data and makes <strong>zero API calls</strong>.
+          </div>
+        </div>
+      )}
 
       {/* Flight Details Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

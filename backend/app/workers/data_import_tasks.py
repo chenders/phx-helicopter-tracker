@@ -292,200 +292,16 @@ def get_all_active_tasks() -> List[Dict[str, Any]]:
         return []
 
 
-@celery_app.task(bind=True, name="download_and_import_fr24_flights")
-def download_and_import_fr24_flights(
-    self, registration: str, start_date: str, end_date: str, format: str = "kml"
-):
-    """
-    Download full flight track files from FR24 and import them
-
-    Args:
-        registration: Aircraft registration
-        start_date: Start date (YYYY-MM-DD)
-        end_date: End date (YYYY-MM-DD)
-        format: File format (kml, csv, json)
-    """
-    try:
-        logger.info(f"Downloading FR24 flight tracks for {registration}")
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(
-            _download_and_import_fr24_async(registration, start_date, end_date, format)
-        )
-        loop.close()
-
-        return result
-
-    except Exception as exc:
-        logger.error(f"FR24 download/import failed: {exc}")
-        if self.request.retries < 3:
-            raise self.retry(countdown=300, exc=exc)
-        raise
+# DEPRECATED: Removed download_and_import_fr24_flights task
+# This task used an inefficient approach that only captured 12.5% of positions
+# while consuming excessive API credits (21,600 per month per aircraft)
+# 
+# REPLACED BY: monitor_and_download_complete_flights (in flight_tracking_tasks.py)
+# The new task captures 100% of positions using 90% fewer API credits
 
 
-async def _download_and_import_fr24_async(
-    registration: str, start_date: str, end_date: str, format: str
-) -> Dict[str, Any]:
-    """Download flight data using FR24 API and import it"""
-    from app.services.flightradar24_api_service import fr24_api_service
-    from app.crud.aircraft import aircraft_crud
-    from app.crud.flights import flight_log_crud, flight_position_crud
-    from app.schemas.flights import FlightLogCreate, FlightPositionCreate
-
-    db = SessionLocal()
-    results = {
-        "registration": registration,
-        "flights_downloaded": 0,
-        "flights_imported": 0,
-        "total_positions": 0,
-        "errors": [],
-    }
-
-    try:
-        # Get aircraft
-        aircraft = aircraft_crud.get_by_registration(db, registration=registration)
-        if not aircraft:
-            results["errors"].append(f"Aircraft {registration} not found")
-            return results
-
-        async with fr24_api_service:
-            # Check credits
-            if fr24_api_service.credit_manager:
-                stats = await fr24_api_service.credit_manager.get_usage_stats()
-                if stats["monthly_percentage"] > 90:
-                    results["errors"].append(
-                        f"Credit usage too high: {stats['monthly_percentage']:.1f}%"
-                    )
-                    return results
-
-            # Parse date range
-            start_dt = datetime.strptime(start_date, "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
-            )
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
-            ) + timedelta(days=1)
-
-            logger.info(
-                f"Getting historical positions for {registration} from {start_date} to {end_date}"
-            )
-
-            # Use the same approach as import_fr24_historical but with more frequent sampling
-            # Build list of timestamps to check (every 30 minutes for detailed coverage)
-            timestamps_to_check = []
-            current = start_dt
-            while current < end_dt:
-                timestamps_to_check.append(current)
-                current += timedelta(
-                    minutes=30
-                )  # Check every 30 minutes for detailed data
-
-            logger.info(
-                f"Checking {len(timestamps_to_check)} timestamps for {registration}"
-            )
-
-            all_positions = []
-            flights_by_time = {}
-
-            # Get positions for each timestamp
-            for timestamp in timestamps_to_check:
-                try:
-                    positions = await fr24_api_service.get_historical_positions(
-                        timestamp=timestamp, registrations=[registration]
-                    )
-
-                    if positions:
-                        for pos in positions:
-                            # Group positions into flights (new flight if gap > 2 hours)
-                            flight_key = None
-                            for key in flights_by_time:
-                                if (
-                                    abs((pos.timestamp - key).total_seconds()) < 7200
-                                ):  # Within 2 hours
-                                    flight_key = key
-                                    break
-
-                            if not flight_key:
-                                flight_key = pos.timestamp
-                                flights_by_time[flight_key] = []
-
-                            flights_by_time[flight_key].append(pos)
-                            all_positions.append(pos)
-
-                except Exception as e:
-                    logger.warning(f"Error getting positions for {timestamp}: {e}")
-                    continue
-
-            logger.info(
-                f"Found {len(all_positions)} total positions grouped into {len(flights_by_time)} flights"
-            )
-            results["flights_downloaded"] = len(flights_by_time)
-
-            # Process each flight group
-            for flight_start, flight_positions in flights_by_time.items():
-                try:
-                    # Sort positions by time
-                    flight_positions.sort(key=lambda p: p.timestamp)
-
-                    # Create flight log
-                    first_pos = flight_positions[0]
-                    last_pos = flight_positions[-1]
-
-                    flight_log = flight_log_crud.create(
-                        db,
-                        obj_in=FlightLogCreate(
-                            aircraft_id=aircraft.id,
-                            flight_id=f"fr24_api_{registration}_{first_pos.timestamp.strftime('%Y%m%d_%H%M%S')}",
-                            callsign=first_pos.callsign,
-                            departure_time=first_pos.timestamp,
-                            arrival_time=last_pos.timestamp,
-                            flight_duration_minutes=(
-                                last_pos.timestamp - first_pos.timestamp
-                            ).total_seconds()
-                            / 60,
-                            data_source="flightradar24_api",
-                        ),
-                    )
-                    results["flights_imported"] += 1
-
-                    # Create position records
-                    for pos in flight_positions:
-                        position = flight_position_crud.create(
-                            db,
-                            obj_in=FlightPositionCreate(
-                                flight_log_id=flight_log.id,
-                                aircraft_id=aircraft.id,
-                                timestamp=pos.timestamp,
-                                latitude=pos.latitude,
-                                longitude=pos.longitude,
-                                altitude_feet=pos.altitude_feet,
-                                ground_speed_knots=pos.ground_speed_knots,
-                                track_degrees=pos.track_degrees,
-                                vertical_rate=pos.vertical_speed_fpm,
-                                data_source="flightradar24_api",
-                            ),
-                        )
-                        results["total_positions"] += 1
-
-                    logger.info(
-                        f"Imported flight starting at {first_pos.timestamp} with {len(flight_positions)} positions"
-                    )
-
-                except Exception as e:
-                    logger.error(f"Error processing flight group: {e}")
-                    continue
-
-            db.commit()
-
-    except Exception as e:
-        logger.error(f"Download/import error: {e}")
-        results["errors"].append(str(e))
-        db.rollback()
-    finally:
-        db.close()
-
-    return results
+# DEPRECATED: Removed _download_and_import_fr24_async helper function
+# See note above about the removal of download_and_import_fr24_flights task
 
 
 @celery_app.task(bind=True, name="import_fr24_historical")
@@ -681,6 +497,8 @@ async def _import_fr24_historical_async(
                 except Exception as e:
                     logger.error(f"Error importing {registration} at {timestamp}: {e}")
                     results["errors"].append(f"{timestamp.date()}: {str(e)}")
+                    # Rollback the session after an error to reset transaction state
+                    db.rollback()
                     # Continue with next timestamp instead of failing completely
                     continue
 

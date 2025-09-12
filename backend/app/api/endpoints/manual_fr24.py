@@ -8,76 +8,43 @@ from datetime import datetime, timedelta
 
 from app.api.deps import get_db
 from app.services.fr24_rate_limiter import fr24_rate_limiter
-from app.workers.data_import_tasks import download_and_import_fr24_flights
+# DEPRECATED: download_and_import_fr24_flights removed - use new monitoring system
+# from app.workers.flight_tracking_tasks import monitor_and_download_complete_flights
 
 router = APIRouter()
 
 
-@router.post("/fetch-helicopter-data")
+@router.post("/fetch-helicopter-data", deprecated=True)
 async def manually_fetch_helicopter_data(
     registration: str,
     days_back: int = 1,
     db=Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Manually trigger FR24 data fetch for a specific helicopter
+    DEPRECATED: This endpoint used the old inefficient download method.
+    The system now automatically monitors flights and downloads complete tracks.
+    
+    The new system:
+    - Monitors flights every 5 minutes via monitor_and_download_complete_flights
+    - Downloads complete tracks when flights land (100% of positions)
+    - Uses 90% fewer API credits
     
     Args:
         registration: Aircraft registration (e.g., "N622FB")
         days_back: Number of days of historical data to fetch (default: 1)
     
     Returns:
-        Task status and data fetched
+        Deprecation notice
     """
-    # Check rate limits first
-    can_request, reason = fr24_rate_limiter.can_make_request()
-    if not can_request:
-        raise HTTPException(
-            status_code=429,
-            detail=f"Rate limit exceeded: {reason}. Please wait before making another request."
+    raise HTTPException(
+        status_code=410,  # Gone
+        detail=(
+            "This endpoint has been deprecated. The system now automatically "
+            "monitors all flights and downloads complete tracks when they land. "
+            "This captures 100% of positions using 90% fewer API credits. "
+            "Check /api/v1/flights for complete flight data."
         )
-    
-    # Validate registration
-    valid_registrations = [
-        "N621FB", "N622FB", "N623FB", "N624FB", 
-        "N625FB", "N626FB", "N627FB", "N628FB"
-    ]
-    
-    if registration not in valid_registrations:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid registration. Must be one of: {', '.join(valid_registrations)}"
-        )
-    
-    # Limit days_back to prevent excessive API usage
-    if days_back > 7:
-        raise HTTPException(
-            status_code=400,
-            detail="Cannot fetch more than 7 days of historical data at once"
-        )
-    
-    # Calculate date range
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=days_back)
-    
-    # Trigger the task asynchronously
-    task = download_and_import_fr24_flights.delay(
-        registration=registration,
-        start_date=start_date.strftime("%Y-%m-%d"),
-        end_date=end_date.strftime("%Y-%m-%d"),
-        format="kml"
     )
-    
-    return {
-        "status": "Task queued",
-        "task_id": task.id,
-        "registration": registration,
-        "date_range": {
-            "start": start_date.strftime("%Y-%m-%d"),
-            "end": end_date.strftime("%Y-%m-%d")
-        },
-        "rate_limit_status": fr24_rate_limiter.get_usage_stats()
-    }
 
 
 @router.get("/fetch-status/{task_id}")

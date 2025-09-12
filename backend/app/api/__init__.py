@@ -13,6 +13,7 @@ from app.api.endpoints import (
     rate_limit_status,
     manual_fr24,
     radio,
+    live_database,
 )
 
 api_router = APIRouter()
@@ -40,3 +41,6 @@ api_router.include_router(
     manual_fr24.router, prefix="/manual-fr24", tags=["manual_fr24"]
 )
 api_router.include_router(radio.router, prefix="/radio", tags=["radio"])
+api_router.include_router(
+    live_database.router, prefix="/tracking", tags=["tracking"]
+)

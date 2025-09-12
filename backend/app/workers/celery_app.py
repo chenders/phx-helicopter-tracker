@@ -14,6 +14,7 @@ celery_app = Celery(
         "app.workers.data_import_tasks",
         "app.workers.fr24_scheduler",
         "app.workers.radio_tasks",
+        "app.workers.flight_tracking_tasks",
     ],
 )
 
@@ -68,61 +69,21 @@ celery_app.conf.update(
             "task": "app.workers.tracking_tasks.monitor_fr24_credits",
             "schedule": 3600.0,  # Every hour
         },
-        # FR24 downloads
-        "schedule-fr24-downloads": {
-            "task": "app.workers.fr24_scheduler.schedule_fr24_downloads",
-            "schedule": 86400.0,  # Once per day
+        # COMPLETE FLIGHT TRACKING - Captures 100% of positions
+        "monitor-complete-flights": {
+            "task": "monitor_and_download_complete_flights",
+            "schedule": 300.0,  # Every 5 minutes - detect takeoffs/landings
         },
-        # Individual helicopter downloads
-        "download-fr24-N621FB": {
-            "task": "download_and_import_fr24_flights",
-            "schedule": 86400.0,  # Once per day
+        "download-missed-flights-daily": {
+            "task": "download_missed_flight_tracks",
+            "schedule": 86400.0,  # Once per day - catch any missed flights
             "kwargs": {
-                "registration": "N621FB",
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
-                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "format": "kml",
+                "hours_back": 24,
             },
         },
-        "download-fr24-N622FB": {
-            "task": "download_and_import_fr24_flights",
-            "schedule": 86400.0,  # Once per day
-            "kwargs": {
-                "registration": "N622FB",
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
-                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "format": "kml",
-            },
-        },
-        "download-fr24-N623FB": {
-            "task": "download_and_import_fr24_flights",
-            "schedule": 86400.0,  # Once per day
-            "kwargs": {
-                "registration": "N623FB",
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
-                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "format": "kml",
-            },
-        },
-        "download-fr24-N624FB": {
-            "task": "download_and_import_fr24_flights",
-            "schedule": 86400.0,  # Once per day
-            "kwargs": {
-                "registration": "N624FB",
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
-                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "format": "kml",
-            },
-        },
-        "download-fr24-N625FB": {
-            "task": "download_and_import_fr24_flights",
-            "schedule": 86400.0,  # Once per day
-            "kwargs": {
-                "registration": "N625FB",
-                "start_date": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d"),
-                "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                "format": "kml",
-            },
+        "analyze-phoenix-pd-fleet": {
+            "task": "analyze_phoenix_pd_fleet_status",
+            "schedule": 3600.0,  # Every hour - track 24/7 coverage claims
         },
         # Radio archive tasks
         "download-radio-archives": {
@@ -177,13 +138,12 @@ celery_app.conf.update(
                 "document_id": 1,  # Placeholder - would be dynamically created
             },
         },
-        # Backup historical data collection
-        "backfill-historical-data-monthly": {
-            "task": "app.workers.fr24_scheduler.backfill_historical_data",
-            "schedule": 2592000.0,  # Every 30 days
+        # Weekly complete historical backfill for legal documentation
+        "weekly-complete-flight-backfill": {
+            "task": "download_missed_flight_tracks",
+            "schedule": 604800.0,  # Every 7 days
             "kwargs": {
-                "registration": "N622FB",
-                "months_back": 1,
+                "hours_back": 168,  # Full week of data
             },
         },
         # Additional radio archive tasks

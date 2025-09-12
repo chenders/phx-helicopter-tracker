@@ -35,7 +35,7 @@ def task_prerun_handler(sender=None, task_id=None, task=None, args=None, kwargs=
             db.add(task_history)
             
             # Create event for important task starts
-            important_tasks = ['download_and_import_fr24_flights', 'analyze_flight_patterns', 
+            important_tasks = ['monitor_and_download_complete_flights', 'analyze_flight_patterns', 
                              'transcribe_radio_archives', 'download_broadcastify_archives']
             if task and any(t in task.name for t in important_tasks):
                 task_event = TaskEvent(
