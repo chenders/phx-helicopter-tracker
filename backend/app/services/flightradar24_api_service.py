@@ -78,7 +78,7 @@ class FR24Position:
 class CreditManager:
     """Manages API credit usage and tracking"""
 
-    def __init__(self, redis_client: redis.Redis, monthly_limit: int = 60000):
+    def __init__(self, redis_client: redis.Redis, monthly_limit: int = 666000):
         self.redis = redis_client
         self.monthly_limit = monthly_limit
         self.credit_costs = {
@@ -247,7 +247,7 @@ class FlightRadar24APIService:
         self.redis = await redis.from_url(redis_url, decode_responses=True)
 
         # Initialize credit manager
-        monthly_limit = int(getattr(settings, "FR24_MONTHLY_CREDIT_LIMIT", 60000))
+        monthly_limit = int(getattr(settings, "FR24_MONTHLY_CREDIT_LIMIT", 666000))
         self.credit_manager = CreditManager(self.redis, monthly_limit)
 
         logger.info("FR24 API Service initialized successfully")

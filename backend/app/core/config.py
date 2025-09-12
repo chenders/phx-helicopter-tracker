@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     FR24_API_KEY_SANDBOX: Optional[str] = None
     FR24_API_KEY_PRODUCTION: Optional[str] = None
     FR24_API_ENVIRONMENT: str = "production"  # Options: 'sandbox', 'production'
-    FR24_MONTHLY_CREDIT_LIMIT: int = 60000
+    FR24_MONTHLY_CREDIT_LIMIT: int = 666000
 
     # CORS settings
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3001", "http://localhost:3000"]

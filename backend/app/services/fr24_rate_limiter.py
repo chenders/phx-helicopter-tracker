@@ -33,7 +33,7 @@ class FR24RateLimiter:
             "per_minute": 30,  # STRICT LIMIT: 30 requests per minute total
             "per_hour": 1000,  # Conservative hourly limit
             "per_day": 10000,  # Conservative daily limit  
-            "monthly_credits": int(getattr(settings, "FR24_MONTHLY_CREDIT_LIMIT", 500000))
+            "monthly_credits": int(getattr(settings, "FR24_MONTHLY_CREDIT_LIMIT", 666000))
         }
         
         # Minimum delays between requests (in seconds)
