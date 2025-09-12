@@ -59,6 +59,7 @@ export function RadioPage() {
   const [playingAudio, setPlayingAudio] = useState<string | null>(null)
   const [audioCurrentTime, setAudioCurrentTime] = useState(0)
   const [audioDuration, setAudioDuration] = useState(0)
+  const [playingSegment, setPlayingSegment] = useState<{filename: string, startTime: number, endTime: number} | null>(null)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
@@ -95,6 +96,18 @@ export function RadioPage() {
       }
     }
   }, [audioCurrentTime, playingAudio, autoScrollEnabled]) // Trigger when time updates or auto-scroll changes
+
+  // Auto-stop audio when reaching end of search result segment
+  useEffect(() => {
+    if (playingSegment && audioRef.current && playingAudio === playingSegment.filename) {
+      // Check if current time has reached or passed the segment end time
+      if (audioCurrentTime >= playingSegment.endTime) {
+        console.log('Auto-stopping audio at segment end:', playingSegment.endTime)
+        audioRef.current.pause()
+        setPlayingSegment(null) // Clear the playing segment
+      }
+    }
+  }, [audioCurrentTime, playingSegment, playingAudio])
 
   const fetchArchives = async () => {
     try {
@@ -267,6 +280,11 @@ export function RadioPage() {
         audioRef.current.pause()
       }
       
+      // Clear any playing segment when switching files
+      if (seekToTime === undefined) {
+        setPlayingSegment(null)
+      }
+      
       const audio = new Audio(`/api/v1/radio/archives/${filename}/audio`)
       audioRef.current = audio
       
@@ -298,6 +316,7 @@ export function RadioPage() {
         console.log('audio ended')
         setPlayingAudio(null)
         setAudioCurrentTime(0)
+        setPlayingSegment(null) // Clear playing segment when audio ends
       })
       
       // Start playing immediately, we'll seek once it's ready
@@ -321,6 +340,7 @@ export function RadioPage() {
       if (playingAudio === filename && audioRef.current) {
         audioRef.current.pause()
         setPlayingAudio(null)
+        setPlayingSegment(null) // Clear playing segment when stopping audio
       }
     } else {
       setExpandedRow(filename)
@@ -358,6 +378,86 @@ export function RadioPage() {
         audioRef.current.play()
       }
     }
+  }
+
+  const handleSearchResultClick = (startTime: number, endTime: number, filename: string) => {
+    console.log('handleSearchResultClick called:', { startTime, endTime, filename })
+    
+    // Check if this segment is currently playing
+    const isCurrentlyPlaying = playingSegment && 
+      playingSegment.filename === filename && 
+      playingSegment.startTime === startTime &&
+      playingAudio === filename &&
+      audioRef.current && !audioRef.current.paused
+    
+    if (isCurrentlyPlaying) {
+      // Pause the audio if this segment is currently playing
+      audioRef.current.pause()
+      setPlayingSegment(null)
+      return
+    }
+    
+    // Set the playing segment for auto-stop functionality
+    setPlayingSegment({ filename, startTime, endTime })
+    
+    // Expand the row in the archives table to show the full transcript
+    setExpandedRow(filename)
+    
+    // Fetch transcription if available
+    const archive = archives.find(a => a.filename === filename)
+    if (archive?.has_transcription) {
+      fetchTranscription(filename)
+    }
+    
+    // Start playing audio at the specified time
+    handleTranscriptClick(startTime, filename)
+    
+    // Optional: scroll to the archives table to show the expanded row
+    setTimeout(() => {
+      const archiveRow = document.querySelector(`[data-filename="${filename}"]`)
+      if (archiveRow) {
+        archiveRow.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 100)
+  }
+
+  const handleFullClipClick = (filename: string) => {
+    console.log('handleFullClipClick called:', { filename })
+    
+    // Find which page this file is on
+    const sortedArchives = [...archives].sort((a, b) => {
+      const dateA = a.filename.substring(0, 8) + a.filename.substring(9, 19)
+      const dateB = b.filename.substring(0, 8) + b.filename.substring(9, 19)
+      return dateB.localeCompare(dateA) // Descending order
+    })
+    
+    const fileIndex = sortedArchives.findIndex(archive => archive.filename === filename)
+    if (fileIndex === -1) {
+      console.warn('File not found in archives:', filename)
+      return
+    }
+    
+    // Calculate which page the file is on
+    const targetPage = Math.floor(fileIndex / itemsPerPage) + 1
+    
+    // Navigate to the correct page if needed
+    if (targetPage !== currentPage) {
+      setCurrentPage(targetPage)
+    }
+    
+    // Scroll to the archives table and highlight the row
+    setTimeout(() => {
+      const archiveRow = document.querySelector(`[data-filename="${filename}"]`)
+      if (archiveRow) {
+        archiveRow.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        
+        // Add a brief highlight effect to make it clear which row we navigated to
+        archiveRow.classList.add('bg-yellow-100', 'dark:bg-yellow-900/30')
+        setTimeout(() => {
+          archiveRow.classList.remove('bg-yellow-100', 'dark:bg-yellow-900/30')
+        }, 2000) // Remove highlight after 2 seconds
+      }
+    }, targetPage !== currentPage ? 300 : 100) // Wait longer if we need to change pages
   }
 
   const downloadFile = (filename: string, type: 'mp3' | 'txt' = 'mp3') => {
@@ -507,20 +607,61 @@ export function RadioPage() {
             ) : (
               searchResults.map((result, idx) => (
                 <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
-                  <div className="font-medium text-gray-900 dark:text-white">
-                    {result.filename}
+                  <div className="flex items-center justify-between mb-2">
+                    <button
+                      onClick={() => handleFullClipClick(result.filename)}
+                      className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 underline decoration-dotted hover:decoration-solid transition-all cursor-pointer text-left flex items-center"
+                      title="Click to navigate to this file in the archives table"
+                    >
+                      <span className="mr-2">📁</span>
+                      {result.filename}
+                    </button>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center ml-2">
+                      <span className="mr-1">📄</span>
+                      View file
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                  <div className="text-sm text-gray-600 dark:text-gray-300 mb-3">
                     {result.total_matches} matches • Model: {result.model}
                   </div>
-                  {result.matching_segments.slice(0, 2).map((seg: any, segIdx: number) => (
-                    <div key={segIdx} className="mt-2 p-2 bg-white dark:bg-gray-600 rounded text-sm">
-                      <span className="text-gray-500 dark:text-gray-400">
-                        [{formatTime(seg.start)} - {formatTime(seg.end)}]
-                      </span>
-                      <span className="ml-2 text-gray-900 dark:text-white">{seg.text}</span>
+                  <div className="border-l-2 border-gray-300 dark:border-gray-600 pl-3 space-y-2">
+                    <div className="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium mb-2">
+                      Search Matches:
                     </div>
-                  ))}
+                    {result.matching_segments.slice(0, 2).map((seg: any, segIdx: number) => {
+                    const isCurrentlyPlaying = playingSegment && 
+                      playingSegment.filename === result.filename && 
+                      playingSegment.startTime === seg.start &&
+                      playingAudio === result.filename &&
+                      audioRef.current && !audioRef.current.paused
+                    
+                    return (
+                      <div 
+                        key={segIdx} 
+                        onClick={() => handleSearchResultClick(seg.start, seg.end, result.filename)}
+                        className="mt-2 p-2 bg-white dark:bg-gray-600 rounded text-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors group"
+                        title={isCurrentlyPlaying ? "Click to pause audio" : "Click to play audio at this time and show full transcript"}
+                      >
+                        <span className="text-blue-600 dark:text-blue-400 group-hover:text-blue-800 dark:group-hover:text-blue-300 font-medium flex items-center">
+                          [{formatTime(seg.start)} - {formatTime(seg.end)}] 
+                          <span className="ml-1">
+                            {isCurrentlyPlaying ? (
+                              <Pause className="h-3 w-3 inline" />
+                            ) : (
+                              <Play className="h-3 w-3 inline" />
+                            )}
+                          </span>
+                        </span>
+                        <span className="ml-2 text-gray-900 dark:text-white">{seg.text}</span>
+                      </div>
+                      )
+                    })}
+                    {result.total_matches > 2 && (
+                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
+                        ... and {result.total_matches - 2} more matches in this file
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))
             )}
@@ -605,7 +746,7 @@ export function RadioPage() {
                   
                   return (
                     <React.Fragment key={archive.filename}>
-                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <tr className="hover:bg-gray-50 dark:hover:bg-gray-700" data-filename={archive.filename}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
                           {fileInfo.dateStr}
                         </td>
