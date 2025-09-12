@@ -14,7 +14,6 @@ celery_app = Celery(
         "app.workers.data_import_tasks",
         "app.workers.fr24_scheduler",
         "app.workers.radio_tasks",
-        "app.workers.test_task",
     ],
 )
 
