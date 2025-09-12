@@ -91,27 +91,27 @@ export function HomePage() {
 
       {/* Current Activity */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-        <h2 className="text-xl font-semibold mb-4">Current Phoenix PD Aircraft Activity</h2>
+        <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Current Phoenix PD Aircraft Activity</h2>
         {realtimeFlights && realtimeFlights.length > 0 ? (
           <div className="space-y-4">
             {realtimeFlights.map((flight: any) => (
-              <div key={flight.aircraft_id} className="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
+              <div key={flight.aircraft_id} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                 <div>
-                  <div className="font-semibold">{flight.aircraft_registration}</div>
+                  <div className="font-semibold text-gray-900 dark:text-white">{flight.aircraft_registration}</div>
                   <div className="text-sm text-gray-600 dark:text-gray-300">
                     Altitude: {flight.altitude} ft • Speed: {flight.speed} mph
                   </div>
                   {flight.is_surveillance && (
-                    <div className="text-sm text-orange-600 font-medium">
+                    <div className="text-sm text-orange-600 dark:text-orange-400 font-medium">
                       ⚠️ Potential surveillance activity detected
                     </div>
                   )}
                 </div>
                 <div className="text-right">
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
                     Last seen: {formatRelativeTime(flight.last_seen)}
                   </div>
-                  <div className="text-sm font-medium">
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Cost: ${flight.hourly_cost_estimate}/hour
                   </div>
                 </div>
@@ -119,7 +119,7 @@ export function HomePage() {
             ))}
           </div>
         ) : (
-          <p className="text-gray-500 text-center py-8">
+          <p className="text-gray-500 dark:text-gray-400 text-center py-8">
             No Phoenix PD aircraft currently tracked. Real-time monitoring active.
           </p>
         )}

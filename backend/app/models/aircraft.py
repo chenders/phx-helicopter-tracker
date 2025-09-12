@@ -20,6 +20,7 @@ class Aircraft(Base):
     make = Column(String(50))  # e.g., "Airbus"
     model = Column(String(50))  # e.g., "H125"
     year_manufactured = Column(Integer)
+    operator = Column(String(100))  # e.g., "Phoenix Police Dept", "Private", etc.
 
     # Phoenix PD specific
     is_phoenix_pd = Column(Boolean, default=False, index=True)

@@ -185,6 +185,11 @@ export function LiveTrackingPage() {
   const [isForceUpdating, setIsForceUpdating] = useState(false)
   const { lastMessage, connectionStatus } = useWebSocket()
   const { data: alerts } = useSurveillanceAlerts()
+  
+  // Detect if we're using API fallback
+  const isUsingApiFallback = realtimeFlights?.some((flight: any) => 
+    flight.data_source === 'fr24_api' || flight.raw_data?.fallback_note
+  )
 
   // Map API response to FlightData format
   const mappedFlights = realtimeFlights?.map((flight: any, index: number) => {
@@ -641,15 +646,19 @@ export function LiveTrackingPage() {
               </div>
               <div className="text-xs text-gray-500">in database</div>
             </div>
-            <div className="bg-green-50 dark:bg-green-900/30 rounded p-3">
-              <div className="text-sm text-green-700 dark:text-green-400">API Credits Used</div>
-              <div className="text-2xl font-bold text-green-800 dark:text-green-300">0</div>
-              <div className="text-xs text-green-600 dark:text-green-400">Database mode</div>
+            <div className={`${isUsingApiFallback ? 'bg-orange-50 dark:bg-orange-900/30' : 'bg-green-50 dark:bg-green-900/30'} rounded p-3`}>
+              <div className={`text-sm ${isUsingApiFallback ? 'text-orange-700 dark:text-orange-400' : 'text-green-700 dark:text-green-400'}`}>API Credits Used</div>
+              <div className={`text-2xl font-bold ${isUsingApiFallback ? 'text-orange-800 dark:text-orange-300' : 'text-green-800 dark:text-green-300'}`}>{isUsingApiFallback ? '~1' : '0'}</div>
+              <div className={`text-xs ${isUsingApiFallback ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}`}>
+                {isUsingApiFallback ? 'API fallback' : 'Database mode'}
+              </div>
             </div>
           </div>
           <div className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-            <strong>Note:</strong> Flight positions are updated every 5 minutes when aircraft are active. Complete flight paths are downloaded when flights land.
-            This page uses stored data and makes <strong>zero API calls</strong>.
+            <strong>Note:</strong> {isUsingApiFallback 
+              ? 'Database has stale data. Using FR24 API for real-time positions (~1 credit per refresh).' 
+              : 'Flight positions are updated every 5 minutes when aircraft are active. Complete flight paths are downloaded when flights land. This page uses stored data and makes zero API calls.'
+            }
           </div>
         </div>
       )}
