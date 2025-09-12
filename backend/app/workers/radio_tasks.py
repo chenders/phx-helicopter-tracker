@@ -410,21 +410,25 @@ def transcribe_radio_archives(
                 # Track transcription start time for performance metrics
                 transcription_start = time.time()
 
-                # Transcribe with Whisper - optimized for accuracy
+                # Transcribe with Whisper - optimized to prevent repetition
                 result = model.transcribe(
                     str(mp3_file),
                     fp16=False,  # Use FP32 for better accuracy on CPU
                     language="en",  # Explicitly specify English
                     task="transcribe",  # Transcribe, not translate
                     verbose=False,
-                    temperature=0,  # Most deterministic results for accuracy
-                    best_of=5,  # Use best of 5 candidates for better accuracy (slower)
-                    beam_size=5,  # Beam search for better accuracy (slower)
-                    patience=1.0,  # Default patience for beam search
+                    temperature=0.2,  # Slightly higher temperature to avoid getting stuck
+                    best_of=1,  # Reduce to prevent getting stuck on same output
+                    beam_size=3,  # Reduced beam size to prevent repetition loops
+                    patience=0.5,  # Reduced patience to stop early if stuck
                     length_penalty=1.0,  # Default length penalty
-                    suppress_tokens="",  # Don't suppress any tokens
-                    condition_on_previous_text=True,  # Better context (slower but more accurate)
+                    suppress_tokens="-1",  # Default token suppression
+                    condition_on_previous_text=False,  # Disable to prevent repetition cascades
                     word_timestamps=False,  # We don't need word-level timestamps
+                    no_speech_threshold=0.6,  # Higher threshold to skip silent/noisy sections
+                    compression_ratio_threshold=2.4,  # Lower threshold to reject repetitive text
+                    logprob_threshold=-1.0,  # Average log probability threshold
+                    initial_prompt="This is a Phoenix police radio communication transcript.",  # Guide the model
                 )
 
                 # Track transcription time
@@ -443,16 +447,60 @@ def transcribe_radio_archives(
                     "segments": [],
                 }
 
-                # Add segment details with timestamps
+                # Function to detect repetitive text
+                def is_repetitive(text, threshold=3):
+                    """Check if text contains repetitive patterns"""
+                    if not text or len(text) < 10:
+                        return False
+                    
+                    words = text.split()
+                    if len(words) < 5:
+                        return False
+                    
+                    # Check for repeating phrases (3+ words)
+                    for phrase_len in range(3, min(6, len(words) // 2)):
+                        for i in range(len(words) - phrase_len * 2):
+                            phrase = ' '.join(words[i:i + phrase_len])
+                            remaining_text = ' '.join(words[i + phrase_len:])
+                            
+                            # Count occurrences of the phrase
+                            count = remaining_text.count(phrase)
+                            if count >= threshold:
+                                return True
+                    
+                    return False
+
+                # Add segment details with timestamps, filtering repetitive ones
+                previous_text = ""
+                filtered_segments = []
+                
                 for segment in result.get("segments", []):
-                    transcription_data["segments"].append(
-                        {
-                            "id": segment.get("id"),
-                            "start": segment.get("start"),
-                            "end": segment.get("end"),
-                            "text": segment.get("text", "").strip(),
-                        }
-                    )
+                    segment_text = segment.get("text", "").strip()
+                    
+                    # Skip if segment is repetitive
+                    if is_repetitive(segment_text):
+                        logger.warning(f"Skipping repetitive segment: {segment_text[:50]}...")
+                        continue
+                    
+                    # Skip if identical to previous segment
+                    if segment_text == previous_text:
+                        logger.warning(f"Skipping duplicate segment: {segment_text[:50]}...")
+                        continue
+                    
+                    # Skip very short segments that might be noise
+                    if len(segment_text) < 3:
+                        continue
+                    
+                    filtered_segments.append({
+                        "id": segment.get("id"),
+                        "start": segment.get("start"),
+                        "end": segment.get("end"),
+                        "text": segment_text,
+                    })
+                    
+                    previous_text = segment_text
+                
+                transcription_data["segments"] = filtered_segments
 
                 # Save transcription as JSON
                 json_file = mp3_file.with_suffix(".json")

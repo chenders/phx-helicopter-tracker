@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { Sidebar } from './components/Sidebar'
 import { Header } from './components/Header'
+import { MobileNav } from './components/MobileNav'
 import { HomePage } from './pages/HomePage'
 import { LiveTrackingPage } from './pages/LiveTrackingPage'
 import { HistoricalAnalysisPage } from './pages/HistoricalAnalysisPage'
@@ -13,23 +15,60 @@ import { RadioPage } from './pages/RadioPage'
 import './App.css'
 
 function App() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 flex relative">
-      <Sidebar />
-      <Header />
-      <main className="flex-1 px-6 py-8 overflow-auto pt-16">
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/live" element={<LiveTrackingPage />} />
-          <Route path="/historical" element={<HistoricalAnalysisPage />} />
-          <Route path="/patterns" element={<PatternAnalysisPage />} />
-          <Route path="/costs" element={<CostAnalysisPage />} />
-          <Route path="/legal" element={<LegalDocumentsPage />} />
-          <Route path="/data-sources" element={<DataSourcesPage />} />
-          <Route path="/tasks" element={<TaskMonitoringPage />} />
-          <Route path="/radio" element={<RadioPage />} />
-        </Routes>
-      </main>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+      {isMobile ? (
+        // Mobile Layout
+        <div className="flex flex-col">
+          <MobileNav isOpen={isMobileMenuOpen} setIsOpen={setIsMobileMenuOpen} />
+          <main className="flex-1 px-4 py-4 pt-16">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/live" element={<LiveTrackingPage />} />
+              <Route path="/historical" element={<HistoricalAnalysisPage />} />
+              <Route path="/patterns" element={<PatternAnalysisPage />} />
+              <Route path="/costs" element={<CostAnalysisPage />} />
+              <Route path="/legal" element={<LegalDocumentsPage />} />
+              <Route path="/data-sources" element={<DataSourcesPage />} />
+              <Route path="/tasks" element={<TaskMonitoringPage />} />
+              <Route path="/radio" element={<RadioPage />} />
+            </Routes>
+          </main>
+        </div>
+      ) : (
+        // Desktop Layout
+        <div className="flex relative">
+          <Sidebar />
+          <Header />
+          <main className="flex-1 px-6 py-8 overflow-auto pt-16">
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/live" element={<LiveTrackingPage />} />
+              <Route path="/historical" element={<HistoricalAnalysisPage />} />
+              <Route path="/patterns" element={<PatternAnalysisPage />} />
+              <Route path="/costs" element={<CostAnalysisPage />} />
+              <Route path="/legal" element={<LegalDocumentsPage />} />
+              <Route path="/data-sources" element={<DataSourcesPage />} />
+              <Route path="/tasks" element={<TaskMonitoringPage />} />
+              <Route path="/radio" element={<RadioPage />} />
+            </Routes>
+          </main>
+        </div>
+      )}
     </div>
   )
 }

@@ -20,6 +20,7 @@ import redis.asyncio as redis
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
+from app.services.fr24_rate_limiter import fr24_rate_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -313,6 +314,28 @@ class FlightRadar24APIService:
         if cached:
             return cached
 
+        # Check rate limit before making request
+        can_request, reason = fr24_rate_limiter.can_make_request()
+        if not can_request:
+            logger.warning(f"FR24 API rate limit hit: {reason}")
+            # For async, we'll wait the appropriate time
+            if "minute" in reason:
+                await asyncio.sleep(60 - datetime.now().second + 1)
+            elif "hour" in reason:
+                await asyncio.sleep(60)  # Wait a minute and retry
+            else:
+                logger.error(f"FR24 API limit reached: {reason}")
+                return None
+            
+            # Recheck after waiting
+            can_request, reason = fr24_rate_limiter.can_make_request()
+            if not can_request:
+                logger.error(f"Still rate limited after waiting: {reason}")
+                return None
+        
+        # Enforce minimum delay between requests
+        fr24_rate_limiter._wait_if_needed()
+        
         # Make API request
         url = f"{self.base_url}/{endpoint}"
 
@@ -323,6 +346,12 @@ class FlightRadar24APIService:
 
                     # Record credit usage
                     await self.credit_manager.record_usage(credit_type)
+                    
+                    # Update rate limiter counters
+                    fr24_rate_limiter._increment_counter("minute")
+                    fr24_rate_limiter._increment_counter("hour")
+                    fr24_rate_limiter._increment_counter("day")
+                    fr24_rate_limiter._increment_counter("month")
 
                     # Cache response
                     ttl = self.cache_ttl.get(

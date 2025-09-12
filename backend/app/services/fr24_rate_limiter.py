@@ -28,17 +28,17 @@ class FR24RateLimiter:
             decode_responses=True
         )
         
-        # Rate limits based on FR24 subscription (VERY conservative to avoid 429s)
+        # Rate limits based on FR24 subscription (STRICT 30/minute limit)
         self.limits = {
-            "per_minute": 10,  # Very conservative limit (was 30)
-            "per_hour": 100,  # Reduced hourly limit (was 1000)
-            "per_day": 1000,  # Reduced daily limit (was 10000)
+            "per_minute": 30,  # STRICT LIMIT: 30 requests per minute total
+            "per_hour": 1000,  # Conservative hourly limit
+            "per_day": 10000,  # Conservative daily limit  
             "monthly_credits": int(getattr(settings, "FR24_MONTHLY_CREDIT_LIMIT", 500000))
         }
         
         # Minimum delays between requests (in seconds)
-        self.min_delay = 10.0  # 10 seconds between requests minimum (was 2)
-        self.backoff_base = 30.0  # Base backoff time when rate limited (was 5)
+        self.min_delay = 2.1  # 2.1 seconds between requests (allows ~28 req/min max)
+        self.backoff_base = 30.0  # Base backoff time when rate limited
         
         # Keys for Redis
         self.key_prefix = "fr24_rate_limit"

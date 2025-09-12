@@ -52,6 +52,7 @@ export function RadioPage() {
   const [transcription, setTranscription] = useState<Transcription | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
+  const [hasSearched, setHasSearched] = useState(false)
   const [downloadingTask, setDownloadingTask] = useState<string | null>(null)
   const [transcribingTask, setTranscribingTask] = useState<string | null>(null)
   const [transcribingFiles, setTranscribingFiles] = useState<Set<string>>(new Set())
@@ -127,7 +128,13 @@ export function RadioPage() {
   }
 
   const searchTranscriptions = async () => {
-    if (!searchQuery.trim()) return
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      setHasSearched(false)
+      return
+    }
+    
+    setHasSearched(true)
     
     try {
       const response = await axios.get('/api/v1/radio/search', {
@@ -136,6 +143,7 @@ export function RadioPage() {
       setSearchResults(response.data)
     } catch (error) {
       console.error('Search failed:', error)
+      setSearchResults([])
     }
   }
 
@@ -374,13 +382,13 @@ export function RadioPage() {
         
         {/* Stats */}
         {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-gray-50 dark:bg-gray-700 rounded p-4">
-              <div className="flex items-center space-x-2 mb-2">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+            <div className="bg-gray-50 dark:bg-gray-700 rounded p-3 md:p-4">
+              <div className="flex items-center space-x-1 md:space-x-2 mb-2">
                 <Database className="h-5 w-5 text-blue-500" />
-                <span className="text-sm text-gray-600 dark:text-gray-300">Total Archives</span>
+                <span className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Total Archives</span>
               </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
                 {stats.total_archives}
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -388,12 +396,12 @@ export function RadioPage() {
               </div>
             </div>
             
-            <div className="bg-gray-50 dark:bg-gray-700 rounded p-4">
-              <div className="flex items-center space-x-2 mb-2">
+            <div className="bg-gray-50 dark:bg-gray-700 rounded p-3 md:p-4">
+              <div className="flex items-center space-x-1 md:space-x-2 mb-2">
                 <FileText className="h-5 w-5 text-green-500" />
-                <span className="text-sm text-gray-600 dark:text-gray-300">Transcribed</span>
+                <span className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Transcribed</span>
               </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
                 {stats.total_transcribed}
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -401,12 +409,12 @@ export function RadioPage() {
               </div>
             </div>
             
-            <div className="bg-gray-50 dark:bg-gray-700 rounded p-4">
-              <div className="flex items-center space-x-2 mb-2">
+            <div className="bg-gray-50 dark:bg-gray-700 rounded p-3 md:p-4">
+              <div className="flex items-center space-x-1 md:space-x-2 mb-2">
                 <Clock className="h-5 w-5 text-purple-500" />
-                <span className="text-sm text-gray-600 dark:text-gray-300">Avg Transcription</span>
+                <span className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Avg Transcription</span>
               </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
                 {stats.average_transcription_time_seconds.toFixed(1)}s
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -414,12 +422,12 @@ export function RadioPage() {
               </div>
             </div>
             
-            <div className="bg-gray-50 dark:bg-gray-700 rounded p-4">
-              <div className="flex items-center space-x-2 mb-2">
+            <div className="bg-gray-50 dark:bg-gray-700 rounded p-3 md:p-4">
+              <div className="flex items-center space-x-1 md:space-x-2 mb-2">
                 <TrendingUp className="h-5 w-5 text-orange-500" />
-                <span className="text-sm text-gray-600 dark:text-gray-300">Storage Growth</span>
+                <span className="text-xs md:text-sm text-gray-600 dark:text-gray-300">Storage Growth</span>
               </div>
-              <div className="text-2xl font-bold text-gray-900 dark:text-white">
+              <div className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
                 {stats.storage_growth_per_day_mb.toFixed(1)} MB
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -430,11 +438,11 @@ export function RadioPage() {
         )}
 
         {/* Action Buttons */}
-        <div className="flex space-x-4">
+        <div className="flex flex-wrap gap-2 md:gap-4">
           <button
             onClick={triggerTranscription}
             disabled={!!transcribingTask}
-            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 flex items-center space-x-2"
+            className="px-3 py-2 md:px-4 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 flex items-center space-x-2 text-sm md:text-base"
           >
             <Mic className="h-4 w-4" />
             <span>Transcribe Untranscribed</span>
@@ -443,61 +451,92 @@ export function RadioPage() {
       </div>
 
       {/* Search */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div className="flex space-x-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 md:p-6">
+        <div className="flex flex-col md:flex-row gap-3 md:gap-4">
           <input
             type="text"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value)
+              if (!e.target.value.trim()) {
+                setSearchResults([])
+                setHasSearched(false)
+              }
+            }}
             onKeyPress={(e) => e.key === 'Enter' && searchTranscriptions()}
             placeholder="Search transcriptions..."
-            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            className="flex-1 px-3 md:px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm md:text-base"
           />
-          <button
-            onClick={searchTranscriptions}
-            className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center space-x-2"
-          >
-            <Search className="h-4 w-4" />
-            <span>Search</span>
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={searchTranscriptions}
+              className="px-4 md:px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 flex items-center justify-center space-x-2 text-sm md:text-base"
+            >
+              <Search className="h-4 w-4" />
+              <span>Search</span>
+            </button>
+            {hasSearched && (
+              <button
+                onClick={() => {
+                  setSearchQuery('')
+                  setSearchResults([])
+                  setHasSearched(false)
+                }}
+                className="px-4 md:px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center justify-center text-sm md:text-base"
+              >
+                Clear
+              </button>
+            )}
+          </div>
         </div>
         
-        {searchResults.length > 0 && (
+        {hasSearched && (
           <div className="mt-4 space-y-2">
             <h3 className="font-semibold text-gray-900 dark:text-white">
-              Search Results ({searchResults.length})
+              Search Results {searchResults.length > 0 && `(${searchResults.length})`}
             </h3>
-            {searchResults.map((result, idx) => (
-              <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
-                <div className="font-medium text-gray-900 dark:text-white">
-                  {result.filename}
-                </div>
-                <div className="text-sm text-gray-600 dark:text-gray-300">
-                  {result.total_matches} matches • Model: {result.model}
-                </div>
-                {result.matching_segments.slice(0, 2).map((seg: any, segIdx: number) => (
-                  <div key={segIdx} className="mt-2 p-2 bg-white dark:bg-gray-600 rounded text-sm">
-                    <span className="text-gray-500 dark:text-gray-400">
-                      [{formatTime(seg.start)} - {formatTime(seg.end)}]
-                    </span>
-                    <span className="ml-2 text-gray-900 dark:text-white">{seg.text}</span>
-                  </div>
-                ))}
+            {searchResults.length === 0 ? (
+              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                <p className="text-yellow-800 dark:text-yellow-200">
+                  No results found for "{searchQuery}". Try a different search term.
+                </p>
+                <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+                  Note: Only {stats?.total_transcribed || 0} of {stats?.total_archives || 0} files have been transcribed.
+                </p>
               </div>
-            ))}
+            ) : (
+              searchResults.map((result, idx) => (
+                <div key={idx} className="p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    {result.filename}
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">
+                    {result.total_matches} matches • Model: {result.model}
+                  </div>
+                  {result.matching_segments.slice(0, 2).map((seg: any, segIdx: number) => (
+                    <div key={segIdx} className="mt-2 p-2 bg-white dark:bg-gray-600 rounded text-sm">
+                      <span className="text-gray-500 dark:text-gray-400">
+                        [{formatTime(seg.start)} - {formatTime(seg.end)}]
+                      </span>
+                      <span className="ml-2 text-gray-900 dark:text-white">{seg.text}</span>
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>
 
       {/* Archives Table with Expandable Rows */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 md:p-6">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4">
+          <h2 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white">
             Archive Files
           </h2>
           
           {/* Items per page selector */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 self-end md:self-auto">
             <span className="text-sm text-gray-600 dark:text-gray-400">Show:</span>
             <select
               value={itemsPerPage}
@@ -505,7 +544,7 @@ export function RadioPage() {
                 setItemsPerPage(Number(e.target.value))
                 setCurrentPage(1) // Reset to first page when changing items per page
               }}
-              className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+              className="px-2 md:px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs md:text-sm"
             >
               <option value={25}>25</option>
               <option value={50}>50</option>
@@ -583,7 +622,7 @@ export function RadioPage() {
                         <div className="flex space-x-4">
                           <button
                             onClick={() => handlePlayAudio(archive.filename)}
-                            className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                            className="p-1 md:p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
                             title="Play Audio"
                           >
                             {playingAudio === archive.filename && audioRef.current && !audioRef.current.paused ? (
@@ -595,10 +634,10 @@ export function RadioPage() {
                           {archive.has_transcription ? (
                             <button
                               onClick={() => toggleRowExpansion(archive.filename)}
-                              className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors"
+                              className="p-1 md:p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors"
                               title="View Transcription"
                             >
-                              <FileText className="h-5 w-5" />
+                              <FileText className="h-4 w-4 md:h-5 md:w-5" />
                             </button>
                           ) : transcribingFiles.has(archive.filename) ? (
                             <button
@@ -606,15 +645,15 @@ export function RadioPage() {
                               className="p-1.5 rounded text-yellow-600 dark:text-yellow-400 cursor-not-allowed opacity-75"
                               title="Transcribing..."
                             >
-                              <Loader2 className="h-5 w-5 animate-spin" />
+                              <Loader2 className="h-4 w-4 md:h-5 md:w-5 animate-spin" />
                             </button>
                           ) : null}
                           <button
                             onClick={() => downloadFile(archive.filename, 'mp3')}
-                            className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+                            className="p-1 md:p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
                             title="Download"
                           >
-                            <Download className="h-5 w-5" />
+                            <Download className="h-4 w-4 md:h-5 md:w-5" />
                           </button>
                         </div>
                       </td>
@@ -623,23 +662,23 @@ export function RadioPage() {
                     {/* Expanded Row with Audio Player and Transcript */}
                     {expandedRow === archive.filename && (
                       <tr>
-                        <td colSpan={5} className="px-6 py-4">
+                        <td colSpan={5} className="px-3 md:px-6 py-3 md:py-4">
                           <div className="space-y-4">
                             {/* Audio Player */}
-                            <div className="bg-gray-900 rounded-lg p-4">
-                              <div className="flex items-center justify-between mb-4">
+                            <div className="bg-gray-900 rounded-lg p-3 md:p-4">
+                              <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-3 md:mb-4 gap-2">
                                 <div>
                                   <div className="flex items-center space-x-2">
                                     <Volume2 className="h-5 w-5 text-blue-400" />
-                                    <span className="text-lg font-medium text-white">Audio Player</span>
+                                    <span className="text-base md:text-lg font-medium text-white">Audio Player</span>
                                   </div>
-                                  <div className="text-xs text-gray-400 mt-1">
+                                  <div className="text-xs text-gray-400 mt-0.5 md:mt-1">
                                     File: {archive.filename}
                                   </div>
                                 </div>
                                 <button
                                   onClick={() => downloadFile(archive.filename, 'mp3')}
-                                  className="flex items-center space-x-2 text-blue-400 hover:text-blue-300"
+                                  className="flex items-center space-x-1 md:space-x-2 text-blue-400 hover:text-blue-300 text-xs md:text-sm"
                                 >
                                   <Download className="h-4 w-4" />
                                   <span className="text-sm">Download MP3</span>
@@ -682,11 +721,11 @@ export function RadioPage() {
                             
                             {/* Transcript */}
                             {archive.has_transcription && transcription && selectedArchive === archive.filename && (
-                              <div className="bg-gray-900 rounded-lg p-4">
-                                <div className="flex items-center justify-between mb-4">
+                              <div className="bg-gray-900 rounded-lg p-3 md:p-4">
+                                <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-3 md:mb-4 gap-2">
                                   <div className="flex items-center space-x-2">
                                     <FileText className="h-5 w-5 text-green-400" />
-                                    <span className="text-lg font-medium text-white">
+                                    <span className="text-base md:text-lg font-medium text-white">
                                       Transcript ({transcription.model || archive.transcription_model} model)
                                     </span>
                                   </div>
@@ -705,7 +744,7 @@ export function RadioPage() {
                                     
                                     <button
                                       onClick={() => downloadFile(archive.filename, 'txt')}
-                                      className="flex items-center space-x-2 text-green-400 hover:text-green-300"
+                                      className="flex items-center space-x-1 md:space-x-2 text-green-400 hover:text-green-300 text-xs md:text-sm"
                                     >
                                       <Download className="h-4 w-4" />
                                       <span className="text-sm">Download TXT</span>
@@ -715,7 +754,7 @@ export function RadioPage() {
                                 
                                 <div 
                                   ref={transcriptContainerRef}
-                                  className="space-y-2 max-h-96 overflow-y-auto"
+                                  className="space-y-2 max-h-64 md:max-h-96 overflow-y-auto"
                                 >
                                   {transcription.segments && transcription.segments.length > 0 ? (
                                     transcription.segments.map((segment, idx) => {
@@ -772,12 +811,12 @@ export function RadioPage() {
                   
                   {/* Pagination Controls */}
                   {totalPages > 1 && (
-                    <div className="flex items-center justify-between mt-4 px-4">
+                    <div className="flex flex-col md:flex-row items-center justify-between mt-4 px-2 md:px-4 gap-3">
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                           disabled={currentPage === 1}
-                          className="px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-600"
+                          className="px-2 md:px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-600 text-sm md:text-base"
                         >
                           Previous
                         </button>
@@ -800,7 +839,7 @@ export function RadioPage() {
                               <button
                                 key={pageNum}
                                 onClick={() => setCurrentPage(pageNum)}
-                                className={`px-3 py-1 rounded-lg ${
+                                className={`px-2 md:px-3 py-1 rounded-lg text-sm md:text-base ${
                                   currentPage === pageNum
                                     ? 'bg-blue-500 text-white'
                                     : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
@@ -815,13 +854,13 @@ export function RadioPage() {
                         <button
                           onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                           disabled={currentPage === totalPages}
-                          className="px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-600"
+                          className="px-2 md:px-3 py-1 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-200 dark:hover:bg-gray-600 text-sm md:text-base"
                         >
                           Next
                         </button>
                       </div>
                       
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                      <div className="text-xs md:text-sm text-gray-600 dark:text-gray-400 text-center md:text-left">
                         Showing {startIndex + 1}-{Math.min(endIndex, sortedArchives.length)} of {sortedArchives.length} files
                       </div>
                     </div>
