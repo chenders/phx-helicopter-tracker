@@ -175,4 +175,8 @@ celery_app.conf.update(
 )
 
 # Import signal handlers for task monitoring
-from app.workers import task_monitoring_signals
+try:
+    from app.workers import task_monitoring_signals
+except ImportError:
+    # Task monitoring signals are optional
+    pass

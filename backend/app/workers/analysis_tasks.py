@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.workers.celery_app import celery_app
 from app.db.database import SessionLocal
 from app.crud.flights import flight_log_crud, flight_position_crud
+from app.schemas.flights import FlightLogUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -350,14 +351,12 @@ def _generate_cost_analysis(
         db.close()
 
 
-@celery_app.task
-def analyze_and_score_flights():
+@celery_app.task(bind=True, name="app.workers.analysis_tasks.analyze_and_score_flights", max_retries=2, time_limit=600, soft_time_limit=540)
+def analyze_and_score_flights(self):
     """Analyze flights without surveillance scores and update them"""
     db = SessionLocal()
 
     try:
-        from app.schemas.flights import FlightLogUpdate
-
         # Get flights that need analysis (no surveillance score)
         flights = (
             db.query(flight_log_crud.model)

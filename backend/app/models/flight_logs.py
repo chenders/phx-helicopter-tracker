@@ -123,7 +123,7 @@ class FlightPosition(Base):
 
     # Data quality
     position_accuracy_meters = Column(Float)  # GPS accuracy
-    data_source = Column(String(20))  # 'flightradar24', 'interpolated'
+    data_source = Column(String(50))  # 'flightradar24', 'flightradar24_historical', 'interpolated'
 
     # Relationships
     flight_log = relationship("FlightLog", back_populates="positions")

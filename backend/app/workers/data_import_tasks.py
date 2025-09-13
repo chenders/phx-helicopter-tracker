@@ -407,10 +407,35 @@ async def _import_fr24_historical_async(
                             )
                             break
 
-                    # Get historical positions for this timestamp
-                    positions = await fr24_api_service.get_historical_positions(
-                        timestamp=timestamp, registrations=[registration]
-                    )
+                    # Get historical positions for this timestamp with retry logic
+                    positions = None
+                    retry_count = 0
+                    max_retries = 3
+                    
+                    while retry_count < max_retries:
+                        try:
+                            positions = await fr24_api_service.get_historical_positions(
+                                timestamp=timestamp, registrations=[registration]
+                            )
+                            break  # Success, exit retry loop
+                        except Exception as e:
+                            if "rate" in str(e).lower() or "429" in str(e):
+                                retry_count += 1
+                                if retry_count < max_retries:
+                                    wait_time = min(60 * retry_count, 300)  # Max 5 min wait
+                                    logger.warning(
+                                        f"Rate limited, waiting {wait_time}s before retry {retry_count}/{max_retries}"
+                                    )
+                                    await asyncio.sleep(wait_time)
+                                else:
+                                    logger.error(f"Max retries reached for {timestamp}")
+                                    results["errors"].append(
+                                        f"{timestamp.date()}: Rate limit exceeded after {max_retries} retries"
+                                    )
+                                    # Skip to next timestamp
+                                    continue
+                            else:
+                                raise  # Re-raise non-rate-limit errors
 
                     if positions:
                         # Check if we already have data for this time period

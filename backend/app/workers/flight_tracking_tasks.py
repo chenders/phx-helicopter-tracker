@@ -271,7 +271,7 @@ def analyze_phoenix_pd_fleet_status(self) -> Dict[str, Any]:
 @celery_app.task(bind=True, name="generate_complete_flight_report")
 def generate_complete_flight_report(
     self,
-    flight_log_id: int
+    flight_log_id: int = None
 ) -> Dict[str, Any]:
     """
     Generate detailed report for a flight with complete track data
@@ -283,6 +283,11 @@ def generate_complete_flight_report(
     db = SessionLocal()
     
     try:
+        # Handle case where no flight_log_id is provided
+        if flight_log_id is None:
+            logger.warning("generate_complete_flight_report called without flight_log_id, skipping")
+            return {"status": "skipped", "reason": "No flight_log_id provided"}
+        
         # Get flight with all positions
         flight = db.query(FlightLog).filter(
             FlightLog.id == flight_log_id
@@ -321,6 +326,18 @@ def generate_complete_flight_report(
                     })
                 consecutive_hovers = []
         
+        # Calculate arrival time and duration from positions if not available
+        if not flight.arrival_time and positions:
+            # Use last position timestamp as arrival time
+            flight.arrival_time = positions[-1].timestamp
+            
+        if not flight.flight_duration_minutes and flight.departure_time and flight.arrival_time:
+            duration_delta = flight.arrival_time - flight.departure_time
+            flight.flight_duration_minutes = duration_delta.total_seconds() / 60
+            
+        if not flight.estimated_cost and flight.flight_duration_minutes:
+            flight.estimated_cost = flight.flight_duration_minutes / 60 * 2160  # $2160/hour
+        
         # Generate report
         report = {
             "flight_id": flight.flight_id,
@@ -330,8 +347,8 @@ def generate_complete_flight_report(
                 "operator": aircraft.operator if aircraft else "Unknown"
             },
             "flight_summary": {
-                "departure_time": flight.departure_time.isoformat(),
-                "arrival_time": flight.arrival_time.isoformat(),
+                "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
+                "arrival_time": flight.arrival_time.isoformat() if flight.arrival_time else None,
                 "duration_minutes": flight.flight_duration_minutes,
                 "estimated_cost": flight.estimated_cost
             },
