@@ -39,48 +39,34 @@ class CompleteFlightTracker:
         self.last_check = datetime.now(timezone.utc)
         
     def get_active_flights(self) -> List[Dict]:
-        """Get currently active flights in Phoenix area"""
-        from app.services.flightradar24_api_service import fr24_api_service
-        import asyncio
+        """Get currently active Phoenix PD helicopters ONLY"""
+        from app.services.fr24_official_api import fr24_official_api
         
         try:
-            # Use the FR24 API service which has proper auth and error handling
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # Use the working FR24 official API that properly identifies Phoenix PD aircraft
+            helicopters = fr24_official_api.get_phoenix_pd_live()
             
-            async def get_flights():
-                async with fr24_api_service:
-                    positions = await fr24_api_service.get_live_positions_in_area(
-                        lat_min=PHOENIX_BOUNDS['lat_min'], 
-                        lat_max=PHOENIX_BOUNDS['lat_max'],
-                        lon_min=PHOENIX_BOUNDS['lon_min'], 
-                        lon_max=PHOENIX_BOUNDS['lon_max']
-                    )
-                    return positions
-            
-            positions = loop.run_until_complete(get_flights())
-            loop.close()
-            
-            # Convert positions to flight dict format
+            # Convert to flight dict format
             flights = []
-            for pos in positions:
+            for heli in helicopters:
                 flight = {
-                    'flight_id': pos.flight_id,
-                    'registration': pos.registration,
-                    'callsign': pos.callsign,
-                    'latitude': pos.latitude,
-                    'longitude': pos.longitude,
-                    'altitude': pos.altitude_feet,
-                    'speed': pos.ground_speed_knots,
-                    'track': pos.track_degrees,
-                    'timestamp': pos.timestamp.isoformat()
+                    'flight_id': heli.raw_data.get('fr24_id', ''),
+                    'registration': heli.aircraft_registration,
+                    'callsign': heli.callsign,
+                    'latitude': heli.latitude,
+                    'longitude': heli.longitude,
+                    'altitude': heli.altitude_feet,
+                    'speed': heli.ground_speed_knots,
+                    'track': heli.track_degrees,
+                    'timestamp': heli.timestamp.isoformat()
                 }
                 flights.append(flight)
+                logger.info(f"Phoenix PD helicopter active: {heli.aircraft_registration} at {heli.latitude},{heli.longitude}")
             
             return flights
             
         except Exception as e:
-            logger.error(f"Error fetching active flights: {e}")
+            logger.error(f"Error fetching Phoenix PD helicopters: {e}")
             return []
     
     def get_complete_flight_track(self, flight_id: str) -> Optional[Dict]:
@@ -98,20 +84,35 @@ class CompleteFlightTracker:
             
             async def get_track():
                 async with fr24_api_service:
-                    # Get flight details which includes track data
-                    flight_data = await fr24_api_service.get_flight_details(flight_id)
-                    return flight_data
+                    # Get flight track data
+                    positions = await fr24_api_service.get_flight_track(flight_id)
+                    return positions
             
-            flight_data = loop.run_until_complete(get_track())
+            positions = loop.run_until_complete(get_track())
             loop.close()
             
-            if flight_data and 'track' in flight_data:
-                tracks = flight_data['track']
+            if positions:
+                # Convert FR24Position objects to dict format
+                tracks = []
+                for pos in positions:
+                    tracks.append({
+                        'latitude': pos.latitude,
+                        'longitude': pos.longitude,
+                        'altitude': pos.altitude_feet,
+                        'speed': pos.ground_speed_knots,
+                        'track': pos.track_degrees,
+                        'timestamp': pos.timestamp.isoformat()
+                    })
+                
                 logger.info(f"Downloaded complete track for {flight_id}: {len(tracks)} positions")
                 return {
                     'flight_id': flight_id,
                     'tracks': tracks,
-                    'metadata': flight_data
+                    'metadata': {
+                        'registration': positions[0].registration if positions else None,
+                        'callsign': positions[0].callsign if positions else None,
+                        'aircraft_type': positions[0].aircraft_type if positions else None
+                    }
                 }
             return None
             
@@ -121,31 +122,35 @@ class CompleteFlightTracker:
     
     def detect_flight_changes(self) -> Tuple[List[str], List[str]]:
         """
-        Detect new takeoffs and landings
+        Detect new takeoffs and landings for Phoenix PD helicopters ONLY
         Returns: (new_flights, landed_flights)
         """
         current_flights = self.get_active_flights()
         current_ids = set()
         new_flights = []
         
-        # Process current active flights
+        # Process current active flights - PHOENIX PD ONLY
         for flight in current_flights:
             flight_id = flight.get('flight_id') or flight.get('fr24_id')
             if not flight_id:
                 continue
+            
+            registration = flight.get('registration', '')
+            callsign = flight.get('callsign', '')
+            
+            # ONLY track Phoenix PD helicopters - skip everything else
+            is_phoenix_pd = (
+                registration in PHOENIX_PD_REGISTRATIONS or
+                callsign in PHOENIX_PD_REGISTRATIONS
+            )
+            
+            if not is_phoenix_pd:
+                continue  # Skip ALL non-Phoenix PD aircraft
                 
             current_ids.add(flight_id)
             
-            # Check if this is a new flight
+            # Check if this is a new Phoenix PD flight
             if flight_id not in self.active_flights:
-                registration = flight.get('registration', '')
-                callsign = flight.get('callsign', '')
-                
-                # Priority tracking for Phoenix PD helicopters
-                is_phoenix_pd = (
-                    registration in PHOENIX_PD_REGISTRATIONS or
-                    callsign in PHOENIX_PD_REGISTRATIONS
-                )
                 
                 self.active_flights[flight_id] = {
                     'first_seen': datetime.now(timezone.utc),
@@ -155,30 +160,49 @@ class CompleteFlightTracker:
                     'hex': flight.get('hex'),
                     'is_phoenix_pd': is_phoenix_pd,
                     'last_position': {
-                        'lat': flight.get('lat'),
-                        'lon': flight.get('lon'),
-                        'alt': flight.get('alt')
-                    }
+                        'lat': flight.get('latitude'),
+                        'lon': flight.get('longitude'),
+                        'alt': flight.get('altitude')
+                    },
+                    'flight_log_id': None  # Will be set when we create the flight log
                 }
                 
                 new_flights.append(flight_id)
-                logger.info(f"New flight detected: {flight_id} ({registration or callsign})"
-                          f"{' [PHOENIX PD]' if is_phoenix_pd else ''}")
+                logger.info(f"Phoenix PD helicopter detected: {flight_id} ({registration or callsign})")
             else:
-                # Update last seen time
+                # Update last seen time and check for landing
                 self.active_flights[flight_id]['last_seen'] = datetime.now(timezone.utc)
+                prev_alt = self.active_flights[flight_id]['last_position'].get('alt', 0)
+                current_alt = flight.get('altitude', 0)
+                
                 self.active_flights[flight_id]['last_position'] = {
-                    'lat': flight.get('lat'),
-                    'lon': flight.get('lon'),
-                    'alt': flight.get('alt')
+                    'lat': flight.get('latitude'),
+                    'lon': flight.get('longitude'),
+                    'alt': current_alt
                 }
+                
+                # Detect landing: altitude drops to near zero (below 100 feet)
+                if prev_alt > 500 and current_alt < 100 and current_alt >= 0:
+                    logger.info(f"Detected landing by altitude: {flight_id} dropped from {prev_alt}ft to {current_alt}ft")
+                    # Mark for landing processing but keep tracking until it disappears
+                    self.active_flights[flight_id]['landing_detected'] = True
         
-        # Detect landed flights (no longer in active list)
+        # Detect landed flights (no longer in active list OR altitude indicates landing)
         landed_flights = []
         for flight_id in list(self.active_flights.keys()):
             if flight_id not in current_ids:
+                # Flight disappeared from radar
                 landed_flights.append(flight_id)
-                logger.info(f"Flight landed: {flight_id} ({self.active_flights[flight_id]['registration']})")
+                logger.info(f"Flight disappeared (landed): {flight_id} ({self.active_flights[flight_id]['registration']})")
+            elif self.active_flights[flight_id].get('landing_detected'):
+                # Landing was detected by altitude
+                time_since_landing = datetime.now(timezone.utc) - self.active_flights[flight_id]['last_seen']
+                if time_since_landing.total_seconds() > 120:  # Wait 2 minutes after landing detection
+                    landed_flights.append(flight_id)
+                    logger.info(f"Flight confirmed landed: {flight_id} ({self.active_flights[flight_id]['registration']})")
+        
+        # Store current positions for all active flights AFTER processing them
+        self._store_active_positions(current_flights)
         
         return new_flights, landed_flights
     
@@ -256,8 +280,8 @@ class CompleteFlightTracker:
                 
                 if i > 0:
                     prev_track = tracks[i-1]
-                    lat_diff = abs(track.get('lat', 0) - prev_track.get('lat', 0))
-                    lon_diff = abs(track.get('lon', 0) - prev_track.get('lon', 0))
+                    lat_diff = abs(track.get('latitude', 0) - prev_track.get('latitude', 0))
+                    lon_diff = abs(track.get('longitude', 0) - prev_track.get('longitude', 0))
                     
                     # Very small movement = hovering (less than ~50 meters)
                     if lat_diff < 0.0005 and lon_diff < 0.0005:
@@ -269,15 +293,15 @@ class CompleteFlightTracker:
                     flight_log_id=flight_log.id,
                     aircraft_id=aircraft.id,
                     timestamp=timestamp,
-                    latitude=track.get('lat'),
-                    longitude=track.get('lon'),
-                    altitude_feet=track.get('alt'),
+                    latitude=track.get('latitude'),
+                    longitude=track.get('longitude'),
+                    altitude_feet=track.get('altitude'),
                     ground_speed_knots=track.get('speed'),
                     track_degrees=track.get('track'),
-                    vertical_rate=track.get('vspeed'),
+                    vertical_rate=track.get('vertical_rate'),
                     is_hovering=is_hovering,
                     hover_duration_seconds=hover_duration,
-                    altitude_privacy_concern=track.get('alt', 10000) < 1000,
+                    altitude_privacy_concern=track.get('altitude', 10000) < 1000,
                     data_source='flightradar24_complete'
                 )
                 self.db.add(position)
@@ -298,10 +322,68 @@ class CompleteFlightTracker:
             self.db.rollback()
             return False
     
+    def _store_active_positions(self, current_flights: List[Dict]):
+        """Store current positions for all active flights in the database"""
+        try:
+            for flight in current_flights:
+                flight_id = flight.get('flight_id') or flight.get('fr24_id')
+                if not flight_id or flight_id not in self.active_flights:
+                    continue
+                
+                flight_info = self.active_flights[flight_id]
+                
+                # Only store positions for Phoenix PD or other relevant aircraft
+                if not flight_info.get('is_phoenix_pd'):
+                    continue  # Skip commercial/unknown aircraft
+                
+                # Create flight log if it doesn't exist
+                if not flight_info.get('flight_log_id'):
+                    aircraft = self._find_or_create_aircraft(flight_info)
+                    
+                    flight_log = FlightLog(
+                        aircraft_id=aircraft.id,
+                        flight_id=f"fr24_active_{flight_id}",
+                        callsign=flight_info['callsign'] or flight_info['registration'],
+                        departure_time=flight_info['first_seen'],
+                        departure_airport='KDVT' if flight_info['is_phoenix_pd'] else None,
+                        data_source='flightradar24',
+                        raw_data={'active': True, 'flight_id': flight_id}
+                    )
+                    self.db.add(flight_log)
+                    self.db.flush()
+                    flight_info['flight_log_id'] = flight_log.id
+                
+                # Add current position
+                position = FlightPosition(
+                    flight_log_id=flight_info['flight_log_id'],
+                    aircraft_id=aircraft.id if 'aircraft' in locals() else self._find_or_create_aircraft(flight_info).id,
+                    timestamp=datetime.now(timezone.utc),
+                    latitude=flight.get('latitude'),
+                    longitude=flight.get('longitude'),
+                    altitude_feet=flight.get('altitude'),
+                    ground_speed_knots=flight.get('speed'),
+                    track_degrees=flight.get('track'),
+                    is_hovering=flight.get('speed', 100) < 10,
+                    altitude_privacy_concern=flight.get('altitude', 10000) < 1000,
+                    data_source='flightradar24'
+                )
+                self.db.add(position)
+            
+            self.db.commit()
+            logger.debug(f"Stored positions for {len(current_flights)} active flights")
+            
+        except Exception as e:
+            logger.error(f"Error storing active positions: {e}")
+            self.db.rollback()
+    
     def _find_or_create_aircraft(self, flight_info: Dict) -> Aircraft:
         """Find or create aircraft record"""
         registration = flight_info.get('registration', '')
         hex_code = flight_info.get('hex', '')
+        
+        # Only process known Phoenix PD aircraft
+        if not flight_info.get('is_phoenix_pd'):
+            return None
         
         # Try to find by registration first
         if registration:
@@ -319,20 +401,22 @@ class CompleteFlightTracker:
             if aircraft:
                 return aircraft
         
-        # Create new aircraft
-        aircraft = Aircraft(
-            registration=registration or f"UNKNOWN_{hex_code}",
-            icao_code=hex_code,
-            model="Helicopter" if flight_info['is_phoenix_pd'] else "Unknown",
-            operator="Phoenix Police Dept" if flight_info['is_phoenix_pd'] else "Unknown",
-            is_phoenix_pd=flight_info['is_phoenix_pd'],
-            is_active=True,
-            hourly_operating_cost=2160.0 if flight_info['is_phoenix_pd'] else None
-        )
-        self.db.add(aircraft)
-        self.db.flush()
+        # Create new Phoenix PD aircraft only if we have a valid registration
+        if registration and registration in PHOENIX_PD_REGISTRATIONS:
+            aircraft = Aircraft(
+                registration=registration,
+                icao_code=hex_code,
+                model="Airbus H125",  # Phoenix PD fleet model
+                operator="Phoenix Police Department",
+                is_phoenix_pd=True,
+                is_active=True,
+                hourly_operating_cost=2160.0
+            )
+            self.db.add(aircraft)
+            self.db.flush()
+            return aircraft
         
-        return aircraft
+        return None
     
     def _analyze_complete_path(self, tracks: List[Dict], flight_info: Dict) -> Dict:
         """
