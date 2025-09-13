@@ -407,8 +407,8 @@ class FlightRadar24APIService:
         if registrations:
             params["registrations"] = ",".join(registrations)
 
-        # Use live feed endpoint - this is the correct FR24 API endpoint
-        data = await self._make_api_request("live/feed/light", params, "live_feed")
+        # Use live flight positions endpoint - this is the correct FR24 API endpoint
+        data = await self._make_api_request("live/flight-positions/light", params, "live_positions_light")
 
         if not data:
             return []

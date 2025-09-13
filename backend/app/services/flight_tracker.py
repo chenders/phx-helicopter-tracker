@@ -2,12 +2,9 @@
 Flight tracking service for complete flight path collection
 Monitors active flights and downloads complete tracks after landing
 """
-import os
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Set, Tuple
-import requests
-import json
 from collections import defaultdict
 from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
@@ -15,9 +12,6 @@ from app.models.flight_logs import FlightLog, FlightPosition
 from app.models.aircraft import Aircraft
 
 logger = logging.getLogger(__name__)
-
-FR24_API_KEY = os.getenv("FR24_API_KEY_PRODUCTION")
-BASE_URL = "https://fr24api.flightradar24.com/api"
 
 PHOENIX_BOUNDS = {
     "lat_min": 33.2,
@@ -29,12 +23,6 @@ PHOENIX_BOUNDS = {
 PHOENIX_PD_REGISTRATIONS = {
     "N621FB", "N622FB", "N623FB", "N624FB", "N625FB",
     "N626FB", "N627FB", "N628FB", "N629FB", "N630FB"
-}
-
-HEADERS = {
-    "Authorization": f"Bearer {FR24_API_KEY}",
-    "Accept": "application/json",
-    "Accept-Version": "v1",
 }
 
 
@@ -52,20 +40,45 @@ class CompleteFlightTracker:
         
     def get_active_flights(self) -> List[Dict]:
         """Get currently active flights in Phoenix area"""
-        endpoint = f"{BASE_URL}/live/flights"
-        params = {
-            "bounds": f"{PHOENIX_BOUNDS['lat_max']},{PHOENIX_BOUNDS['lat_min']},{PHOENIX_BOUNDS['lon_min']},{PHOENIX_BOUNDS['lon_max']}",
-        }
+        from app.services.flightradar24_api_service import fr24_api_service
+        import asyncio
         
         try:
-            response = requests.get(endpoint, params=params, headers=HEADERS, timeout=30)
-            if response.status_code == 200:
-                data = response.json()
-                flights = data.get('data', []) if isinstance(data, dict) else data
-                return flights if isinstance(flights, list) else []
-            else:
-                logger.error(f"Failed to get active flights: {response.status_code}")
-                return []
+            # Use the FR24 API service which has proper auth and error handling
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            async def get_flights():
+                async with fr24_api_service:
+                    positions = await fr24_api_service.get_live_positions_in_area(
+                        lat_min=PHOENIX_BOUNDS['lat_min'], 
+                        lat_max=PHOENIX_BOUNDS['lat_max'],
+                        lon_min=PHOENIX_BOUNDS['lon_min'], 
+                        lon_max=PHOENIX_BOUNDS['lon_max']
+                    )
+                    return positions
+            
+            positions = loop.run_until_complete(get_flights())
+            loop.close()
+            
+            # Convert positions to flight dict format
+            flights = []
+            for pos in positions:
+                flight = {
+                    'flight_id': pos.flight_id,
+                    'registration': pos.registration,
+                    'callsign': pos.callsign,
+                    'latitude': pos.latitude,
+                    'longitude': pos.longitude,
+                    'altitude': pos.altitude_feet,
+                    'speed': pos.ground_speed_knots,
+                    'track': pos.track_degrees,
+                    'timestamp': pos.timestamp.isoformat()
+                }
+                flights.append(flight)
+            
+            return flights
+            
         except Exception as e:
             logger.error(f"Error fetching active flights: {e}")
             return []
@@ -75,26 +88,33 @@ class CompleteFlightTracker:
         Download complete flight track with all available positions
         This returns positions every 5-15 seconds for the entire flight
         """
-        endpoint = f"{BASE_URL}/flight/tracks/{flight_id}"
+        from app.services.flightradar24_api_service import fr24_api_service
+        import asyncio
         
         try:
-            response = requests.get(endpoint, headers=HEADERS, timeout=30)
-            if response.status_code == 200:
-                data = response.json()
-                
-                # FR24 returns complete track with all positions
-                if 'data' in data and 'tracks' in data['data']:
-                    tracks = data['data']['tracks']
-                    logger.info(f"Downloaded complete track for {flight_id}: {len(tracks)} positions")
-                    return {
-                        'flight_id': flight_id,
-                        'tracks': tracks,
-                        'metadata': data['data'].get('metadata', {})
-                    }
-                return None
-            else:
-                logger.error(f"Failed to get flight track {flight_id}: {response.status_code}")
-                return None
+            # Use the FR24 API service to get complete flight tracks
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            async def get_track():
+                async with fr24_api_service:
+                    # Get flight details which includes track data
+                    flight_data = await fr24_api_service.get_flight_details(flight_id)
+                    return flight_data
+            
+            flight_data = loop.run_until_complete(get_track())
+            loop.close()
+            
+            if flight_data and 'track' in flight_data:
+                tracks = flight_data['track']
+                logger.info(f"Downloaded complete track for {flight_id}: {len(tracks)} positions")
+                return {
+                    'flight_id': flight_id,
+                    'tracks': tracks,
+                    'metadata': flight_data
+                }
+            return None
+            
         except Exception as e:
             logger.error(f"Error downloading flight track {flight_id}: {e}")
             return None

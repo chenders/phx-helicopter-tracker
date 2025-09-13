@@ -10,6 +10,7 @@ class TrackingSource(str, Enum):
     FLIGHTRADAR24 = "flightradar24"
     MANUAL = "manual"
     COMMUNITY = "community"
+    DATABASE = "database"  # For data retrieved from database
 
 
 class AlertType(str, Enum):

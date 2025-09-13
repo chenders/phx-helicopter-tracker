@@ -144,23 +144,49 @@ def download_missed_flight_tracks(self, hours_back: int = 24) -> Dict[str, Any]:
     try:
         tracker = CompleteFlightTracker(db)
         
-        # Get list of recent flights from FR24
+        # Get list of recent flights from FR24 using the proper service
         # This is a backup check for any flights we might have missed
-        endpoint = f"https://fr24api.flightradar24.com/api/historic/flights"
-        params = {
-            "bounds": "33.8,33.2,-112.4,-111.8",  # Phoenix area
-            "hours_back": hours_back
-        }
+        from app.services.flightradar24_api_service import fr24_api_service
+        import asyncio
         
-        headers = {
-            "Authorization": f"Bearer {tracker.FR24_API_KEY}",
-            "Accept": "application/json"
-        }
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
         
-        response = requests.get(endpoint, params=params, headers=headers, timeout=30)
+        async def get_recent_flights():
+            async with fr24_api_service:
+                # Calculate timestamp for hours_back
+                from datetime import datetime, timedelta, timezone
+                timestamp = datetime.now(timezone.utc) - timedelta(hours=hours_back)
+                
+                # Get historical positions for Phoenix area
+                positions = await fr24_api_service.get_historical_positions(
+                    timestamp=timestamp,
+                    lat_min=33.2,
+                    lat_max=33.8,
+                    lon_min=-112.4,
+                    lon_max=-111.8
+                )
+                
+                # Convert positions to flight list
+                flight_ids = set()
+                flights_data = []
+                for pos in positions:
+                    if pos.flight_id not in flight_ids:
+                        flight_ids.add(pos.flight_id)
+                        flights_data.append({
+                            'flight_id': pos.flight_id,
+                            'registration': pos.registration,
+                            'callsign': pos.callsign
+                        })
+                return flights_data
         
-        if response.status_code == 200:
-            flights = response.json().get('data', [])
+        try:
+            flights = loop.run_until_complete(get_recent_flights())
+        except Exception as e:
+            logger.error(f"Failed to get recent flights: {e}")
+            flights = []
+        finally:
+            loop.close()
             results["flights_checked"] = len(flights)
             
             for flight in flights:
