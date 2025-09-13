@@ -339,19 +339,30 @@ class CompleteFlightTracker:
                 # Create flight log if it doesn't exist
                 if not flight_info.get('flight_log_id'):
                     aircraft = self._find_or_create_aircraft(flight_info)
+                    if not aircraft:
+                        continue  # Skip if aircraft couldn't be created
                     
-                    flight_log = FlightLog(
-                        aircraft_id=aircraft.id,
-                        flight_id=f"fr24_active_{flight_id}",
-                        callsign=flight_info['callsign'] or flight_info['registration'],
-                        departure_time=flight_info['first_seen'],
-                        departure_airport='KDVT' if flight_info['is_phoenix_pd'] else None,
-                        data_source='flightradar24',
-                        raw_data={'active': True, 'flight_id': flight_id}
-                    )
-                    self.db.add(flight_log)
-                    self.db.flush()
-                    flight_info['flight_log_id'] = flight_log.id
+                    # Check if flight log already exists in database
+                    flight_log_id = f"fr24_active_{flight_id}"
+                    existing_log = self.db.query(FlightLog).filter(
+                        FlightLog.flight_id == flight_log_id
+                    ).first()
+                    
+                    if existing_log:
+                        flight_info['flight_log_id'] = existing_log.id
+                    else:
+                        flight_log = FlightLog(
+                            aircraft_id=aircraft.id,
+                            flight_id=flight_log_id,
+                            callsign=flight_info['callsign'] or flight_info['registration'],
+                            departure_time=flight_info['first_seen'],
+                            departure_airport='KDVT' if flight_info['is_phoenix_pd'] else None,
+                            data_source='flightradar24',
+                            raw_data={'active': True, 'flight_id': flight_id}
+                        )
+                        self.db.add(flight_log)
+                        self.db.flush()
+                        flight_info['flight_log_id'] = flight_log.id
                 
                 # Add current position
                 position = FlightPosition(

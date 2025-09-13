@@ -501,7 +501,7 @@ async def _import_fr24_historical_async(
                         )
 
                     # Update progress if this is a Celery task
-                    if current_task:
+                    if current_task and current_task.request.id:
                         progress = int(
                             (
                                 len(results["dates_processed"])
