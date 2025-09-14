@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from celery import Celery
+from celery.schedules import crontab
 from app.core.config import settings
 
 # Create Celery instance
@@ -15,6 +16,7 @@ celery_app = Celery(
         "app.workers.fr24_scheduler",
         "app.workers.radio_tasks",
         "app.workers.flight_tracking_tasks",
+        "app.workers.flight_discovery_tasks",
     ],
 )
 
@@ -44,21 +46,25 @@ celery_app.conf.update(
         # Analysis tasks
         "analyze-recent-patterns": {
             "task": "app.workers.analysis_tasks.analyze_recent_patterns",
-            "schedule": 1800.0,  # Every 30 minutes
+            "schedule": crontab(minute='0,30'),  # Every 30 minutes at :00 and :30
         },
         "analyze-and-score-flights": {
             "task": "app.workers.analysis_tasks.analyze_and_score_flights",
-            "schedule": 3600.0,  # Every hour
+            "schedule": crontab(minute='15,45'),  # Every 30 minutes at :15 and :45 (offset by 15 min)
+            "options": {
+                "expires": 1700,  # Expire if not started within ~28 minutes
+            },
         },
         "analyze-flight-patterns": {
             "task": "app.workers.analysis_tasks.analyze_flight_patterns",
-            "schedule": 86400.0,  # Once per day
+            "schedule": 3600.0,  # Every hour
             "kwargs": {
                 "start_date": (
                     datetime.now(timezone.utc) - timedelta(hours=24)
                 ).strftime("%Y-%m-%d"),
                 "end_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 "analysis_types": ["surveillance", "hovering", "circling"],
+                "max_flights": 100,  # Limit to prevent overload
             },
         },
         # Data import and management
@@ -74,13 +80,14 @@ celery_app.conf.update(
             "task": "monitor_and_download_complete_flights",
             "schedule": 300.0,  # Every 5 minutes - detect takeoffs/landings
         },
-        "download-missed-flights-daily": {
-            "task": "download_missed_flight_tracks",
-            "schedule": 86400.0,  # Once per day - catch any missed flights
-            "kwargs": {
-                "hours_back": 24,
-            },
-        },
+        # DISABLED - Replaced by discover-phoenix-pd-flights which gets complete tracks
+        # "download-missed-flights-daily": {
+        #     "task": "download_missed_flight_tracks",
+        #     "schedule": 86400.0,  # Once per day - catch any missed flights
+        #     "kwargs": {
+        #         "hours_back": 24,
+        #     },
+        # },
         "analyze-phoenix-pd-fleet": {
             "task": "analyze_phoenix_pd_fleet_status",
             "schedule": 3600.0,  # Every hour - track 24/7 coverage claims
@@ -138,14 +145,14 @@ celery_app.conf.update(
                 "document_id": 1,  # Placeholder - would be dynamically created
             },
         },
-        # Weekly complete historical backfill for legal documentation
-        "weekly-complete-flight-backfill": {
-            "task": "download_missed_flight_tracks",
-            "schedule": 604800.0,  # Every 7 days
-            "kwargs": {
-                "hours_back": 168,  # Full week of data
-            },
-        },
+        # DISABLED - Replaced by discover-phoenix-pd-flights which gets complete tracks
+        # "weekly-complete-flight-backfill": {
+        #     "task": "download_missed_flight_tracks",
+        #     "schedule": 604800.0,  # Every 7 days
+        #     "kwargs": {
+        #         "hours_back": 168,  # Full week of data
+        #     },
+        # },
         # Additional radio archive tasks
         "download-broadcastify-archives-extended": {
             "task": "download_broadcastify_archives",
@@ -155,6 +162,16 @@ celery_app.conf.update(
                 "max_downloads": 5,
                 "days_back": 2,  # Check last 2 days
             },
+        },
+        # Flight discovery for historical backfill
+        "discover-phoenix-pd-flights": {
+            "task": "discover_all_phoenix_pd_flights",
+            "schedule": 86400.0,  # Daily
+        },
+        "download-discovered-tracks": {
+            "task": "download_tracks_for_discovered_flights",
+            "schedule": 900.0,  # Every 15 minutes
+            "kwargs": {"batch_size": 5}
         },
         "transcribe-radio-archives-single": {
             "task": "transcribe_radio_archives",

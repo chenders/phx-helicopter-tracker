@@ -52,11 +52,20 @@ def get_monitoring_dashboard(
         beat_schedule = celery_app.conf.beat_schedule
 
         for name, config in beat_schedule.items():
+            # Convert schedule object to string representation
+            schedule = config.get("schedule")
+            if hasattr(schedule, '__repr__'):
+                schedule_str = str(schedule)
+            elif isinstance(schedule, (int, float)):
+                schedule_str = f"{schedule} seconds"
+            else:
+                schedule_str = str(schedule)
+                
             scheduled_tasks.append(
                 {
                     "name": name,
                     "task": config.get("task"),
-                    "schedule": config.get("schedule"),
+                    "schedule": schedule_str,
                     "kwargs": config.get("kwargs", {}),
                     "options": config.get("options", {}),
                 }
@@ -197,11 +206,18 @@ def get_scheduled_tasks() -> List[Dict[str, Any]]:
 
         scheduled = []
         for name, config in beat_schedule.items():
+            # Convert schedule object to string or seconds
+            schedule = config.get("schedule")
+            if isinstance(schedule, (int, float)):
+                schedule_val = schedule
+            else:
+                schedule_val = str(schedule)
+                
             scheduled.append(
                 {
                     "name": name,
                     "task": config.get("task"),
-                    "schedule_seconds": config.get("schedule"),
+                    "schedule_seconds": schedule_val,
                     "kwargs": config.get("kwargs", {}),
                     "options": config.get("options", {}),
                     "enabled": True,  # All scheduled tasks are enabled

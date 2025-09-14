@@ -87,7 +87,8 @@ class CreditManager:
             "historic_positions_light": 50,
             "historic_positions_full": 100,
             "flight_tracks": 20,
-            "flight_summary": 5,
+            "flights": 10,  # Search for flights by registration
+            "flight_summary": 10,  # Flight summary by registration
         }
 
     async def can_make_request(self, endpoint_type: str, count: int = 1) -> bool:
@@ -458,37 +459,127 @@ class FlightRadar24APIService:
             registrations=list(self.phoenix_pd_aircraft)
         )
 
-    async def get_flight_track(self, flight_id: str) -> List[FR24Position]:
-        """Get complete track for a specific flight"""
+    async def search_flights_by_registration(
+        self, registration: str, days_back: int = 7
+    ) -> List[Dict[str, Any]]:
+        """Search for recent flights by aircraft registration"""
+        end_date = datetime.now(timezone.utc)
+        start_date = end_date - timedelta(days=days_back)
+        
+        params = {
+            "registration": registration,
+            "from": start_date.strftime("%Y-%m-%d"),
+            "to": end_date.strftime("%Y-%m-%d"),
+            "limit": 100
+        }
+        
+        logger.info(f"Searching flights for {registration} from {params['from']} to {params['to']}")
+        
+        data = await self._make_api_request("flights", params, "flights")
+        
+        if not data:
+            return []
+            
+        flights = data.get('data', []) if isinstance(data, dict) else data
+        logger.info(f"Found {len(flights)} flights for {registration}")
+        return flights
 
+    async def get_flight_summary(self, registration: str, page: int = 1, days_back: int = 14, start_date: datetime = None, end_date: datetime = None) -> Dict[str, Any]:
+        """
+        Get flight summary for a specific registration
+        Returns list of all flights with their IDs for later track download
+        Note: API has a 14-day maximum date range limit
+        """
+        # If specific dates provided, use them
+        if start_date and end_date:
+            # Ensure we don't exceed 14-day limit
+            date_diff = (end_date - start_date).days
+            if date_diff > 14:
+                raise ValueError(f"Date range cannot exceed 14 days (got {date_diff} days)")
+        else:
+            # Use days_back parameter
+            days_back = min(days_back, 14)
+            end_date = datetime.now(timezone.utc)
+            start_date = end_date - timedelta(days=days_back)
+        
+        params = {
+            "registrations": registration,  # Note: plural 'registrations'
+            "flight_datetime_from": start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "flight_datetime_to": end_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "page": page,
+            "limit": 100  # Max results per page
+        }
+        
+        logger.info(f"Getting flight summary for {registration}, page {page}, from {start_date.date()} to {end_date.date()}")
+        
         data = await self._make_api_request(
-            f"flight-tracks/{flight_id}", None, "flight_tracks"
+            "flight-summary/light", params, "flight_summary"
+        )
+        
+        if not data:
+            return {"data": []}
+            
+        # Ensure consistent format
+        if isinstance(data, list):
+            return {"data": data}
+        elif isinstance(data, dict) and "data" in data:
+            return data
+        else:
+            return {"data": []}
+
+    async def get_flight_track(self, flight_id: str) -> List[FR24Position]:
+        """Get complete track for a specific flight - ALL positions for the entire flight"""
+
+        # Use flight-tracks endpoint with flight_id as parameter
+        params = {"flight_id": flight_id}
+        data = await self._make_api_request(
+            "flight-tracks", params, "flight_tracks"
         )
 
         if not data:
             return []
 
         positions = []
-        for track_point in data.get("track", []):
-            try:
-                position = FR24Position(
-                    flight_id=flight_id,
-                    registration=data.get("registration"),
-                    callsign=data.get("callsign"),
-                    aircraft_type=data.get("aircraft_type"),
-                    latitude=float(track_point["latitude"]),
-                    longitude=float(track_point["longitude"]),
-                    altitude_feet=track_point.get("altitude"),
-                    ground_speed_knots=track_point.get("ground_speed"),
-                    track_degrees=track_point.get("track"),
-                    vertical_speed_fpm=track_point.get("vertical_speed"),
-                    timestamp=datetime.fromtimestamp(track_point.get("timestamp", 0)),
-                    origin=data.get("origin"),
-                    destination=data.get("destination"),
-                )
-                positions.append(position)
-            except (KeyError, ValueError) as e:
-                logger.error(f"Error parsing track point: {e}")
+        
+        # Response is a list with flight data
+        if isinstance(data, list) and len(data) > 0:
+            flight_data = data[0]
+            fr24_id = flight_data.get("fr24_id", flight_id)
+            tracks = flight_data.get("tracks", [])
+            
+            logger.info(f"Processing {len(tracks)} track points for flight {fr24_id}")
+            
+            for track_point in tracks:
+                try:
+                    # Parse timestamp
+                    timestamp_str = track_point.get("timestamp", "")
+                    if timestamp_str:
+                        # Handle ISO format with Z
+                        if isinstance(timestamp_str, str):
+                            timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+                        else:
+                            timestamp = datetime.fromtimestamp(timestamp_str, tz=timezone.utc)
+                    else:
+                        timestamp = datetime.now(timezone.utc)
+                    
+                    position = FR24Position(
+                        flight_id=fr24_id,
+                        registration=track_point.get("callsign") or fr24_id,  # Use callsign if available
+                        callsign=track_point.get("callsign", ""),
+                        aircraft_type=None,  # Not in track data
+                        latitude=float(track_point.get("lat", 0)),
+                        longitude=float(track_point.get("lon", 0)),
+                        altitude_feet=track_point.get("alt"),
+                        ground_speed_knots=track_point.get("gspeed"),
+                        track_degrees=track_point.get("track"),
+                        vertical_speed_fpm=track_point.get("vspeed"),
+                        timestamp=timestamp,
+                        origin=None,  # Not in track data
+                        destination=None,  # Not in track data
+                    )
+                    positions.append(position)
+                except (KeyError, ValueError) as e:
+                    logger.error(f"Error parsing track point: {e}")
 
         return positions
 

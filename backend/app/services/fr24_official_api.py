@@ -73,7 +73,7 @@ class FR24OfficialAPI:
         """Get all flights in Phoenix area using bounds"""
         # Check cache first (5 minute cache for bounds queries)
         cache_key = "fr24_phoenix_area_flights"
-        cached_data = cache_service.get(cache_key, max_age=300)
+        cached_data = cache_service.get(cache_key)
         if cached_data:
             logger.info(f"Returning cached data for Phoenix area flights")
             return cached_data
@@ -91,7 +91,8 @@ class FR24OfficialAPI:
                 # Rate limiter returned None - we're at limit
                 logger.warning("Rate limit prevented request - returning cached data if available")
                 # Try to return any cached data even if expired
-                old_data = cache_service.get(cache_key, max_age=3600)  # Accept up to 1 hour old
+                old_cache = cache_service.cache.get(cache_key)
+                old_data = old_cache[0] if old_cache else None
                 return old_data if old_data else []
             
             if response.status_code == 200:
@@ -110,7 +111,8 @@ class FR24OfficialAPI:
                 logger.warning("FR24 API returned 429 despite rate limiting - adjusting limits")
                 fr24_rate_limiter.min_delay *= 1.5  # Increase delay
                 # Try to return any cached data
-                old_data = cache_service.get(cache_key, max_age=3600)
+                old_cache = cache_service.cache.get(cache_key)
+                old_data = old_cache[0] if old_cache else None
                 return old_data if old_data else []
             else:
                 logger.error(f"FR24 API error {response.status_code}: {response.text}")

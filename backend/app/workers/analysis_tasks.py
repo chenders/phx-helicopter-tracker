@@ -19,6 +19,7 @@ def analyze_flight_patterns(
     end_date: str,
     aircraft_filter: List[str] = None,
     analysis_types: List[str] = None,
+    max_flights: int = 100,
 ):
     """Analyze flight patterns for surveillance detection"""
     try:
@@ -31,7 +32,7 @@ def analyze_flight_patterns(
             )
 
         result = _analyze_patterns(
-            start_date, end_date, aircraft_filter, analysis_types
+            start_date, end_date, aircraft_filter, analysis_types, max_flights
         )
         return result
 
@@ -47,6 +48,7 @@ def _analyze_patterns(
     end_date: str,
     aircraft_filter: List[str] = None,
     analysis_types: List[str] = None,
+    max_flights: int = 100,
 ) -> Dict[str, Any]:
     """Internal pattern analysis function"""
     db = SessionLocal()
@@ -55,10 +57,15 @@ def _analyze_patterns(
         start_dt = datetime.fromisoformat(start_date)
         end_dt = datetime.fromisoformat(end_date)
 
-        # Get flights in date range
-        flights = flight_log_crud.get_by_date_range(
+        # Get flights in date range (with limit)
+        all_flights = flight_log_crud.get_by_date_range(
             db, start_date=start_dt, end_date=end_dt
         )
+        
+        # Limit number of flights to analyze to prevent overload
+        flights = all_flights[:max_flights] if len(all_flights) > max_flights else all_flights
+        
+        logger.info(f"Analyzing {len(flights)} of {len(all_flights)} total flights")
 
         if current_task:
             current_task.update_state(
@@ -100,10 +107,10 @@ def _analyze_patterns(
                 meta={"current": 40, "total": 100, "status": "Analyzing positions..."},
             )
 
-        # Analyze positions for patterns
+        # Analyze positions for patterns (limit positions per flight)
         all_positions = []
         for flight in flights:
-            positions = flight_position_crud.get_by_flight(db, flight_log_id=flight.id)
+            positions = flight_position_crud.get_by_flight(db, flight_log_id=flight.id, limit=100)
             all_positions.extend(positions)
 
         # Count behavior patterns
@@ -235,7 +242,7 @@ def _detect_surveillance_patterns(
 
 @celery_app.task(bind=True, max_retries=2)
 def generate_cost_analysis(
-    self, start_date: str, end_date: str, aircraft_filter: List[str] = None
+    self, start_date: str, end_date: str, aircraft_filter: List[str] = None, max_flights: int = 200
 ):
     """Generate comprehensive cost analysis"""
     try:
@@ -247,7 +254,7 @@ def generate_cost_analysis(
                 meta={"current": 0, "total": 100, "status": "Calculating costs..."},
             )
 
-        result = _generate_cost_analysis(start_date, end_date, aircraft_filter)
+        result = _generate_cost_analysis(start_date, end_date, aircraft_filter, max_flights)
         return result
 
     except Exception as exc:
@@ -258,7 +265,7 @@ def generate_cost_analysis(
 
 
 def _generate_cost_analysis(
-    start_date: str, end_date: str, aircraft_filter: List[str] = None
+    start_date: str, end_date: str, aircraft_filter: List[str] = None, max_flights: int = 200
 ) -> Dict[str, Any]:
     """Internal cost analysis function"""
     db = SessionLocal()
@@ -268,10 +275,16 @@ def _generate_cost_analysis(
         end_dt = datetime.fromisoformat(end_date)
         analysis_period_days = (end_dt - start_dt).days
 
-        # Get flights in date range
-        flights = flight_log_crud.get_by_date_range(
+        # Get flights in date range (with limit)
+        all_flights = flight_log_crud.get_by_date_range(
             db, start_date=start_dt, end_date=end_dt
         )
+        
+        # Limit for performance
+        flights = all_flights[:max_flights] if len(all_flights) > max_flights else all_flights
+        
+        if len(all_flights) > max_flights:
+            logger.warning(f"Cost analysis limited to {max_flights} of {len(all_flights)} flights")
 
         analysis = {
             "analysis_period_days": analysis_period_days,
@@ -487,7 +500,7 @@ def analyze_and_score_flights(self):
 
 
 @celery_app.task
-def analyze_recent_patterns():
+def analyze_recent_patterns(max_flights: int = 50):
     """Periodic task to analyze recent flight patterns"""
     db = SessionLocal()
 
@@ -496,9 +509,13 @@ def analyze_recent_patterns():
         end_time = datetime.now(timezone.utc)
         start_time = end_time - timedelta(hours=24)
 
-        flights = flight_log_crud.get_by_date_range(
+        all_flights = flight_log_crud.get_by_date_range(
             db, start_date=start_time, end_date=end_time
         )
+        
+        # Limit to prevent overload
+        flights = all_flights[:max_flights] if len(all_flights) > max_flights else all_flights
+        logger.info(f"Analyzing {len(flights)} of {len(all_flights)} recent flights")
 
         if not flights:
             return {"message": "No recent flights to analyze"}

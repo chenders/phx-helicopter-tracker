@@ -139,7 +139,7 @@ export function TaskMonitoringPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Success Rate (24h)</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
                 {status_summary.success_rate_24h.toFixed(1)}%
               </p>
             </div>
@@ -151,7 +151,7 @@ export function TaskMonitoringPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Active Tasks</p>
-              <p className="text-2xl font-bold text-blue-600">
+              <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                 {status_summary.running + (activeTasks?.length || 0)}
               </p>
             </div>
@@ -163,7 +163,7 @@ export function TaskMonitoringPage() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500 dark:text-gray-400">Failed (24h)</p>
-              <p className="text-2xl font-bold text-red-600">
+              <p className="text-2xl font-bold text-red-600 dark:text-red-400">
                 {status_summary.failed}
               </p>
             </div>
@@ -177,7 +177,7 @@ export function TaskMonitoringPage() {
               <p className="text-sm text-gray-500 dark:text-gray-400">FR24 Credits</p>
               {credit_usage?.monthly_used ? (
                 <>
-                  <p className="text-2xl font-bold text-purple-600">
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                     {credit_usage.monthly_used.toLocaleString()}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -185,7 +185,7 @@ export function TaskMonitoringPage() {
                   </p>
                 </>
               ) : (
-                <p className="text-2xl font-bold text-purple-600">
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                   {status_summary.total_credits_used_24h}
                 </p>
               )}
@@ -205,7 +205,7 @@ export function TaskMonitoringPage() {
                 onClick={() => setSelectedTab(tab)}
                 className={`px-6 py-3 text-sm font-medium capitalize ${
                   selectedTab === tab
-                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
                 }`}
               >
@@ -426,15 +426,13 @@ export function TaskMonitoringPage() {
                               : `Every ${Math.round(task.schedule / 86400)} day${Math.round(task.schedule / 86400) !== 1 ? 's' : ''}`
                             : typeof task.schedule === 'object' && task.schedule?.seconds
                             ? `Every ${task.schedule.seconds}s`
+                            : typeof task.schedule === 'string'
+                            ? task.schedule
                             : 'Custom schedule'
                           }
                         </span>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {task.schedule === 300 && '(5 minutes)'}
-                          {task.schedule === 3600 && '(1 hour)'}
-                          {task.schedule === 7200 && '(2 hours)'}
-                          {task.schedule === 86400 && '(24 hours)'}
-                          {task.schedule === 604800 && '(7 days)'}
+                          {typeof task.schedule === 'string' && task.schedule.includes('crontab') && 'Cron schedule'}
                         </div>
                       </div>
                     </div>
