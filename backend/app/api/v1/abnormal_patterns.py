@@ -16,6 +16,7 @@ from app.schemas.abnormal_patterns import (
     AbnormalPatternDetail,
     AbnormalPatternSummary
 )
+from app.schemas.aircraft import AircraftBase
 
 router = APIRouter()
 
@@ -25,6 +26,7 @@ router = APIRouter()
 async def get_abnormal_patterns(
     pattern_type: Optional[str] = Query(None, description="Filter by pattern type"),
     reviewed: Optional[str] = Query(None, description="Filter by review status"),
+    aircraft_id: Optional[int] = Query(None, description="Filter by aircraft ID"),
     days_back: int = Query(7, description="Number of days to look back"),
     limit: int = Query(100, description="Maximum number of patterns to return"),
     db: Session = Depends(get_db)
@@ -47,12 +49,18 @@ async def get_abnormal_patterns(
     if reviewed:
         query = query.filter(AbnormalPattern.reviewed == reviewed)
     
+    if aircraft_id:
+        query = query.filter(FlightLog.aircraft_id == aircraft_id)
+    
     # Time filter
     cutoff_date = datetime.utcnow() - timedelta(days=days_back)
     query = query.filter(AbnormalPattern.detected_at >= cutoff_date)
     
-    # Order by detection time and limit
-    patterns = query.order_by(desc(AbnormalPattern.detected_at)).limit(limit).all()
+    # Order by confidence score (descending), then by detection time (descending)
+    patterns = query.order_by(
+        desc(AbnormalPattern.confidence_score), 
+        desc(AbnormalPattern.detected_at)
+    ).limit(limit).all()
     
     # Format response
     results = []
@@ -76,6 +84,27 @@ async def get_abnormal_patterns(
     return results
 
 
+@router.get("/aircraft", response_model=List[dict])
+async def get_phoenix_pd_aircraft(
+    db: Session = Depends(get_db)
+):
+    """Get list of Phoenix PD aircraft for filtering"""
+    aircraft = db.query(Aircraft).filter(
+        Aircraft.is_phoenix_pd == True
+    ).order_by(Aircraft.registration).all()
+    
+    return [
+        {
+            "id": a.id,
+            "registration": a.registration,
+            "make": a.make,
+            "model": a.model,
+            "is_active": a.is_active
+        }
+        for a in aircraft
+    ]
+
+
 @router.get("/{pattern_id}", response_model=AbnormalPatternDetail)
 async def get_abnormal_pattern_detail(
     pattern_id: int,
@@ -93,24 +122,41 @@ async def get_abnormal_pattern_detail(
     flight = pattern.flight_log
     aircraft = flight.aircraft if flight else None
     
-    # Get flight positions if available
+    # Get flight positions from FlightPosition table
     positions = []
-    if flight and flight.raw_data:
-        trail = flight.raw_data.get("trail", [])
-        for point in trail:
-            positions.append({
-                "lat": point.get("lat"),
-                "lng": point.get("lng"),
-                "alt": point.get("alt"),
-                "spd": point.get("spd"),
-                "ts": point.get("ts")
-            })
+    if flight:
+        # First try to get from raw_data trail if available
+        if flight.raw_data and "trail" in flight.raw_data:
+            trail = flight.raw_data.get("trail", [])
+            for point in trail:
+                positions.append({
+                    "lat": point.get("lat"),
+                    "lng": point.get("lng"),
+                    "alt": point.get("alt"),
+                    "spd": point.get("spd"),
+                    "ts": point.get("ts")
+                })
+        else:
+            # Otherwise get from FlightPosition table
+            from app.models.flight_logs import FlightPosition
+            flight_positions = db.query(FlightPosition).filter(
+                FlightPosition.flight_log_id == flight.id
+            ).order_by(FlightPosition.timestamp).all()
+            
+            for pos in flight_positions:
+                positions.append({
+                    "lat": pos.latitude,
+                    "lng": pos.longitude,
+                    "alt": pos.altitude_feet,
+                    "spd": pos.ground_speed_knots,
+                    "ts": int(pos.timestamp.timestamp()) if pos.timestamp else None
+                })
     
     return {
         "id": pattern.id,
         "flight_id": flight.flight_id if flight else None,
         "aircraft_registration": aircraft.registration if aircraft else None,
-        "aircraft_type": aircraft.aircraft_type if aircraft else None,
+        "aircraft_type": f"{aircraft.make} {aircraft.model}" if aircraft and aircraft.make and aircraft.model else None,
         "pattern_type": pattern.pattern_type,
         "confidence_score": pattern.confidence_score,
         "detected_at": pattern.detected_at,

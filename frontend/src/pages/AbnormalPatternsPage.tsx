@@ -52,11 +52,13 @@ interface PatternDetail {
 }
 
 const PATTERN_COLORS: Record<string, string> = {
-  sky_writing: '#FF0000',        // Red for sky-writing (like ALEX)
-  excessive_hovering: '#FFA500',  // Orange for hovering
-  repetitive_circling: '#FFFF00', // Yellow for circling
-  abnormal_path: '#FF1493',       // Pink for other abnormal paths
-  default: '#0000FF'              // Blue for default
+  sky_art: '#FF0000',              // Red for deliberate sky art (like ALEX)
+  sky_writing: '#FF0000',          // Red (legacy, for backward compatibility)
+  intensive_surveillance: '#9400D3', // Violet for intensive surveillance patterns
+  excessive_hovering: '#FFA500',   // Orange for hovering
+  repetitive_circling: '#FFD700',  // Gold for circling (more visible than yellow)
+  abnormal_path: '#FF1493',        // Pink for other abnormal paths
+  default: '#0000FF'               // Blue for default
 };
 
 const PHOENIX_CENTER = { lat: 33.4484, lng: -112.0740 };
@@ -64,6 +66,7 @@ const PHOENIX_CENTER = { lat: 33.4484, lng: -112.0740 };
 const mapContainerStyle = {
   width: '100%',
   height: '100%',
+  minHeight: '400px',
 };
 
 // Dark mode map styles - matching LiveTrackingPage
@@ -168,29 +171,59 @@ export const AbnormalPatternsPage: React.FC = () => {
   const [mapZoom, setMapZoom] = useState(10);
   const [filterType, setFilterType] = useState<string>('all');
   const [filterReviewed, setFilterReviewed] = useState<string>('all');
+  const [filterAircraft, setFilterAircraft] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('confidence_desc');
   const [selectedMarker, setSelectedMarker] = useState<any>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
+  const itemsPerPage = 5;
 
   const onLoad = useCallback((map: google.maps.Map) => {
     setMap(map);
+    setIsGoogleMapsLoaded(true);
   }, []);
 
   const onUnmount = useCallback(() => {
     setMap(null);
   }, []);
 
+  // Fetch list of aircraft
+  const { data: aircraft } = useQuery<any[]>({
+    queryKey: ['phoenixAircraft'],
+    queryFn: async () => {
+      const response = await axios.get('/api/v1/abnormal-patterns/aircraft');
+      return response.data;
+    },
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false,
+  });
+
   // Fetch list of abnormal patterns
   const { data: patterns, isLoading: patternsLoading } = useQuery<AbnormalPattern[]>({
-    queryKey: ['abnormalPatterns', filterType, filterReviewed],
+    queryKey: ['abnormalPatterns', filterType, filterReviewed, filterAircraft],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filterType !== 'all') params.append('pattern_type', filterType);
       if (filterReviewed !== 'all') params.append('reviewed', filterReviewed);
+      if (filterAircraft !== 'all') params.append('aircraft_id', filterAircraft);
       params.append('days_back', '30');
       
       const response = await axios.get(`/api/v1/abnormal-patterns?${params}`);
       return response.data;
     },
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
+    staleTime: 30 * 60 * 1000, // Consider data fresh for 30 minutes
+    gcTime: 60 * 60 * 1000, // Keep in cache for 1 hour
+    retry: false, // Don't retry on error
   });
 
   // Fetch detailed pattern data when one is selected
@@ -202,34 +235,113 @@ export const AbnormalPatternsPage: React.FC = () => {
       return response.data;
     },
     enabled: !!selectedPattern,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    refetchInterval: false,
+    staleTime: 30 * 60 * 1000, // Cache pattern details for 30 minutes
+    gcTime: 60 * 60 * 1000, // Keep in cache for 1 hour
+    retry: false,
   });
 
-  // Auto-select first pattern if none selected
-  useEffect(() => {
-    if (patterns && patterns.length > 0 && !selectedPattern) {
-      setSelectedPattern(patterns[0].id);
+  // Sort patterns based on selected sorting option
+  const sortedPatterns = React.useMemo(() => {
+    if (!patterns) return [];
+    
+    const sorted = [...patterns];
+    switch (sortBy) {
+      case 'confidence_desc':
+        sorted.sort((a, b) => b.confidence_score - a.confidence_score);
+        break;
+      case 'confidence_asc':
+        sorted.sort((a, b) => a.confidence_score - b.confidence_score);
+        break;
+      case 'date_desc':
+        sorted.sort((a, b) => {
+          // Use flight_date for sorting (when the flight happened)
+          const dateA = new Date(a.flight_date || a.detected_at).getTime();
+          const dateB = new Date(b.flight_date || b.detected_at).getTime();
+          return dateB - dateA;
+        });
+        break;
+      case 'date_asc':
+        sorted.sort((a, b) => {
+          // Use flight_date for sorting (when the flight happened)
+          const dateA = new Date(a.flight_date || a.detected_at).getTime();
+          const dateB = new Date(b.flight_date || b.detected_at).getTime();
+          return dateA - dateB;
+        });
+        break;
+      default:
+        // Default to confidence descending
+        sorted.sort((a, b) => b.confidence_score - a.confidence_score);
     }
-  }, [patterns, selectedPattern]);
+    return sorted;
+  }, [patterns, sortBy]);
 
-  // Center map on selected pattern
+  // Calculate paginated patterns
+  const totalPages = sortedPatterns ? Math.ceil(sortedPatterns.length / itemsPerPage) : 0;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedPatterns = sortedPatterns?.slice(startIndex, endIndex) || [];
+
+  // Auto-select first pattern on current page if none selected
   useEffect(() => {
-    if (patternDetail && patternDetail.positions.length > 0) {
-      const firstPos = patternDetail.positions[0];
-      setMapCenter({ lat: firstPos.lat, lng: firstPos.lng });
-      setMapZoom(12);
+    if (paginatedPatterns && paginatedPatterns.length > 0 && !selectedPattern) {
+      setSelectedPattern(paginatedPatterns[0].id);
     }
-  }, [patternDetail]);
+  }, [paginatedPatterns, selectedPattern]);
+
+  // Reset to page 1 when filters or sorting change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterType, filterReviewed, filterAircraft, sortBy]);
+
+  // Center and zoom map to fit the selected pattern
+  useEffect(() => {
+    if (patternDetail && patternDetail.positions.length > 0 && map && isGoogleMapsLoaded && window.google?.maps) {
+      // Calculate bounds of all positions
+      const bounds = new window.google.maps.LatLngBounds();
+      patternDetail.positions.forEach(pos => {
+        bounds.extend(new window.google.maps.LatLng(pos.lat, pos.lng));
+      });
+      
+      // Add padding around the bounds
+      const ne = bounds.getNorthEast();
+      const sw = bounds.getSouthWest();
+      const latPadding = Math.abs(ne.lat() - sw.lat()) * 0.2;
+      const lngPadding = Math.abs(ne.lng() - sw.lng()) * 0.2;
+      
+      bounds.extend(new window.google.maps.LatLng(ne.lat() + latPadding, ne.lng() + lngPadding));
+      bounds.extend(new window.google.maps.LatLng(sw.lat() - latPadding, sw.lng() - lngPadding));
+      
+      // Fit the map to the bounds with animation
+      map.fitBounds(bounds);
+      
+      // Optionally set a maximum zoom level to avoid zooming too close
+      setTimeout(() => {
+        const currentZoom = map.getZoom();
+        if (currentZoom && currentZoom > 15) {
+          map.setZoom(15);
+        }
+      }, 300);
+    }
+  }, [patternDetail, map, isGoogleMapsLoaded]);
 
   const getPatternIcon = (type: string) => {
     switch (type) {
+      case 'sky_art':
+        return '🎨';  // Art palette for deliberate sky art
       case 'sky_writing':
-        return '✏️';
+        return '✏️';  // Pencil (legacy)
+      case 'intensive_surveillance':
+        return '🔍';  // Magnifying glass for intensive searching
       case 'excessive_hovering':
-        return '⏸️';
+        return '⏸️';  // Pause for hovering
       case 'repetitive_circling':
-        return '🔄';
+        return '🔄';  // Circling arrows
       default:
-        return '⚠️';
+        return '⚠️';  // Warning for unknown
     }
   };
 
@@ -259,7 +371,7 @@ export const AbnormalPatternsPage: React.FC = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       {/* Header */}
       <div className="bg-white dark:bg-gray-800 shadow-sm border-b dark:border-gray-700 p-4">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -270,12 +382,29 @@ export const AbnormalPatternsPage: React.FC = () => {
         </p>
       </div>
 
-      <div className="flex-1 flex">
+      <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Pattern List */}
-        <div className="w-96 bg-white dark:bg-gray-800 border-r dark:border-gray-700 overflow-y-auto">
+        <div className="w-96 bg-white dark:bg-gray-800 border-r dark:border-gray-700 flex flex-col h-full">
           {/* Filters */}
           <div className="p-4 border-b dark:border-gray-700">
             <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Helicopter
+                </label>
+                <select
+                  value={filterAircraft}
+                  onChange={(e) => setFilterAircraft(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="all">All Helicopters</option>
+                  {aircraft?.map(a => (
+                    <option key={a.id} value={a.id}>
+                      {a.registration} {a.make && a.model ? `(${a.make} ${a.model})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Pattern Type
@@ -286,10 +415,12 @@ export const AbnormalPatternsPage: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
                 >
                   <option value="all">All Types</option>
-                  <option value="sky_writing">Sky Writing</option>
+                  <option value="sky_art">Sky Art (Deliberate Patterns)</option>
+                  <option value="intensive_surveillance">Intensive Surveillance</option>
                   <option value="excessive_hovering">Excessive Hovering</option>
                   <option value="repetitive_circling">Repetitive Circling</option>
                   <option value="abnormal_path">Abnormal Path</option>
+                  <option value="sky_writing">Sky Writing (Legacy)</option>
                 </select>
               </div>
               <div>
@@ -308,18 +439,38 @@ export const AbnormalPatternsPage: React.FC = () => {
                 </select>
               </div>
             </div>
+            
+            {/* Sort Options */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Sort By
+              </label>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white"
+              >
+                <option value="confidence_desc">Confidence (High to Low)</option>
+                <option value="confidence_asc">Confidence (Low to High)</option>
+                <option value="date_desc">Flight Date (Newest First)</option>
+                <option value="date_asc">Flight Date (Oldest First)</option>
+              </select>
+            </div>
           </div>
 
           {/* Pattern List */}
-          <div className="divide-y dark:divide-gray-700">
-            {patterns && patterns.length > 0 ? (
-              patterns.map((pattern) => (
+          <div className="flex-1 overflow-y-auto divide-y dark:divide-gray-700 min-h-0">
+            {paginatedPatterns && paginatedPatterns.length > 0 ? (
+              paginatedPatterns.map((pattern) => (
                 <div
                   key={pattern.id}
-                  className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${
-                    selectedPattern === pattern.id ? 'bg-blue-50 dark:bg-gray-700 border-l-4 border-blue-500' : ''
+                  className={`p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 ${
+                    selectedPattern === pattern.id ? 'bg-blue-50 dark:bg-gray-700 border-l-4 border-blue-500 shadow-lg' : ''
                   }`}
-                  onClick={() => setSelectedPattern(pattern.id)}
+                  onClick={() => {
+                    setSelectedPattern(pattern.id);
+                    setSelectedMarker(null); // Reset any open info windows
+                  }}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -363,14 +514,41 @@ export const AbnormalPatternsPage: React.FC = () => {
               ))
             ) : (
               <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-                No abnormal patterns found with current filters
+                {patterns?.length === 0 ? 
+                  'No abnormal patterns found with current filters' : 
+                  'No patterns on this page'}
               </div>
             )}
           </div>
+
+          {/* Pagination Controls */}
+          {patterns && patterns.length > itemsPerPage && (
+            <div className="border-t dark:border-gray-700 p-4 bg-white dark:bg-gray-800 flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Page {currentPage} of {totalPages} ({patterns.length} total)
+                </span>
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm border rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Side - Map and Details */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0 h-full">
           {/* Pattern Details Bar */}
           {patternDetail && (
             <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 p-4">
@@ -403,8 +581,11 @@ export const AbnormalPatternsPage: React.FC = () => {
           )}
 
           {/* Map */}
-          <div className="flex-1">
-            <LoadScript googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}>
+          <div className="flex-1 min-h-0">
+            <LoadScript 
+              googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}
+              onLoad={() => setIsGoogleMapsLoaded(true)}
+            >
               <GoogleMap
                 mapContainerStyle={mapContainerStyle}
                 center={mapCenter}
@@ -416,23 +597,49 @@ export const AbnormalPatternsPage: React.FC = () => {
                 {/* Selected Pattern Flight Path */}
                 {patternDetail && patternDetail.positions && patternDetail.positions.length > 0 && (
                   <>
-                    {/* Flight path */}
+                    {/* Highlighted flight path with animation */}
                     <Polyline
                       path={patternDetail.positions.map(p => ({ lat: p.lat, lng: p.lng }))}
                       options={{
                         strokeColor: PATTERN_COLORS[patternDetail.pattern_type] || PATTERN_COLORS.default,
-                        strokeWeight: 3,
-                        strokeOpacity: 0.8,
+                        strokeWeight: 4,
+                        strokeOpacity: 0.9,
+                        icons: isGoogleMapsLoaded && window.google?.maps ? [{
+                          icon: {
+                            path: window.google.maps.SymbolPath.FORWARD_OPEN_ARROW,
+                            scale: 2,
+                            strokeColor: '#FFFFFF',
+                            strokeWeight: 1,
+                            fillColor: '#FFFFFF',
+                            fillOpacity: 0.8
+                          },
+                          offset: '100%',
+                          repeat: '100px'
+                        }] : [],
+                      }}
+                    />
+                    
+                    {/* Background glow effect for highlighting */}
+                    <Polyline
+                      path={patternDetail.positions.map(p => ({ lat: p.lat, lng: p.lng }))}
+                      options={{
+                        strokeColor: PATTERN_COLORS[patternDetail.pattern_type] || PATTERN_COLORS.default,
+                        strokeWeight: 12,
+                        strokeOpacity: 0.3,
+                        zIndex: 0,
                       }}
                     />
 
-                    {/* Start marker */}
+                    {/* Start marker with pulsing animation */}
                     <MarkerF
                       position={{ lat: patternDetail.positions[0].lat, lng: patternDetail.positions[0].lng }}
                       onClick={() => setSelectedMarker('start')}
                       icon={{
                         url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+                        scaledSize: isGoogleMapsLoaded && window.google?.maps ? new window.google.maps.Size(48, 48) : undefined,
+                        anchor: isGoogleMapsLoaded && window.google?.maps ? new window.google.maps.Point(24, 48) : undefined,
                       }}
+                      animation={isGoogleMapsLoaded && window.google?.maps ? window.google.maps.Animation.DROP : undefined}
                     />
                     {selectedMarker === 'start' && (
                       <InfoWindow
@@ -458,7 +665,10 @@ export const AbnormalPatternsPage: React.FC = () => {
                           onClick={() => setSelectedMarker('end')}
                           icon={{
                             url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+                            scaledSize: isGoogleMapsLoaded && window.google?.maps ? new window.google.maps.Size(48, 48) : undefined,
+                            anchor: isGoogleMapsLoaded && window.google?.maps ? new window.google.maps.Point(24, 48) : undefined,
                           }}
+                          animation={isGoogleMapsLoaded && window.google?.maps ? window.google.maps.Animation.DROP : undefined}
                         />
                         {selectedMarker === 'end' && (
                           <InfoWindow
@@ -511,3 +721,4 @@ export const AbnormalPatternsPage: React.FC = () => {
 };
 
 export default AbnormalPatternsPage;
+

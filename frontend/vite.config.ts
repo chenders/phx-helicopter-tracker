@@ -13,6 +13,11 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
+    // Configure HMR for Docker environment
+    hmr: {
+      host: 'localhost',
+      port: 3000
+    },
     // Proxy API requests to backend during development
     proxy: {
       '/api': {
@@ -23,6 +28,8 @@ export default defineConfig({
     },
     // Allow all hosts to connect in development
     allowedHosts: true,
+    strictPort: true,
+    // cors: true
   },
   build: {
     outDir: 'dist',
