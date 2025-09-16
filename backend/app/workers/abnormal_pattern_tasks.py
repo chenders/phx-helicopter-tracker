@@ -145,6 +145,278 @@ def calculate_path_complexity(positions: List[Tuple[float, float]]) -> Dict[str,
     }
 
 
+def calculate_position_confidence(positions: List[Dict], window_size: int = 20,
+                                 turn_threshold: float = 45.0) -> List[float]:
+    """
+    Calculate confidence level for each position being part of a sky art pattern
+    
+    Args:
+        positions: List of position dictionaries with latitude, longitude, timestamp
+        window_size: Number of positions to analyze together for local complexity
+        turn_threshold: Minimum angle change (degrees) to count as a turn
+    
+    Returns:
+        List of confidence scores (0.0 to 1.0) for each position
+    """
+    if len(positions) < 3:
+        return [0.0] * len(positions)
+    
+    # Helper function to calculate bearing
+    def calculate_bearing(lat1, lon1, lat2, lon2):
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        dlon = lon2 - lon1
+        x = math.sin(dlon) * math.cos(lat2)
+        y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dlon)
+        return math.degrees(math.atan2(x, y))
+    
+    confidence_scores = []
+    
+    for i in range(len(positions)):
+        # Get window around current position
+        start_idx = max(0, i - window_size // 2)
+        end_idx = min(len(positions), i + window_size // 2)
+        
+        if end_idx - start_idx < 3:
+            confidence_scores.append(0.0)
+            continue
+        
+        # Analyze complexity in this window
+        turns = 0
+        total_angle_change = 0
+        sharp_turns = 0
+        very_sharp_turns = 0
+        
+        for j in range(start_idx + 1, end_idx - 1):
+            if j > 0 and j < len(positions) - 1:
+                bearing_before = calculate_bearing(
+                    positions[j-1]["latitude"], positions[j-1]["longitude"],
+                    positions[j]["latitude"], positions[j]["longitude"]
+                )
+                bearing_after = calculate_bearing(
+                    positions[j]["latitude"], positions[j]["longitude"],
+                    positions[j+1]["latitude"], positions[j+1]["longitude"]
+                )
+                
+                change = abs(bearing_after - bearing_before)
+                if change > 180:
+                    change = 360 - change
+                
+                total_angle_change += change
+                
+                if change > 30:  # Moderate turn
+                    turns += 1
+                if change > 45:  # Sharp turn
+                    sharp_turns += 1
+                if change > 90:  # Very sharp turn
+                    very_sharp_turns += 1
+        
+        # Calculate various metrics for confidence
+        window_positions = end_idx - start_idx
+        
+        # Turn density (how many turns per position)
+        turn_density = sharp_turns / window_positions if window_positions > 0 else 0
+        
+        # Average angle change
+        avg_angle_change = total_angle_change / (window_positions - 1) if window_positions > 1 else 0
+        
+        # Calculate confidence based on multiple factors
+        # This is specifically tuned for sky art detection
+        confidence = 0.0
+        
+        # Extremely high turn density (characteristic of letter writing)
+        if turn_density > 0.8:  # 80%+ of positions are sharp turns
+            confidence += 0.5
+        elif turn_density > 0.6:  # 60%+ 
+            confidence += 0.4
+        elif turn_density > 0.4:  # 40%+
+            confidence += 0.3
+        elif turn_density > 0.2:  # 20%+
+            confidence += 0.2
+        elif turn_density > 0.1:  # 10%+
+            confidence += 0.1
+        
+        # Very high average angle change (characteristic of deliberate patterns)
+        if avg_angle_change > 90:  # Very sharp changes
+            confidence += 0.3
+        elif avg_angle_change > 60:
+            confidence += 0.2
+        elif avg_angle_change > 30:
+            confidence += 0.1
+        
+        # Multiple very sharp turns in small area (letter formation)
+        if very_sharp_turns > 5:  # Many 90+ degree turns
+            confidence += 0.2
+        elif very_sharp_turns > 2:
+            confidence += 0.1
+        
+        # Bonus for consistent complex maneuvering
+        if sharp_turns > window_positions * 0.6:  # 60%+ are sharp turns
+            confidence += 0.2
+        elif sharp_turns > window_positions * 0.4:  # 40%+
+            confidence += 0.1
+        
+        # Bonus for extremely tight maneuvering patterns
+        if turn_density > 0.7 and avg_angle_change > 45:
+            confidence += 0.1  # Bonus for combination
+        
+        # Clamp confidence to [0, 1]
+        confidence = min(1.0, max(0.0, confidence))
+        confidence_scores.append(confidence)
+    
+    # Smooth the confidence scores to avoid abrupt changes
+    smoothed_scores = []
+    smooth_window = 5
+    
+    for i in range(len(confidence_scores)):
+        start = max(0, i - smooth_window // 2)
+        end = min(len(confidence_scores), i + smooth_window // 2 + 1)
+        window_scores = confidence_scores[start:end]
+        smoothed_scores.append(sum(window_scores) / len(window_scores) if window_scores else 0)
+    
+    return smoothed_scores
+
+
+def identify_sky_art_segments(positions: List[Dict], window_size: int = 20, 
+                              turn_threshold: float = 45.0, 
+                              min_segment_length: int = 10) -> List[Dict[str, Any]]:
+    """
+    Identify segments of the flight path that qualify as sky art based on local complexity
+    
+    Args:
+        positions: List of position dictionaries with latitude, longitude, timestamp
+        window_size: Number of positions to analyze together for local complexity
+        turn_threshold: Minimum angle change (degrees) to count as a turn
+        min_segment_length: Minimum consecutive positions to qualify as a sky art segment
+    
+    Returns:
+        List of sky art segments with start/end indices and metrics
+    """
+    sky_art_segments = []
+    
+    if len(positions) < window_size * 2:
+        return sky_art_segments
+    
+    # Helper function to calculate bearing
+    def calculate_bearing(lat1, lon1, lat2, lon2):
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        dlon = lon2 - lon1
+        x = math.sin(dlon) * math.cos(lat2)
+        y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dlon)
+        return math.degrees(math.atan2(x, y))
+    
+    # Analyze each position with sliding window
+    local_complexity = []
+    
+    for i in range(len(positions)):
+        # Get window around current position
+        start_idx = max(0, i - window_size // 2)
+        end_idx = min(len(positions), i + window_size // 2)
+        
+        if end_idx - start_idx < 3:
+            local_complexity.append(0)
+            continue
+        
+        # Count turns in this window
+        turns = 0
+        for j in range(start_idx + 1, end_idx - 1):
+            if j > 0 and j < len(positions) - 1:
+                bearing_before = calculate_bearing(
+                    positions[j-1]["latitude"], positions[j-1]["longitude"],
+                    positions[j]["latitude"], positions[j]["longitude"]
+                )
+                bearing_after = calculate_bearing(
+                    positions[j]["latitude"], positions[j]["longitude"],
+                    positions[j+1]["latitude"], positions[j+1]["longitude"]
+                )
+                
+                change = abs(bearing_after - bearing_before)
+                if change > 180:
+                    change = 360 - change
+                
+                if change > turn_threshold:
+                    turns += 1
+        
+        # Calculate local turn rate (turns per position in window)
+        turn_rate = turns / (end_idx - start_idx) if (end_idx - start_idx) > 0 else 0
+        local_complexity.append(turn_rate)
+    
+    # Identify high-complexity segments
+    in_segment = False
+    current_segment = None
+    complexity_threshold = 0.3  # At least 30% of window positions are turns
+    
+    for i, complexity in enumerate(local_complexity):
+        if complexity >= complexity_threshold:
+            if not in_segment:
+                # Start new segment
+                in_segment = True
+                current_segment = {
+                    "start_index": i,
+                    "end_index": i,
+                    "start_position": {
+                        "latitude": positions[i]["latitude"],
+                        "longitude": positions[i]["longitude"],
+                        "timestamp": positions[i].get("timestamp")
+                    },
+                    "complexity_scores": [complexity]
+                }
+            else:
+                # Continue segment
+                current_segment["end_index"] = i
+                current_segment["complexity_scores"].append(complexity)
+        else:
+            if in_segment:
+                # End segment
+                if current_segment["end_index"] - current_segment["start_index"] >= min_segment_length:
+                    # Calculate segment metrics
+                    current_segment["end_position"] = {
+                        "latitude": positions[current_segment["end_index"]]["latitude"],
+                        "longitude": positions[current_segment["end_index"]]["longitude"],
+                        "timestamp": positions[current_segment["end_index"]].get("timestamp")
+                    }
+                    current_segment["length"] = current_segment["end_index"] - current_segment["start_index"] + 1
+                    current_segment["avg_complexity"] = np.mean(current_segment["complexity_scores"])
+                    current_segment["max_complexity"] = max(current_segment["complexity_scores"])
+                    
+                    # Extract the actual positions for this segment
+                    current_segment["positions"] = [
+                        {
+                            "latitude": positions[j]["latitude"],
+                            "longitude": positions[j]["longitude"],
+                            "timestamp": positions[j].get("timestamp")
+                        }
+                        for j in range(current_segment["start_index"], current_segment["end_index"] + 1)
+                    ]
+                    
+                    sky_art_segments.append(current_segment)
+                
+                in_segment = False
+                current_segment = None
+    
+    # Handle segment that extends to end
+    if in_segment and current_segment:
+        if current_segment["end_index"] - current_segment["start_index"] >= min_segment_length:
+            current_segment["end_position"] = {
+                "latitude": positions[current_segment["end_index"]]["latitude"],
+                "longitude": positions[current_segment["end_index"]]["longitude"],
+                "timestamp": positions[current_segment["end_index"]].get("timestamp")
+            }
+            current_segment["length"] = current_segment["end_index"] - current_segment["start_index"] + 1
+            current_segment["avg_complexity"] = np.mean(current_segment["complexity_scores"])
+            current_segment["max_complexity"] = max(current_segment["complexity_scores"])
+            current_segment["positions"] = [
+                {
+                    "latitude": positions[j]["latitude"],
+                    "longitude": positions[j]["longitude"],
+                    "timestamp": positions[j].get("timestamp")
+                }
+                for j in range(current_segment["start_index"], current_segment["end_index"] + 1)
+            ]
+            sky_art_segments.append(current_segment)
+    
+    return sky_art_segments
+
+
 def detect_hovering_patterns(positions: List[Dict]) -> List[Dict[str, Any]]:
     """
     Detect extended hovering in one location
@@ -361,15 +633,48 @@ def detect_abnormal_flight_patterns(self,
             # Calculate turn rate (turns per minute)
             turn_rate = complexity_metrics["sharp_turns"] / flight.flight_duration_minutes if flight.flight_duration_minutes and flight.flight_duration_minutes > 0 else 0
             
+            # Calculate confidence scores for all positions
+            position_confidence = []
+            
+            # Identify sky art segments for visualization
+            sky_art_segments = []
+            
+            # Calculate confidence for all complex flights first
+            if complexity_metrics["sharp_turns"] > 200:
+                position_confidence = calculate_position_confidence(pos_dicts, 
+                                                                   window_size=20,
+                                                                   turn_threshold=45.0)
+                max_position_confidence = max(position_confidence) if position_confidence else 0
+            else:
+                position_confidence = []
+                max_position_confidence = 0
+            
             # SKY ART DETECTION (like ALEX incident)
-            # Characteristics: Deliberate patterns with moderate turn rate
-            if (complexity_metrics["sharp_turns"] > 50 and 
-                complexity_metrics["efficiency"] < 0.05 and
-                turn_rate >= 5 and turn_rate <= 15 and  # Sky art: 5-15 turns/minute
-                complexity_metrics["reversals"] > 20 and
-                flight.flight_duration_minutes and flight.flight_duration_minutes > 40):
+            # Much stricter criteria based on ALEX analysis
+            is_likely_sky_art = (
+                complexity_metrics["sharp_turns"] > 500 and  # Much higher threshold
+                complexity_metrics["efficiency"] < 0.001 and  # Very inefficient path
+                turn_rate >= 7 and turn_rate <= 12 and  # Narrower range around ALEX's 8.8
+                complexity_metrics["reversals"] > 100 and  # More reversals required
+                flight.flight_duration_minutes and flight.flight_duration_minutes > 80 and  # Longer flights
+                max_position_confidence > 0.1  # Require significant confidence peaks
+            )
+            
+            if is_likely_sky_art:
                 is_abnormal = True
-                abnormality_reasons.append(f"Sky art pattern detected (deliberate artistic pattern, {turn_rate:.1f} turns/min)")
+                abnormality_reasons.append(f"Sky art pattern detected (deliberate artistic pattern, {turn_rate:.1f} turns/min, {max_position_confidence*100:.0f}% peak confidence)")
+                
+                # Calculate detailed confidence for sky art
+                if not position_confidence:
+                    position_confidence = calculate_position_confidence(pos_dicts, 
+                                                                       window_size=20,
+                                                                       turn_threshold=45.0)
+                
+                # Identify specific sky art segments for visualization
+                sky_art_segments = identify_sky_art_segments(pos_dicts, 
+                                                            window_size=20,
+                                                            turn_threshold=45.0,
+                                                            min_segment_length=10)
             
             # INTENSIVE SURVEILLANCE DETECTION
             # Characteristics: Extremely high turn rate, searching/tracking behavior
@@ -379,6 +684,11 @@ def detect_abnormal_flight_patterns(self,
                   flight.flight_duration_minutes and flight.flight_duration_minutes > 60):
                 is_abnormal = True
                 abnormality_reasons.append(f"Intensive surveillance pattern detected ({turn_rate:.1f} turns/min, {complexity_metrics['sharp_turns']} total turns)")
+                
+                # Also calculate confidence for surveillance patterns
+                position_confidence = calculate_position_confidence(pos_dicts, 
+                                                                   window_size=15,  # Smaller window for tighter surveillance patterns
+                                                                   turn_threshold=30.0)  # Lower threshold for surveillance
             
             # Always store analysis results (both normal and abnormal)
             # This allows us to track which flights have been analyzed
@@ -397,9 +707,8 @@ def detect_abnormal_flight_patterns(self,
 
                 results["abnormal_patterns_found"].append(abnormal_data)
 
-                # Determine pattern type
-                pattern_type = "normal"
-                if "Sky art" in str(abnormality_reasons):
+                # Determine pattern type with strict priority
+                if is_likely_sky_art:
                     pattern_type = "sky_art"  # Deliberate artistic patterns (like ALEX)
                 elif "Intensive surveillance" in str(abnormality_reasons):
                     pattern_type = "intensive_surveillance"  # High-frequency search patterns
@@ -409,22 +718,39 @@ def detect_abnormal_flight_patterns(self,
                     pattern_type = "repetitive_circling"
                 elif is_abnormal:
                     pattern_type = "abnormal_path"
+                else:
+                    pattern_type = "normal"
             else:
                 # Normal flight
                 pattern_type = "normal"
 
             # Store in database (both normal and abnormal for tracking)
+            metadata = {
+                "reasons": abnormality_reasons if is_abnormal else ["Normal flight pattern"],
+                "metrics": complexity_metrics,
+                "hovering": hovering_events,
+                "circling": circling_metrics,
+                "analyzed": True  # Mark as analyzed
+            }
+            
+            # Add sky art segments if detected
+            if pattern_type == "sky_art" and sky_art_segments:
+                metadata["sky_art_segments"] = sky_art_segments
+                metadata["total_sky_art_positions"] = sum(seg["length"] for seg in sky_art_segments)
+                metadata["num_sky_art_segments"] = len(sky_art_segments)
+            
+            # Add position confidence scores if calculated
+            if position_confidence:
+                metadata["position_confidence"] = position_confidence
+                metadata["avg_confidence"] = sum(position_confidence) / len(position_confidence) if position_confidence else 0
+                metadata["max_confidence"] = max(position_confidence) if position_confidence else 0
+                metadata["high_confidence_positions"] = sum(1 for c in position_confidence if c > 0.7)
+            
             abnormal_pattern = AbnormalPattern(
                 flight_log_id=flight.id,
                 pattern_type=pattern_type,
                 confidence_score=min(complexity_metrics["complexity"] / min_complexity_threshold, 1.0) if is_abnormal else 0.0,
-                detection_metadata={
-                    "reasons": abnormality_reasons if is_abnormal else ["Normal flight pattern"],
-                    "metrics": complexity_metrics,
-                    "hovering": hovering_events,
-                    "circling": circling_metrics,
-                    "analyzed": True  # Mark as analyzed
-                },
+                detection_metadata=metadata,
                 detected_at=datetime.now(timezone.utc)
             )
             db.add(abnormal_pattern)
