@@ -21,8 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Phoenix PD helicopter registrations
 PHOENIX_PD_REGISTRATIONS = [
-    "N621FB", "N622FB", "N623FB", "N624FB",
-    "N625FB", "N626FB", "N627FB", "N628FB"
+    "N621FB", "N622FB", "N623FB", "N624FB", "N625FB"
 ]
 
 

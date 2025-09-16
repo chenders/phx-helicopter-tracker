@@ -51,7 +51,7 @@ if response.status_code == 200:
     print(f"Found {len(flights)} flights in Phoenix area")
 
     # Look for helicopters
-    phoenix_pd = ["N622FB", "N623FB", "N624FB", "N625FB", "N626FB", "N627FB", "N628FB"]
+    phoenix_pd = ["N622FB", "N623FB", "N621FB", "N622FB", "N623FB", "N624FB", "N625FB"]
 
     for flight in flights[:10]:  # Show first 10
         reg = flight.get("reg", "N/A")

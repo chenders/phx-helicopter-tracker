@@ -17,6 +17,7 @@ celery_app = Celery(
         "app.workers.radio_tasks",
         "app.workers.flight_tracking_tasks",
         "app.workers.flight_discovery_tasks",
+        "app.workers.abnormal_pattern_tasks",
     ],
 )
 
@@ -168,25 +169,44 @@ celery_app.conf.update(
             "task": "discover_all_phoenix_pd_flights",
             "schedule": 86400.0,  # Daily
         },
-        "download-discovered-tracks": {
+        # Aggressive download schedule - multiple tasks to maximize throughput
+        # Total: 20 flights per minute = 1,200 flights/hour
+        # This will download all 3,500 pending flights in ~3 hours
+        "download-discovered-tracks-1": {
             "task": "download_tracks_for_discovered_flights",
-            "schedule": 900.0,  # Every 15 minutes
-            "kwargs": {"batch_size": 5}
+            "schedule": 60.0,  # Every minute
+            "kwargs": {"batch_size": 20}  # 20 flights per batch
         },
-        "transcribe-radio-archives-single": {
-            "task": "transcribe_radio_archives",
-            "schedule": 3600.0,  # Every 1 hour
+        # Additional parallel task for faster downloads (disabled for now, enable if needed)
+        # "download-discovered-tracks-2": {
+        #     "task": "download_tracks_for_discovered_flights", 
+        #     "schedule": 60.0,  # Every minute
+        #     "kwargs": {"batch_size": 10}
+        # },
+        # Abnormal pattern detection - runs every 30 minutes to process historical data
+        "detect-abnormal-patterns": {
+            "task": "detect_abnormal_flight_patterns",
+            "schedule": 1800.0,  # Every 30 minutes
             "kwargs": {
-                "batch_size": 1,  # ONLY process 1 file at a time
-                "model_name": "base",
-            },
-            "options": {
-                "time_limit": 3600,  # 1 hour limit
-                "soft_time_limit": 3300,  # 55 minutes soft limit
-                "max_retries": 0,  # No retries to prevent overlap
-                "acks_late": False,  # Acknowledge immediately to prevent requeuing
-            },
+                "batch_size": 50,  # Process 50 unanalyzed flights per run
+                "min_complexity_threshold": 2.0
+            }
         },
+        # TEMPORARILY DISABLED - Radio transcription paused to prioritize flight downloads
+        # "transcribe-radio-archives-single": {
+        #     "task": "transcribe_radio_archives",
+        #     "schedule": 3600.0,  # Every 1 hour
+        #     "kwargs": {
+        #         "batch_size": 1,  # ONLY process 1 file at a time
+        #         "model_name": "base",
+        #     },
+        #     "options": {
+        #         "time_limit": 3600,  # 1 hour limit
+        #         "soft_time_limit": 3300,  # 55 minutes soft limit
+        #         "max_retries": 0,  # No retries to prevent overlap
+        #         "acks_late": False,  # Acknowledge immediately to prevent requeuing
+        #     },
+        # },
         # REMOVED cleanup-old-radio-archives - we want to keep all radio archives permanently
     },
 )

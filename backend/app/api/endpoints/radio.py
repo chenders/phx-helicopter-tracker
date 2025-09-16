@@ -11,10 +11,7 @@ import json
 import os
 import re
 
-from app.workers.radio_tasks import (
-    download_broadcastify_archives,
-    transcribe_radio_archives
-)
+from app.workers.radio_tasks import download_broadcastify_archives
 
 # Data path - use same as in radio_tasks.py
 RADIO_DATA_PATH = Path("/app/data/radio/phoenix_pd") if os.path.exists("/app/data") else Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "data", "radio", "phoenix_pd")))
@@ -264,25 +261,16 @@ async def trigger_archive_download(
     }
 
 
-@router.post("/archives/transcribe")
-async def trigger_transcription(
-    batch_size: int = Query(1, ge=1, le=10, description="Number of files to transcribe"),
-    model_name: Optional[str] = Query(None, description="Whisper model to use")
-) -> Dict[str, Any]:
-    """
-    Trigger transcription of untranscribed radio archives
-    """
-    kwargs = {"batch_size": batch_size}
-    if model_name:
-        kwargs["model_name"] = model_name
-    
-    task = transcribe_radio_archives.delay(**kwargs)
-    
-    return {
-        "task_id": task.id,
-        "status": "Task queued",
-        "parameters": kwargs
-    }
+# @router.post("/archives/transcribe")
+# async def trigger_transcription(
+#     batch_size: int = Query(1, ge=1, le=10, description="Number of files to transcribe"),
+#     model_name: Optional[str] = Query(None, description="Whisper model to use")
+# ) -> Dict[str, Any]:
+#     """
+#     Trigger transcription of untranscribed radio archives
+#     """
+#     # TODO: Implement transcribe_radio_archives task
+#     raise HTTPException(status_code=501, detail="Transcription feature not yet implemented")
 
 
 @router.get("/archives/{filename}/audio")

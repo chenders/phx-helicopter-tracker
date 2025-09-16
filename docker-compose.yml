@@ -138,8 +138,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://${APP_HOSTNAME:-localhost}:9080
+      # Don't set API URL - let the app use relative URLs to prevent HTTPS issues
+      # - REACT_APP_API_URL=http://${APP_HOSTNAME:-localhost}:9080
       - REACT_APP_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - NODE_ENV=production
     volumes:
       - ./frontend:/app
       - /app/node_modules

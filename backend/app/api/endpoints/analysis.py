@@ -833,7 +833,7 @@ def get_historical_analysis(
     # Parse time range
     import re
 
-    match = re.match(r"(\d+)([dDwWmM])", time_range)
+    match = re.match(r"(\d+)([dDwWmMyY])", time_range)
     if not match:
         raise HTTPException(
             status_code=400,
@@ -851,6 +851,8 @@ def get_historical_analysis(
         start_date = end_date - timedelta(weeks=value)
     elif unit.lower() == "m":
         start_date = end_date - timedelta(days=value * 30)
+    elif unit.lower() == "y":
+        start_date = end_date - timedelta(days=value * 365)
     else:
         start_date = end_date - timedelta(days=30)
 

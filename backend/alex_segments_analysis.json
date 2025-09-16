@@ -1,0 +1,21 @@
+{
+  "flight_id": "3b2f4a3c",
+  "total_positions": 2333,
+  "letter_segments": [
+    {
+      "start_index": 1005,
+      "end_index": 1040,
+      "confidence": 0.4,
+      "characteristics": {
+        "sharp_turns": 4,
+        "very_sharp_turns": 2,
+        "avg_angle_change": 23.73445480254808,
+        "max_angle_change": 161.6618385705108,
+        "speed_std": 15.19287113528359,
+        "efficiency": 0.43346093228170274,
+        "duration": 2.55,
+        "points": 30
+      }
+    }
+  ]
+}

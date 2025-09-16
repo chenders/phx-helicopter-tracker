@@ -56,7 +56,7 @@ def trigger_specific_downloads():
     print("\n🚁 Triggering specific downloads for Phoenix PD helicopters...")
 
     # Phoenix PD aircraft registrations
-    aircraft = ["N624FB", "N625FB", "N626FB", "N627FB", "N628FB"]
+    aircraft = ["N621FB", "N622FB", "N623FB", "N624FB", "N625FB"]
 
     # Download last 7 days of data
     end_date = datetime.now(timezone.utc)

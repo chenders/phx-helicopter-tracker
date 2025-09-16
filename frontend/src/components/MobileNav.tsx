@@ -16,6 +16,7 @@ export const MobileNav = ({ isOpen, setIsOpen }: MobileNavProps) => {
     { path: '/live', label: 'Live Tracking', icon: '📡' },
     { path: '/historical', label: 'Historical', icon: '📊' },
     { path: '/patterns', label: 'Patterns', icon: '🔍' },
+    { path: '/abnormal', label: 'Abnormal', icon: '⚠️' },
     { path: '/costs', label: 'Cost Analysis', icon: '💰' },
     { path: '/legal', label: 'Legal Docs', icon: '⚖️' },
     { path: '/radio', label: 'Radio Archives', icon: '📻' },

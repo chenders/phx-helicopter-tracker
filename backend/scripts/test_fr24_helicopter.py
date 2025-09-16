@@ -22,7 +22,7 @@ print(f"Found {len(flights)} aircraft in Phoenix area")
 
 # Filter for helicopters
 helicopters = []
-phoenix_pd_regs = ["N622FB", "N623FB", "N624FB", "N625FB", "N626FB", "N627FB", "N628FB"]
+phoenix_pd_regs = ["N622FB", "N623FB", "N621FB", "N622FB", "N623FB", "N624FB", "N625FB"]
 
 for flight in flights:
     # Check if it's a helicopter by aircraft type or other indicators

@@ -69,6 +69,7 @@ class FlightLog(Base):
     positions = relationship(
         "FlightPosition", back_populates="flight_log", cascade="all, delete-orphan"
     )
+    abnormal_patterns = relationship("AbnormalPattern", back_populates="flight_log")
 
     # Indexes for efficient querying
     __table_args__ = (

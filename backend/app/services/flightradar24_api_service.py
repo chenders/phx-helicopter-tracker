@@ -201,13 +201,11 @@ class FlightRadar24APIService:
 
         # Phoenix PD aircraft
         self.phoenix_pd_aircraft = {
+            "N621FB",
             "N622FB",
             "N623FB",
             "N624FB",
             "N625FB",
-            "N626FB",
-            "N627FB",
-            "N628FB",
         }
 
         # Intelligent polling configuration

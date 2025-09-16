@@ -28,7 +28,7 @@ params = {
     "timestamp": int(timestamp.timestamp()),  # Unix timestamp: 1757505600
     "bounds": f"{phoenix_bounds['lat_max']},{phoenix_bounds['lat_min']},{phoenix_bounds['lon_min']},{phoenix_bounds['lon_max']}",
     # Results in: "33.8,33.2,-112.4,-111.8"
-    "registrations": "N624FB,N625FB,N626FB,N627FB,N628FB"  # Optional: specific aircraft
+    "registrations": "N621FB,N622FB,N623FB,N624FB,N625FB"  # Optional: specific aircraft
 }
 
 # Headers

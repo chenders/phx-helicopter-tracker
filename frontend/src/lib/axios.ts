@@ -4,21 +4,13 @@ import axios from 'axios'
 // Use window.location.hostname to dynamically use the current hostname
 const getApiBaseUrl = () => {
   // If VITE_API_URL is set, use it
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL
-  }
+//  if (import.meta.env.VITE_API_URL) {
+//    return import.meta.env.VITE_API_URL
+//  }
 
-  // Otherwise, use the current hostname with the API port
-  const protocol = window.location.protocol
-  const hostname = window.location.hostname
-  const port = window.location.hostname == "localhost" ? 9001 : 80; // Direct API port, or 9080 for nginx proxy
-
-  // If accessed via nginx proxy (port 9080), use relative URLs
-  if (window.location.port === '9080') {
-    return ''  // Use relative URLs, nginx will proxy to backend
-  }
-
-  return `${protocol}//${hostname}`
+  // For production, always use relative URLs so the protocol matches the page
+  // This prevents mixed content errors when served over HTTPS
+  return ''
 }
 
 const API_BASE_URL = getApiBaseUrl()

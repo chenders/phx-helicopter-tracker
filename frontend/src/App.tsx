@@ -12,6 +12,7 @@ import { LegalDocumentsPage } from './pages/LegalDocumentsPage'
 import { DataSourcesPage } from './pages/DataSourcesPage'
 import { TaskMonitoringPage } from './pages/TaskMonitoringPage'
 import { RadioPage } from './pages/RadioPage'
+import AbnormalPatternsPage from './pages/AbnormalPatternsPage'
 import './App.css'
 
 function App() {
@@ -46,6 +47,7 @@ function App() {
               <Route path="/data-sources" element={<DataSourcesPage />} />
               <Route path="/tasks" element={<TaskMonitoringPage />} />
               <Route path="/radio" element={<RadioPage />} />
+              <Route path="/abnormal" element={<AbnormalPatternsPage />} />
             </Routes>
           </main>
         </div>
@@ -65,6 +67,7 @@ function App() {
               <Route path="/data-sources" element={<DataSourcesPage />} />
               <Route path="/tasks" element={<TaskMonitoringPage />} />
               <Route path="/radio" element={<RadioPage />} />
+              <Route path="/abnormal" element={<AbnormalPatternsPage />} />
             </Routes>
           </main>
         </div>

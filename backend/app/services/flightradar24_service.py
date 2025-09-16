@@ -50,7 +50,7 @@ class FlightRadar24Service:
         self.supported_formats = [".kml", ".csv", ".json"]
 
         # Phoenix PD aircraft registrations
-        self.phoenix_pd_aircraft = {"N624FB", "N625FB", "N626FB", "N627FB", "N628FB"}
+        self.phoenix_pd_aircraft = {"N621FB", "N622FB", "N623FB", "N624FB", "N625FB"}
 
     async def import_file(
         self, file_path: str, aircraft_registration: str, file_format: str = None

@@ -37,7 +37,8 @@ class FR24RateLimiter:
         }
         
         # Minimum delays between requests (in seconds)
-        self.min_delay = 2.1  # 2.1 seconds between requests (allows ~28 req/min max)
+        # For aggressive downloading: 3 seconds = 20 req/min (safe under 30 limit)
+        self.min_delay = 3.0  # 3 seconds between requests (allows 20 req/min)
         self.backoff_base = 30.0  # Base backoff time when rate limited
         
         # Keys for Redis

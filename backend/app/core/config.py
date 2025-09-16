@@ -37,13 +37,11 @@ class Settings(BaseSettings):
     # Phoenix PD specific settings
     PHOENIX_PD_AIRCRAFT: Optional[List[str]] = Field(
         default=[
+            "N621FB",
             "N622FB",
             "N623FB",
             "N624FB",
             "N625FB",
-            "N626FB",
-            "N627FB",
-            "N628FB",
         ]
     )
 

@@ -276,27 +276,28 @@ def calculate_position_confidence(positions: List[Dict], window_size: int = 20,
     return smoothed_scores
 
 
-def identify_sky_art_segments(positions: List[Dict], window_size: int = 20, 
-                              turn_threshold: float = 45.0, 
-                              min_segment_length: int = 10) -> List[Dict[str, Any]]:
+def identify_sky_art_segments(positions: List[Dict], window_size: int = 100, 
+                              turn_threshold: float = 30.0, 
+                              min_segment_length: int = 50) -> List[Dict[str, Any]]:
     """
-    Identify segments of the flight path that qualify as sky art based on local complexity
+    Identify segments of the flight path that qualify as sky art based on concentrated activity patterns.
+    Improved detection based on ALEX pattern analysis.
     
     Args:
         positions: List of position dictionaries with latitude, longitude, timestamp
-        window_size: Number of positions to analyze together for local complexity
-        turn_threshold: Minimum angle change (degrees) to count as a turn
-        min_segment_length: Minimum consecutive positions to qualify as a sky art segment
+        window_size: Number of positions to analyze together (default 100 for larger patterns)
+        turn_threshold: Minimum angle change (degrees) to count as a significant turn (default 30)
+        min_segment_length: Minimum consecutive positions to qualify as a sky art segment (default 50)
     
     Returns:
         List of sky art segments with start/end indices and metrics
     """
     sky_art_segments = []
     
-    if len(positions) < window_size * 2:
+    if len(positions) < window_size:
         return sky_art_segments
     
-    # Helper function to calculate bearing
+    # Helper functions
     def calculate_bearing(lat1, lon1, lat2, lon2):
         lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
         dlon = lon2 - lon1
@@ -304,117 +305,120 @@ def identify_sky_art_segments(positions: List[Dict], window_size: int = 20,
         y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(dlon)
         return math.degrees(math.atan2(x, y))
     
-    # Analyze each position with sliding window
-    local_complexity = []
+    def haversine_distance(lat1, lon1, lat2, lon2):
+        R = 6371000  # Earth radius in meters
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        return R * c
     
-    for i in range(len(positions)):
-        # Get window around current position
-        start_idx = max(0, i - window_size // 2)
-        end_idx = min(len(positions), i + window_size // 2)
+    # Analyze windows for concentrated activity patterns
+    for i in range(0, len(positions) - window_size, 25):  # Step by 25 for overlapping windows
+        window = positions[i:i + window_size]
         
-        if end_idx - start_idx < 3:
-            local_complexity.append(0)
-            continue
+        # Calculate geographic extent
+        lats = [p['latitude'] for p in window]
+        lons = [p['longitude'] for p in window]
         
-        # Count turns in this window
-        turns = 0
-        for j in range(start_idx + 1, end_idx - 1):
-            if j > 0 and j < len(positions) - 1:
-                bearing_before = calculate_bearing(
-                    positions[j-1]["latitude"], positions[j-1]["longitude"],
-                    positions[j]["latitude"], positions[j]["longitude"]
-                )
-                bearing_after = calculate_bearing(
-                    positions[j]["latitude"], positions[j]["longitude"],
-                    positions[j+1]["latitude"], positions[j+1]["longitude"]
-                )
-                
-                change = abs(bearing_after - bearing_before)
+        lat_range = max(lats) - min(lats)
+        lon_range = max(lons) - min(lons)
+        
+        # Calculate path complexity within window
+        total_distance = 0
+        bearing_changes = []
+        prev_bearing = None
+        
+        for j in range(len(window) - 1):
+            dist = haversine_distance(
+                window[j]['latitude'], window[j]['longitude'],
+                window[j+1]['latitude'], window[j+1]['longitude']
+            )
+            total_distance += dist
+            
+            bearing = calculate_bearing(
+                window[j]['latitude'], window[j]['longitude'],
+                window[j+1]['latitude'], window[j+1]['longitude']
+            )
+            
+            if prev_bearing is not None:
+                change = abs(bearing - prev_bearing)
                 if change > 180:
                     change = 360 - change
-                
-                if change > turn_threshold:
-                    turns += 1
+                bearing_changes.append(change)
+            prev_bearing = bearing
         
-        # Calculate local turn rate (turns per position in window)
-        turn_rate = turns / (end_idx - start_idx) if (end_idx - start_idx) > 0 else 0
-        local_complexity.append(turn_rate)
-    
-    # Identify high-complexity segments
-    in_segment = False
-    current_segment = None
-    complexity_threshold = 0.3  # At least 30% of window positions are turns
-    
-    for i, complexity in enumerate(local_complexity):
-        if complexity >= complexity_threshold:
-            if not in_segment:
-                # Start new segment
-                in_segment = True
-                current_segment = {
+        # Direct distance from start to end
+        direct_dist = haversine_distance(
+            window[0]['latitude'], window[0]['longitude'],
+            window[-1]['latitude'], window[-1]['longitude']
+        )
+        
+        # Calculate efficiency and turn metrics
+        efficiency = direct_dist / total_distance if total_distance > 0 else 0
+        significant_changes = sum(1 for c in bearing_changes if c > turn_threshold)
+        avg_bearing_change = np.mean(bearing_changes) if bearing_changes else 0
+        
+        # Sky art detection criteria (based on ALEX analysis)
+        # More relaxed criteria to catch subtle patterns
+        is_sky_art = (
+            lat_range > 0.0001 and lat_range < 0.05 and  # ~11m to 5.5km geographic extent
+            lon_range > 0.0001 and lon_range < 0.05 and
+            efficiency < 0.5 and  # Indirect path (relaxed)
+            significant_changes > 5 and  # Some direction changes (relaxed)
+            total_distance > 500  # At least 500m of movement (relaxed)
+        )
+        
+        if is_sky_art:
+            # Calculate confidence based on pattern complexity
+            confidence = min(1.0, (significant_changes / 30) * (1 - efficiency) * 0.8)
+            
+            if confidence >= 0.15:  # Lower confidence threshold to catch more patterns
+                segment = {
                     "start_index": i,
-                    "end_index": i,
+                    "end_index": i + window_size - 1,
                     "start_position": {
-                        "latitude": positions[i]["latitude"],
-                        "longitude": positions[i]["longitude"],
-                        "timestamp": positions[i].get("timestamp")
+                        "latitude": window[0]["latitude"],
+                        "longitude": window[0]["longitude"],
+                        "timestamp": window[0].get("timestamp")
                     },
-                    "complexity_scores": [complexity]
+                    "end_position": {
+                        "latitude": window[-1]["latitude"],
+                        "longitude": window[-1]["longitude"],
+                        "timestamp": window[-1].get("timestamp")
+                    },
+                    "length": window_size,
+                    "confidence": round(confidence, 3),
+                    "characteristics": {
+                        "geographic_extent": f"{lat_range:.4f} x {lon_range:.4f}",
+                        "efficiency": round(efficiency, 3),
+                        "bearing_changes": significant_changes,
+                        "distance_covered": round(total_distance, 0),
+                        "avg_bearing_change": round(avg_bearing_change, 1)
+                    },
+                    "positions": window  # Include actual positions for visualization
                 }
-            else:
-                # Continue segment
-                current_segment["end_index"] = i
-                current_segment["complexity_scores"].append(complexity)
-        else:
-            if in_segment:
-                # End segment
-                if current_segment["end_index"] - current_segment["start_index"] >= min_segment_length:
-                    # Calculate segment metrics
-                    current_segment["end_position"] = {
-                        "latitude": positions[current_segment["end_index"]]["latitude"],
-                        "longitude": positions[current_segment["end_index"]]["longitude"],
-                        "timestamp": positions[current_segment["end_index"]].get("timestamp")
-                    }
-                    current_segment["length"] = current_segment["end_index"] - current_segment["start_index"] + 1
-                    current_segment["avg_complexity"] = np.mean(current_segment["complexity_scores"])
-                    current_segment["max_complexity"] = max(current_segment["complexity_scores"])
-                    
-                    # Extract the actual positions for this segment
-                    current_segment["positions"] = [
-                        {
-                            "latitude": positions[j]["latitude"],
-                            "longitude": positions[j]["longitude"],
-                            "timestamp": positions[j].get("timestamp")
-                        }
-                        for j in range(current_segment["start_index"], current_segment["end_index"] + 1)
-                    ]
-                    
-                    sky_art_segments.append(current_segment)
-                
-                in_segment = False
-                current_segment = None
+                sky_art_segments.append(segment)
     
-    # Handle segment that extends to end
-    if in_segment and current_segment:
-        if current_segment["end_index"] - current_segment["start_index"] >= min_segment_length:
-            current_segment["end_position"] = {
-                "latitude": positions[current_segment["end_index"]]["latitude"],
-                "longitude": positions[current_segment["end_index"]]["longitude"],
-                "timestamp": positions[current_segment["end_index"]].get("timestamp")
-            }
-            current_segment["length"] = current_segment["end_index"] - current_segment["start_index"] + 1
-            current_segment["avg_complexity"] = np.mean(current_segment["complexity_scores"])
-            current_segment["max_complexity"] = max(current_segment["complexity_scores"])
-            current_segment["positions"] = [
-                {
-                    "latitude": positions[j]["latitude"],
-                    "longitude": positions[j]["longitude"],
-                    "timestamp": positions[j].get("timestamp")
-                }
-                for j in range(current_segment["start_index"], current_segment["end_index"] + 1)
-            ]
-            sky_art_segments.append(current_segment)
+    # Merge overlapping segments and keep highest confidence
+    merged_segments = []
+    for seg in sky_art_segments:
+        should_merge = False
+        for existing in merged_segments:
+            # Check for overlap
+            if (seg["start_index"] <= existing["end_index"] and 
+                seg["end_index"] >= existing["start_index"]):
+                # Merge if new segment has higher confidence
+                if seg["confidence"] > existing["confidence"]:
+                    existing.update(seg)
+                should_merge = True
+                break
+        
+        if not should_merge:
+            merged_segments.append(seg)
     
-    return sky_art_segments
+    return merged_segments
 
 
 def detect_hovering_patterns(positions: List[Dict]) -> List[Dict[str, Any]]:
@@ -559,7 +563,8 @@ def detect_abnormal_flight_patterns(self,
         else:
             # Get unanalyzed flights - those without an entry in abnormal_patterns table
             # This includes both normal flights and those not yet checked
-            subquery = db.query(AbnormalPattern.flight_log_id).subquery()
+            from sqlalchemy import select
+            subquery = select(AbnormalPattern.flight_log_id)
             query = db.query(FlightLog).filter(
                 ~FlightLog.id.in_(subquery)
             ).order_by(FlightLog.departure_time.desc())  # Start with most recent
