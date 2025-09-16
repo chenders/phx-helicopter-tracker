@@ -1,5 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 import asyncio
 import json
@@ -20,7 +21,20 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
+    # Disable automatic trailing slash redirects to prevent HTTPS->HTTP issues
+    redirect_slashes=False,
 )
+
+# Middleware to handle proxy headers and preserve HTTPS
+@app.middleware("http")
+async def proxy_headers_middleware(request, call_next):
+    # Trust X-Forwarded-Proto header from proxy
+    forwarded_proto = request.headers.get("X-Forwarded-Proto")
+    if forwarded_proto:
+        request.scope["scheme"] = forwarded_proto
+    
+    response = await call_next(request)
+    return response
 
 # CORS middleware
 app.add_middleware(
