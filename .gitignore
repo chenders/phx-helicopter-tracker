@@ -2,6 +2,7 @@
 .env
 __pycache__
 .DS_Store
+CLAUDE.md
 
 # Frontend
 frontend/node_modules/

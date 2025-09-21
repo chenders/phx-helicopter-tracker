@@ -1,0 +1,88 @@
+{
+  "N620FB": {
+    "registration": "N620FB",
+    "type": "Fixed-wing",
+    "manufacturer": "Pilatus",
+    "model": "PC-12/47E",
+    "description": "Surveillance aircraft",
+    "owner": "City of Phoenix / Phoenix Police Department",
+    "notes": "Used for aerial surveillance and tracking",
+    "public_info": [
+      "Spotted in various flight tracking databases",
+      "Involved in \"Alex\" skywriting incident (July 10, 2025)",
+      "Active in surveillance operations over Phoenix"
+    ]
+  },
+  "N621FB": {
+    "registration": "N621FB",
+    "type": "Helicopter",
+    "manufacturer": "Airbus Helicopters",
+    "model": "H125 (AS350 B3e)",
+    "description": "Police helicopter",
+    "owner": "City of Phoenix / Phoenix Police Department",
+    "notes": "Part of fleet modernization program started 2022",
+    "public_info": [
+      "Replaced older AS350 B3 model",
+      "Enhanced surveillance capabilities",
+      "FLIR cameras and tactical equipment"
+    ]
+  },
+  "N622FB": {
+    "registration": "N622FB",
+    "type": "Helicopter",
+    "manufacturer": "Airbus Helicopters",
+    "model": "H125",
+    "description": "Police helicopter",
+    "owner": "City of Phoenix / Phoenix Police Department",
+    "notes": "Part of fleet modernization program",
+    "public_info": [
+      "Delivered as part of 5-helicopter order",
+      "Equipped with modern avionics"
+    ]
+  },
+  "N623FB": {
+    "registration": "N623FB",
+    "type": "Helicopter",
+    "manufacturer": "Airbus Helicopters",
+    "model": "H125",
+    "description": "Police helicopter",
+    "owner": "City of Phoenix / Phoenix Police Department",
+    "notes": "Part of fleet modernization program",
+    "public_info": []
+  },
+  "N624FB": {
+    "registration": "N624FB",
+    "type": "Helicopter",
+    "manufacturer": "Airbus Helicopters",
+    "model": "H125",
+    "description": "Police helicopter",
+    "owner": "City of Phoenix / Phoenix Police Department",
+    "notes": "Part of fleet modernization program",
+    "public_info": [
+      "Involved in \"Alex\" skywriting incident over Maryvale (July 10, 2025)",
+      "Flight lasted 1 hour 48 minutes",
+      "Flew below 2,000 feet for 45 minutes spelling \"ALEX\""
+    ],
+    "incidents": [
+      {
+        "date": "2025-07-10",
+        "type": "Unprofessional conduct",
+        "description": "Skywriting \"ALEX\" over Maryvale neighborhood",
+        "duration": "1 hour 48 minutes",
+        "cost_estimate": "$2,160",
+        "official_response": "None",
+        "source": "Phoenix New Times"
+      }
+    ]
+  },
+  "N625FB": {
+    "registration": "N625FB",
+    "type": "Helicopter",
+    "manufacturer": "Airbus Helicopters",
+    "model": "H125",
+    "description": "Police helicopter",
+    "owner": "City of Phoenix / Phoenix Police Department",
+    "notes": "Part of fleet modernization program",
+    "public_info": []
+  }
+}

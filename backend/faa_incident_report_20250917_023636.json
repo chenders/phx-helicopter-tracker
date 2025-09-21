@@ -1,0 +1,170 @@
+[
+  {
+    "registration": "N620FB",
+    "ntsb": {
+      "registration": "N620FB",
+      "ntsb_reports": [],
+      "checked_date": "2025-09-17T02:36:36.946190",
+      "source": "NTSB Aviation Accident Database"
+    },
+    "sdr": {
+      "registration": "N620FB",
+      "service_difficulty_reports": [],
+      "checked_date": "2025-09-17T02:36:36.946196",
+      "source": "FAA SDR Database"
+    },
+    "faa": {
+      "registration": "N620FB",
+      "faa_incidents": [],
+      "airworthiness_directives": [],
+      "checked_date": "2025-09-17T02:36:36.946198",
+      "source": "FAA AIDS Database"
+    },
+    "summary": {
+      "total_incidents": 0,
+      "total_accidents": 0,
+      "service_reports": 0,
+      "airworthiness_directives": 0
+    }
+  },
+  {
+    "registration": "N621FB",
+    "ntsb": {
+      "registration": "N621FB",
+      "ntsb_reports": [],
+      "checked_date": "2025-09-17T02:36:36.946203",
+      "source": "NTSB Aviation Accident Database"
+    },
+    "sdr": {
+      "registration": "N621FB",
+      "service_difficulty_reports": [],
+      "checked_date": "2025-09-17T02:36:36.946204",
+      "source": "FAA SDR Database"
+    },
+    "faa": {
+      "registration": "N621FB",
+      "faa_incidents": [],
+      "airworthiness_directives": [],
+      "checked_date": "2025-09-17T02:36:36.946206",
+      "source": "FAA AIDS Database"
+    },
+    "summary": {
+      "total_incidents": 0,
+      "total_accidents": 0,
+      "service_reports": 0,
+      "airworthiness_directives": 0
+    }
+  },
+  {
+    "registration": "N622FB",
+    "ntsb": {
+      "registration": "N622FB",
+      "ntsb_reports": [],
+      "checked_date": "2025-09-17T02:36:36.946209",
+      "source": "NTSB Aviation Accident Database"
+    },
+    "sdr": {
+      "registration": "N622FB",
+      "service_difficulty_reports": [],
+      "checked_date": "2025-09-17T02:36:36.946211",
+      "source": "FAA SDR Database"
+    },
+    "faa": {
+      "registration": "N622FB",
+      "faa_incidents": [],
+      "airworthiness_directives": [],
+      "checked_date": "2025-09-17T02:36:36.946212",
+      "source": "FAA AIDS Database"
+    },
+    "summary": {
+      "total_incidents": 0,
+      "total_accidents": 0,
+      "service_reports": 0,
+      "airworthiness_directives": 0
+    }
+  },
+  {
+    "registration": "N623FB",
+    "ntsb": {
+      "registration": "N623FB",
+      "ntsb_reports": [],
+      "checked_date": "2025-09-17T02:36:36.946215",
+      "source": "NTSB Aviation Accident Database"
+    },
+    "sdr": {
+      "registration": "N623FB",
+      "service_difficulty_reports": [],
+      "checked_date": "2025-09-17T02:36:36.946217",
+      "source": "FAA SDR Database"
+    },
+    "faa": {
+      "registration": "N623FB",
+      "faa_incidents": [],
+      "airworthiness_directives": [],
+      "checked_date": "2025-09-17T02:36:36.946218",
+      "source": "FAA AIDS Database"
+    },
+    "summary": {
+      "total_incidents": 0,
+      "total_accidents": 0,
+      "service_reports": 0,
+      "airworthiness_directives": 0
+    }
+  },
+  {
+    "registration": "N624FB",
+    "ntsb": {
+      "registration": "N624FB",
+      "ntsb_reports": [],
+      "checked_date": "2025-09-17T02:36:36.946221",
+      "source": "NTSB Aviation Accident Database"
+    },
+    "sdr": {
+      "registration": "N624FB",
+      "service_difficulty_reports": [],
+      "checked_date": "2025-09-17T02:36:36.946222",
+      "source": "FAA SDR Database"
+    },
+    "faa": {
+      "registration": "N624FB",
+      "faa_incidents": [],
+      "airworthiness_directives": [],
+      "checked_date": "2025-09-17T02:36:36.946224",
+      "source": "FAA AIDS Database"
+    },
+    "summary": {
+      "total_incidents": 0,
+      "total_accidents": 0,
+      "service_reports": 0,
+      "airworthiness_directives": 0
+    }
+  },
+  {
+    "registration": "N625FB",
+    "ntsb": {
+      "registration": "N625FB",
+      "ntsb_reports": [],
+      "checked_date": "2025-09-17T02:36:36.946226",
+      "source": "NTSB Aviation Accident Database"
+    },
+    "sdr": {
+      "registration": "N625FB",
+      "service_difficulty_reports": [],
+      "checked_date": "2025-09-17T02:36:36.946228",
+      "source": "FAA SDR Database"
+    },
+    "faa": {
+      "registration": "N625FB",
+      "faa_incidents": [],
+      "airworthiness_directives": [],
+      "checked_date": "2025-09-17T02:36:36.946229",
+      "source": "FAA AIDS Database"
+    },
+    "summary": {
+      "total_incidents": 0,
+      "total_accidents": 0,
+      "service_reports": 0,
+      "airworthiness_directives": 0
+    }
+  }
+]
