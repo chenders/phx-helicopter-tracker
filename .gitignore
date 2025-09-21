@@ -3,7 +3,8 @@
 __pycache__
 .DS_Store
 CLAUDE.md
-*.csv
+.csv
+.geojson
 phx_helicopters.sql
 # Frontend
 frontend/node_modules/
