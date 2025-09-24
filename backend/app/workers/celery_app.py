@@ -93,15 +93,15 @@ celery_app.conf.update(
             "task": "analyze_phoenix_pd_fleet_status",
             "schedule": 3600.0,  # Every hour - track 24/7 coverage claims
         },
-        # Radio archive tasks
-        "download-radio-archives": {
-            "task": "download_broadcastify_archives",
-            "schedule": 3600.0,  # Every hour
-            "kwargs": {
-                "max_downloads": 5,
-                "days_back": 2,
-            },
-        },
+        # Radio archive tasks - TEMPORARILY DISABLED
+        # "download-radio-archives": {
+        #     "task": "download_broadcastify_archives",
+        #     "schedule": 3600.0,  # Every hour
+        #     "kwargs": {
+        #         "max_downloads": 5,
+        #         "days_back": 2,
+        #     },
+        # },
         # REMOVED - Using only transcribe-radio-archives-single below to avoid conflicts
         # Aircraft registry sync
         "sync-aircraft-registry": {
@@ -154,16 +154,16 @@ celery_app.conf.update(
         #         "hours_back": 168,  # Full week of data
         #     },
         # },
-        # Additional radio archive tasks
-        "download-broadcastify-archives-extended": {
-            "task": "download_broadcastify_archives",
-            "schedule": 14400.0,  # Every 4 hours
-            "kwargs": {
-                "feed_id": "12145",  # Phoenix Police
-                "max_downloads": 5,
-                "days_back": 2,  # Check last 2 days
-            },
-        },
+        # Additional radio archive tasks - TEMPORARILY DISABLED
+        # "download-broadcastify-archives-extended": {
+        #     "task": "download_broadcastify_archives",
+        #     "schedule": 14400.0,  # Every 4 hours
+        #     "kwargs": {
+        #         "feed_id": "12145",  # Phoenix Police
+        #         "max_downloads": 5,
+        #         "days_back": 2,  # Check last 2 days
+        #     },
+        # },
         # Flight discovery for historical backfill
         "discover-phoenix-pd-flights": {
             "task": "discover_all_phoenix_pd_flights",
