@@ -1,6 +1,6 @@
 services:
   db:
-    image: timescale/timescaledb:latest-pg15
+    image: timescale/timescaledb-ha:pg15-latest
     environment:
       POSTGRES_DB: phoenix_helicopters
       POSTGRES_USER: postgres
@@ -135,12 +135,15 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
+        - VITE_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
     ports:
       - "3000:3000"
     environment:
       # Don't set API URL - let the app use relative URLs to prevent HTTPS issues
       # - REACT_APP_API_URL=http://${APP_HOSTNAME:-localhost}:9080
-      - REACT_APP_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - VITE_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
       - NODE_ENV=production
     volumes:
       - ./frontend:/app

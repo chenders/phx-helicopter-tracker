@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 // TODO: Migrate to AdvancedMarkerElement when @react-google-maps/api supports it
 // For now, using deprecated Marker which is still supported and will receive 12+ months notice before removal
-import { GoogleMap, LoadScript, MarkerF, InfoWindow, HeatmapLayer, Polygon, Polyline } from '@react-google-maps/api'
+import { GoogleMap, MarkerF, InfoWindow, HeatmapLayer, Polygon, Polyline } from '@react-google-maps/api'
 import { useRealtimeFlightsDB, useLiveTrackingStats, forceAPIUpdate } from '../hooks/useRealtimeFlightsDB'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useSurveillanceAlerts } from '../hooks/useSurveillanceAlerts'
@@ -127,7 +127,6 @@ const mapOptions = {
   styles: darkMapStyles, // Apply dark mode styles
 }
 
-const libraries: ("visualization")[] = ["visualization"]
 
 // Helper function to calculate distance between two coordinates (Haversine formula)
 const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
@@ -163,7 +162,6 @@ export function LiveTrackingPage() {
   const [mapCenter, setMapCenter] = useState(phoenixCenter)
   const [mapZoom, setMapZoom] = useState(11)
   const [showFlightPath, setShowFlightPath] = useState(true) // Show flight paths by default
-  const [isMapLoaded, setIsMapLoaded] = useState(false)
   
   // Temporarily suppress Google Maps Marker deprecation warning
   // TODO: Remove when migrated to AdvancedMarkerElement
@@ -226,8 +224,8 @@ export function LiveTrackingPage() {
     return mappedFlight
   }) || []
 
-  // Convert flight data to heatmap points (only create when Google Maps is loaded)
-  const heatmapData = (isMapLoaded && typeof window !== 'undefined' && window.google?.maps?.LatLng) 
+  // Convert flight data to heatmap points
+  const heatmapData = (typeof window !== 'undefined' && window.google?.maps?.LatLng) 
     ? mappedFlights?.map((flight: FlightData) => ({
         location: new window.google.maps.LatLng(flight.latitude, flight.longitude),
         weight: flight.surveillance_score * 10
@@ -439,24 +437,18 @@ export function LiveTrackingPage() {
 
       {/* Map */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
-        <LoadScript
-          googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}
-          libraries={libraries}
-          onLoad={() => setIsMapLoaded(true)}
-        >
-          <GoogleMap
+        <GoogleMap
             mapContainerStyle={mapContainerStyle}
             center={mapCenter}
             zoom={mapZoom}
             options={mapOptions}
-            onLoad={() => setIsMapLoaded(true)}
             onClick={() => {
               // Prevent map clicks from affecting selection
               // Only helicopter markers should be clickable
             }}
           >
             {/* Flight Markers with helicopter icons */}
-            {isMapLoaded && filteredFlights && filteredFlights.length > 0 && filteredFlights.map((flight: FlightData) => {
+            {filteredFlights && filteredFlights.length > 0 && filteredFlights.map((flight: FlightData) => {
               const icon = getHelicopterIcon(flight, selectedFlight?.id === flight.id)
               
               // Use MarkerF (functional component) with custom icon
@@ -472,7 +464,7 @@ export function LiveTrackingPage() {
             })}
 
             {/* Flight Paths - Show paths when enabled or for selected aircraft */}
-            {isMapLoaded && filteredFlights.map((flight: FlightData) => {
+            {filteredFlights.map((flight: FlightData) => {
               const isSelected = selectedFlight?.id === flight.id
               
               // Show path if enabled globally or if this aircraft is selected
@@ -532,7 +524,7 @@ export function LiveTrackingPage() {
             })}
 
             {/* Info Windows */}
-            {selectedFlight && isMapLoaded && window.google?.maps?.Size && (
+            {selectedFlight && window.google?.maps?.Size && (
               <InfoWindow
                 key={`info-${selectedFlight.id}`}
                 position={{ 
@@ -617,7 +609,6 @@ export function LiveTrackingPage() {
               />
             )}
           </GoogleMap>
-        </LoadScript>
       </div>
 
       {/* Database Status Panel */}

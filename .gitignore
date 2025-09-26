@@ -5,6 +5,7 @@ __pycache__
 CLAUDE.md
 .csv
 .geojson
+backups
 phx_helicopters.sql
 # Frontend
 frontend/node_modules/

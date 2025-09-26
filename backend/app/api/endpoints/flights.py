@@ -1,7 +1,9 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_, func
+import math
 
 from app.api.deps import get_db
 from app.crud.flights import flight_log_crud, flight_position_crud
@@ -14,6 +16,8 @@ from app.schemas.flights import (
     FlightPositionCreate,
     FlightPositionList,
 )
+from app.models.flight_logs import FlightLog as FlightLogModel
+from app.models.flight_logs import FlightPosition as FlightPositionModel
 
 router = APIRouter()
 
@@ -276,6 +280,176 @@ def get_low_altitude_positions(
     return flight_position_crud.get_low_altitude_positions(
         db, max_altitude_feet=max_altitude, over_residential_only=residential_only
     )
+
+
+# Search endpoint
+@router.get("/search")
+def search_flights(
+    *,
+    db: Session = Depends(get_db),
+    start_time: datetime = Query(..., description="Search start time"),
+    end_time: datetime = Query(..., description="Search end time"),
+    aircraft_registration: Optional[str] = Query(None, description="Aircraft registration"),
+    latitude: Optional[float] = Query(None, description="Search location latitude"),
+    longitude: Optional[float] = Query(None, description="Search location longitude"),
+    radius: Optional[float] = Query(1000, description="Search radius in meters")
+) -> Dict[str, Any]:
+    """
+    Search for flights within a time range and optionally near a location
+    """
+    # Build base query with eager loading of positions if location search
+    if latitude is not None and longitude is not None:
+        # Use a subquery to find flight_log_ids that have positions within the radius
+        from sqlalchemy import text
+
+        # PostGIS spatial query to find flights with positions near location
+        spatial_query = text("""
+            SELECT DISTINCT fp.flight_log_id
+            FROM flight_positions fp
+            WHERE fp.location IS NOT NULL
+            AND ST_DWithin(
+                fp.location,
+                ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+                :radius
+            )
+            AND fp.timestamp BETWEEN :start_time AND :end_time
+        """)
+
+        result = db.execute(spatial_query, {
+            'lon': longitude,
+            'lat': latitude,
+            'radius': radius,
+            'start_time': start_time,
+            'end_time': end_time
+        })
+
+        flight_log_ids = [row[0] for row in result]
+
+        if flight_log_ids:
+            query = db.query(FlightLogModel).filter(
+                FlightLogModel.id.in_(flight_log_ids)
+            )
+        else:
+            # No flights found within radius
+            return {
+                "flights": [],
+                "total": 0,
+                "filters": {
+                    "start_time": start_time.isoformat(),
+                    "end_time": end_time.isoformat(),
+                    "aircraft": aircraft_registration,
+                    "location": {"lat": latitude, "lng": longitude, "radius": radius}
+                }
+            }
+    else:
+        # No location filter, use time-based query
+        query = db.query(FlightLogModel)
+
+        # Time range filter
+        query = query.filter(
+            and_(
+                FlightLogModel.departure_time <= end_time,
+                or_(
+                    FlightLogModel.arrival_time >= start_time,
+                    FlightLogModel.arrival_time.is_(None)
+                )
+            )
+        )
+
+    # Aircraft filter
+    if aircraft_registration:
+        query = query.filter(FlightLogModel.aircraft_id == aircraft_registration)
+
+    # Execute query with limit to prevent timeout
+    flights = query.limit(100).all()
+
+    results = []
+    for flight in flights:
+        flight_dict = {
+            "id": flight.id,
+            "aircraft_id": flight.aircraft_id,
+            "registration": flight.aircraft_id,  # Assuming aircraft_id is registration
+            "callsign": flight.callsign,
+            "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
+            "arrival_time": flight.arrival_time.isoformat() if flight.arrival_time else None,
+            "duration_minutes": flight.flight_duration_minutes,
+            "max_altitude": flight.max_altitude_feet,
+            "min_altitude": flight.min_altitude_feet,
+            "positions_count": len(flight.positions) if hasattr(flight, 'positions') else 0,
+            "hover_locations": flight.hover_locations,
+            "surveillance_score": flight.surveillance_likelihood or 0,
+        }
+
+        # If location search, get distance info using PostGIS
+        if latitude is not None and longitude is not None:
+            from sqlalchemy import text
+
+            # Use PostGIS to find closest position efficiently
+            distance_query = text("""
+                SELECT
+                    ST_Distance(
+                        fp.location,
+                        ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography
+                    ) as distance,
+                    fp.latitude,
+                    fp.longitude,
+                    fp.timestamp,
+                    fp.altitude_feet
+                FROM flight_positions fp
+                WHERE fp.flight_log_id = :flight_id
+                AND fp.location IS NOT NULL
+                ORDER BY distance
+                LIMIT 1
+            """)
+
+            result = db.execute(distance_query, {
+                'lon': longitude,
+                'lat': latitude,
+                'flight_id': flight.id
+            }).first()
+
+            if result:
+                flight_dict["distance_from_search"] = result.distance
+                flight_dict["closest_position"] = {
+                    "latitude": result.latitude,
+                    "longitude": result.longitude,
+                    "timestamp": result.timestamp.isoformat(),
+                    "altitude": result.altitude_feet,
+                }
+            else:
+                flight_dict["distance_from_search"] = None
+                flight_dict["closest_position"] = None
+
+            results.append(flight_dict)
+        else:
+            # No location search, include all
+            flight_dict["distance_from_search"] = None
+            flight_dict["closest_position"] = None
+            results.append(flight_dict)
+
+    # Sort by distance if location search
+    if latitude is not None and longitude is not None:
+        results.sort(key=lambda x: x.get("distance_from_search") or float('inf'))
+
+    return {"flights": results, "total": len(results)}
+
+
+@router.get("/{flight_id}/positions", response_model=List[FlightPosition])
+def get_flight_positions_by_id(
+    *,
+    db: Session = Depends(get_db),
+    flight_id: int
+) -> List[FlightPosition]:
+    """Get all positions for a specific flight"""
+    flight = flight_log_crud.get(db, id=flight_id)
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    positions = db.query(FlightPositionModel).filter(
+        FlightPositionModel.flight_log_id == flight_id
+    ).order_by(FlightPositionModel.timestamp).all()
+
+    return positions
 
 
 # Analysis endpoints

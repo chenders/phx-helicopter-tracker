@@ -208,7 +208,16 @@ export function RadioPage() {
   }
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString()
+    // Convert to browser's local time with full date and time
+    return new Date(dateStr).toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+      timeZoneName: 'short'
+    })
   }
 
   const parseFilename = (filename: string) => {
@@ -219,33 +228,45 @@ export function RadioPage() {
       const timestamp = parseInt(parts[1]) // Unix timestamp
       const feedId = parts[2] // 12145
       
-      // Parse date
-      const year = dateStr.substring(0, 4)
-      const month = dateStr.substring(4, 6)
-      const day = dateStr.substring(6, 8)
-      const date = new Date(`${year}-${month}-${day}`)
-      
       // Calculate time from timestamp (if it's a proper Unix timestamp)
       let startTime = null
       let endTime = null
+      let date = null
+
       if (timestamp > 1000000000) { // Likely a Unix timestamp
         startTime = new Date(timestamp * 1000)
         // Assume ~30 minute recordings
         endTime = new Date((timestamp + 1800) * 1000)
+        // Use the timestamp date as the actual date
+        date = startTime
+      } else {
+        // Fallback to parsing date from filename if timestamp is invalid
+        const year = dateStr.substring(0, 4)
+        const month = dateStr.substring(4, 6)
+        const day = dateStr.substring(6, 8)
+        date = new Date(`${year}-${month}-${day}`)
       }
-      
+
       return {
         date: date,
-        dateStr: date.toLocaleDateString('en-US', { 
+        dateStr: date.toLocaleDateString(undefined, {
           weekday: 'short',
-          year: 'numeric', 
-          month: 'short', 
-          day: 'numeric' 
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
         }),
         startTime: startTime,
         endTime: endTime,
-        timeRange: startTime && endTime ? 
-          `${startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - ${endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : 
+        timeRange: startTime && endTime ?
+          `${startTime.toLocaleTimeString(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          })} - ${endTime.toLocaleTimeString(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          })}` :
           null,
         feedId: feedId,
         originalFilename: filename

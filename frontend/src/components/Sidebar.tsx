@@ -7,6 +7,7 @@ export const Sidebar = () => {
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '🏠' },
+    { path: '/search', label: 'Flight Search', icon: '🔎' },
     { path: '/live', label: 'Live Tracking', icon: '📡' },
     { path: '/historical', label: 'Historical', icon: '📊' },
     { path: '/patterns', label: 'Patterns', icon: '🔍' },

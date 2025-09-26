@@ -15,6 +15,7 @@ celery_app = Celery(
         "app.workers.data_import_tasks",
         "app.workers.fr24_scheduler",
         "app.workers.radio_tasks",
+        "app.workers.radio_tasks_alternative",
         "app.workers.flight_tracking_tasks",
         "app.workers.flight_discovery_tasks",
         "app.workers.abnormal_pattern_tasks",

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { GoogleMap, LoadScript, MarkerF, InfoWindow, Polyline } from '@react-google-maps/api';
+import { GoogleMap, MarkerF, InfoWindow, Polyline } from '@react-google-maps/api';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import axios from '../lib/axios';
@@ -205,11 +205,8 @@ export const AbnormalPatternsPage: React.FC = () => {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
-  const [isGoogleMapsLoaded, setIsGoogleMapsLoaded] = useState(false);
-
   const onLoad = useCallback((map: google.maps.Map) => {
     setMap(map);
-    setIsGoogleMapsLoaded(true);
   }, []);
 
   const onUnmount = useCallback(() => {
@@ -327,7 +324,7 @@ export const AbnormalPatternsPage: React.FC = () => {
 
   // Center and zoom map to fit the selected pattern (focus on sky art segments if present)
   useEffect(() => {
-    if (patternDetail && patternDetail.positions.length > 0 && map && isGoogleMapsLoaded && window.google?.maps) {
+    if (patternDetail && patternDetail.positions.length > 0 && map && window.google?.maps) {
       const bounds = new window.google.maps.LatLngBounds();
       
       // If there are sky art segments, focus on them instead of the full path
@@ -386,7 +383,7 @@ export const AbnormalPatternsPage: React.FC = () => {
         }, 300);
       }
     }
-  }, [patternDetail, map, isGoogleMapsLoaded]);
+  }, [patternDetail, map]);
 
   const getPatternIcon = (type: string) => {
     switch (type) {
@@ -739,11 +736,7 @@ export const AbnormalPatternsPage: React.FC = () => {
               </div>
             )}
             
-            <LoadScript 
-              googleMapsApiKey={import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}
-              onLoad={() => setIsGoogleMapsLoaded(true)}
-            >
-              <GoogleMap
+            <GoogleMap
                 mapContainerStyle={mapContainerStyle}
                 center={mapCenter}
                 zoom={mapZoom}
@@ -820,7 +813,7 @@ export const AbnormalPatternsPage: React.FC = () => {
                             strokeWeight: 5,
                             strokeOpacity: 0.9,
                             zIndex: 3,
-                            icons: isGoogleMapsLoaded && window.google?.maps ? [{
+                            icons: window.google?.maps ? [{
                               icon: {
                                 path: window.google.maps.SymbolPath.CIRCLE,
                                 scale: 2,
@@ -848,7 +841,7 @@ export const AbnormalPatternsPage: React.FC = () => {
                             strokeWeight: 4,
                             strokeOpacity: 0.9,
                             zIndex: 2,
-                            icons: isGoogleMapsLoaded && window.google?.maps ? [{
+                            icons: window.google?.maps ? [{
                               icon: {
                                 path: window.google.maps.SymbolPath.FORWARD_OPEN_ARROW,
                                 scale: 2,
@@ -882,10 +875,10 @@ export const AbnormalPatternsPage: React.FC = () => {
                       onClick={() => setSelectedMarker('start')}
                       icon={{
                         url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-                        scaledSize: isGoogleMapsLoaded && window.google?.maps ? new window.google.maps.Size(48, 48) : undefined,
-                        anchor: isGoogleMapsLoaded && window.google?.maps ? new window.google.maps.Point(24, 48) : undefined,
+                        scaledSize: window.google?.maps ? new window.google.maps.Size(48, 48) : undefined,
+                        anchor: window.google?.maps ? new window.google.maps.Point(24, 48) : undefined,
                       }}
-                      animation={isGoogleMapsLoaded && window.google?.maps ? window.google.maps.Animation.DROP : undefined}
+                      animation={window.google?.maps ? window.google.maps.Animation.DROP : undefined}
                     />
                     {selectedMarker === 'start' && (
                       <InfoWindow
@@ -914,7 +907,7 @@ export const AbnormalPatternsPage: React.FC = () => {
                             scaledSize: isGoogleMapsLoaded && window.google?.maps ? new window.google.maps.Size(48, 48) : undefined,
                             anchor: isGoogleMapsLoaded && window.google?.maps ? new window.google.maps.Point(24, 48) : undefined,
                           }}
-                          animation={isGoogleMapsLoaded && window.google?.maps ? window.google.maps.Animation.DROP : undefined}
+                          animation={window.google?.maps ? window.google.maps.Animation.DROP : undefined}
                         />
                         {selectedMarker === 'end' && (
                           <InfoWindow
@@ -958,7 +951,6 @@ export const AbnormalPatternsPage: React.FC = () => {
                   </>
                 )}
               </GoogleMap>
-            </LoadScript>
           </div>
         </div>
       </div>

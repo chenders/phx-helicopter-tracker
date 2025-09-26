@@ -323,5 +323,5 @@ CREATE TRIGGER update_task_history_updated_at BEFORE UPDATE ON task_history FOR 
 CREATE TRIGGER update_task_metrics_updated_at BEFORE UPDATE ON task_metrics FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Grant permissions (if needed)
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO chris;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO chris;
+-- GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO chris;
+-- GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO chris;

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { GoogleMap, Marker, Polyline, HeatmapLayer, useLoadScript } from '@react-google-maps/api'
+import { GoogleMap, Marker, Polyline, HeatmapLayer } from '@react-google-maps/api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ScatterChart, Scatter } from 'recharts'
 import { useHistoricalData } from '../hooks/useHistoricalData'
 
@@ -109,7 +109,6 @@ const mapOptions = {
   styles: darkMapStyles, // Apply dark mode styles
 }
 
-const libraries: ("visualization")[] = ["visualization"]
 
 export function HistoricalAnalysisPage() {
   const [timeRange, setTimeRange] = useState('30d')
@@ -122,11 +121,6 @@ export function HistoricalAnalysisPage() {
 
   const { data: historicalData, isLoading: dataLoading } = useHistoricalData(timeRange, selectedAircraft)
 
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
-    libraries: libraries,
-  })
-
   const onMapLoad = useCallback((map: google.maps.Map) => {
     setMap(map)
     console.log('Map loaded and set')
@@ -138,7 +132,7 @@ export function HistoricalAnalysisPage() {
 
   // Ensure paths are ready after both map and data are loaded
   useEffect(() => {
-    if (showFlightPaths && map && historicalData?.flight_paths?.length > 0 && isLoaded) {
+    if (showFlightPaths && map && historicalData?.flight_paths?.length > 0) {
       console.log('Map and data ready, setting pathsReady to true')
       // Small delay to ensure Google Maps is fully initialized
       const timer = setTimeout(() => {
@@ -148,9 +142,9 @@ export function HistoricalAnalysisPage() {
     } else {
       setPathsReady(false);
     }
-  }, [map, historicalData, isLoaded, showFlightPaths])
+  }, [map, historicalData, showFlightPaths])
 
-  if (dataLoading || !isLoaded) {
+  if (dataLoading) {
     return (
       <div className="flex items-center justify-center min-h-64">
         <div className="text-center">
@@ -163,9 +157,6 @@ export function HistoricalAnalysisPage() {
     )
   }
 
-  if (loadError) {
-    return <div>Error loading maps</div>
-  }
 
   return (
     <div className="space-y-3">
