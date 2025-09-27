@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { GoogleMap, MarkerF, Circle, Polyline, Autocomplete } from '@react-google-maps/api'
-import { Search, Calendar, MapPin, Plane, Clock, Radio, ChevronRight, Play, Pause, Volume2 } from 'lucide-react'
+import { Search, Calendar, MapPin, Plane, Clock, Radio, ChevronRight, Play, Pause, Volume2, ArrowUpDown, Users } from 'lucide-react'
 import axios from '@/lib/axios'
 import { useNavigate } from 'react-router-dom'
 import { formatLocalTime } from '../utils/dateUtils'
@@ -8,6 +8,7 @@ import { formatLocalTime } from '../utils/dateUtils'
 interface FlightResult {
   id: number
   aircraft_id: string
+  flight_id?: string
   registration: string
   callsign: string
   departure_time: string
@@ -25,6 +26,8 @@ interface FlightResult {
     timestamp: string
     altitude: number
   }
+  grouped_count?: number
+  grouped_flights?: FlightResult[]
 }
 
 interface SearchFilters {
@@ -145,10 +148,27 @@ export function FlightSearchPageNew() {
   const navigate = useNavigate()
   const [timezone] = useState(getLocalTimezone())
 
+  // Load saved filters from session storage
   const [filters, setFilters] = useState<SearchFilters>(() => {
+    const savedFilters = sessionStorage.getItem('flightSearchFilters')
+    if (savedFilters) {
+      try {
+        const parsed = JSON.parse(savedFilters)
+        // Restore the search coordinates if they exist
+        if (parsed.search_coordinates) {
+          setTimeout(() => {
+            setMapCenter(parsed.search_coordinates)
+          }, 100)
+        }
+        return parsed
+      } catch (e) {
+        console.error('Error loading saved filters:', e)
+      }
+    }
+
+    // Default values if no saved filters
     const now = new Date()
     const oneHourAgo = new Date(Date.now() - 3600000)
-
     return {
       start_time: getLocalDateTimeString(oneHourAgo),
       end_time: getLocalDateTimeString(now),
@@ -160,16 +180,20 @@ export function FlightSearchPageNew() {
   const [selectedFlight, setSelectedFlight] = useState<FlightResult | null>(null)
   const [flightPath, setFlightPath] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
-  const [mapCenter, setMapCenter] = useState(defaultCenter)
-  const [addressInput, setAddressInput] = useState('')
+  const [mapCenter, setMapCenter] = useState(filters.search_coordinates || defaultCenter)
+  const [addressInput, setAddressInput] = useState(() => {
+    return sessionStorage.getItem('flightSearchAddress') || ''
+  })
   const [aircraftList, setAircraftList] = useState<string[]>([])
   const [radioFiles, setRadioFiles] = useState<any[]>([])
   const [playingAudio, setPlayingAudio] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'registration'>('date-desc')
+  const [groupByFlightId, setGroupByFlightId] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
 
-  // Fetch aircraft list on mount
+  // Fetch aircraft list on mount and setup dark theme for autocomplete
   useEffect(() => {
     const fetchAircraft = async () => {
       try {
@@ -180,6 +204,54 @@ export function FlightSearchPageNew() {
       }
     }
     fetchAircraft()
+
+    // Add dark theme styles for Google autocomplete
+    const style = document.createElement('style')
+    style.innerHTML = `
+      /* Dark theme for Google Autocomplete dropdown */
+      .dark .pac-container {
+        background-color: rgb(31, 41, 55) !important;
+        border: 1px solid rgb(75, 85, 99) !important;
+        border-top: none !important;
+        font-family: inherit !important;
+      }
+
+      .dark .pac-item {
+        background-color: rgb(31, 41, 55) !important;
+        color: rgb(243, 244, 246) !important;
+        border-top: 1px solid rgb(55, 65, 81) !important;
+        padding: 8px 12px !important;
+        cursor: pointer !important;
+      }
+
+      .dark .pac-item:hover {
+        background-color: rgb(55, 65, 81) !important;
+      }
+
+      .dark .pac-item-selected,
+      .dark .pac-item-selected:hover {
+        background-color: rgb(59, 130, 246) !important;
+        color: white !important;
+      }
+
+      .dark .pac-matched {
+        color: rgb(96, 165, 250) !important;
+        font-weight: bold !important;
+      }
+
+      .dark .pac-item-query {
+        color: rgb(209, 213, 219) !important;
+      }
+
+      .dark .pac-icon {
+        filter: brightness(0.8) !important;
+      }
+    `
+    document.head.appendChild(style)
+
+    return () => {
+      document.head.removeChild(style)
+    }
   }, [])
 
   const handleMapClick = useCallback((event: google.maps.MapMouseEvent) => {
@@ -188,11 +260,13 @@ export function FlightSearchPageNew() {
         lat: event.latLng.lat(),
         lng: event.latLng.lng()
       }
+      const coordString = `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`
       setFilters(prev => ({
         ...prev,
         search_coordinates: coords,
-        search_address: `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`
+        search_address: coordString
       }))
+      setAddressInput(coordString) // Update the input field with coordinates
       setMapCenter(coords)
     }
   }, [])
@@ -231,11 +305,14 @@ export function FlightSearchPageNew() {
           lat: place.geometry.location.lat(),
           lng: place.geometry.location.lng()
         }
+        const address = place.formatted_address || place.name || ''
+
         setFilters(prev => ({
           ...prev,
           search_coordinates: coords,
-          search_address: place.formatted_address || place.name || ''
+          search_address: address
         }))
+        setAddressInput(address) // Auto-fill the input field
         setMapCenter(coords)
 
         if (mapRef.current) {
@@ -313,6 +390,79 @@ export function FlightSearchPageNew() {
       fetchFlightDetails(selectedFlight)
     }
   }, [selectedFlight])
+
+  // Save filters to session storage whenever they change
+  useEffect(() => {
+    sessionStorage.setItem('flightSearchFilters', JSON.stringify(filters))
+  }, [filters])
+
+  // Save address input to session storage whenever it changes
+  useEffect(() => {
+    sessionStorage.setItem('flightSearchAddress', addressInput)
+  }, [addressInput])
+
+  // Sort and group search results
+  const processedResults = useMemo(() => {
+    let results = [...searchResults]
+
+    // Sort results
+    switch (sortBy) {
+      case 'date-desc':
+        results.sort((a, b) => new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime())
+        break
+      case 'date-asc':
+        results.sort((a, b) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime())
+        break
+      case 'registration':
+        results.sort((a, b) => (a.registration || a.callsign || '').localeCompare(b.registration || b.callsign || ''))
+        break
+    }
+
+    // Group by flight_id if requested
+    if (groupByFlightId && results.length > 0) {
+      const grouped = new Map<string, FlightResult[]>()
+
+      results.forEach(flight => {
+        const key = flight.flight_id || `single_${flight.id}`
+        if (!grouped.has(key)) {
+          grouped.set(key, [])
+        }
+        grouped.get(key)!.push(flight)
+      })
+
+      // For grouped flights, only show the most recent one from each group
+      results = Array.from(grouped.values()).map(group => {
+        if (group.length === 1) return group[0]
+
+        // Sort group by date and return the most recent
+        const sorted = group.sort((a, b) =>
+          new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime()
+        )
+
+        // Add a count property to indicate how many flights are grouped
+        return {
+          ...sorted[0],
+          grouped_count: group.length,
+          grouped_flights: group
+        }
+      })
+
+      // Re-apply the sort to the grouped results
+      switch (sortBy) {
+        case 'date-desc':
+          results.sort((a, b) => new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime())
+          break
+        case 'date-asc':
+          results.sort((a, b) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime())
+          break
+        case 'registration':
+          results.sort((a, b) => (a.registration || a.callsign || '').localeCompare(b.registration || b.callsign || ''))
+          break
+      }
+    }
+
+    return results
+  }, [searchResults, sortBy, groupByFlightId])
 
   return (
     <div className="h-full flex flex-col">
@@ -417,9 +567,37 @@ export function FlightSearchPageNew() {
         {/* Left Side - Results */}
         <div className="w-2/5 bg-white dark:bg-gray-800 rounded-lg shadow flex flex-col">
           <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-              {loading ? 'Searching...' : `Results (${searchResults.length})`}
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+                {loading ? 'Searching...' : `Results (${searchResults.length})`}
+              </h2>
+              <div className="flex items-center gap-2">
+                {/* Sort dropdown */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  disabled={loading || searchResults.length === 0}
+                >
+                  <option value="date-desc">Newest First</option>
+                  <option value="date-asc">Oldest First</option>
+                  <option value="registration">Registration</option>
+                </select>
+
+                {/* Group checkbox */}
+                <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={groupByFlightId}
+                    onChange={(e) => setGroupByFlightId(e.target.checked)}
+                    disabled={loading || searchResults.length === 0}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  <Users className="h-3 w-3" />
+                  <span>Group</span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -427,72 +605,169 @@ export function FlightSearchPageNew() {
               <div className="p-8 text-center text-gray-500 dark:text-gray-400">
                 Searching flights...
               </div>
-            ) : searchResults.length > 0 ? (
+            ) : processedResults.length > 0 ? (
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                {searchResults.map((flight) => (
+                {processedResults.map((flight) => (
                   <div
                     key={flight.id}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
                       setSelectedFlight(flight)
-                      navigate(`/flight/${flight.id}`)
+                      fetchFlightDetails(flight)
                     }}
-                    className={`p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors ${
-                      selectedFlight?.id === flight.id ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-all ${
+                      selectedFlight?.id === flight.id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500' : ''
                     }`}
                   >
-                    <div className="flex items-start justify-between">
+                    {/* Header with Registration and Type */}
+                    <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Plane className="h-3 w-3 text-blue-600" />
-                          <span className="font-medium text-sm text-gray-900 dark:text-white">
-                            {flight.registration}
-                          </span>
-                          {flight.callsign && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              ({flight.callsign})
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="text-xs text-gray-600 dark:text-gray-400 space-y-0.5">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {formatLocalTime(flight.departure_time)}
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {flight.duration_minutes ? `${Math.round(flight.duration_minutes)} min` : 'In flight'}
-                          </div>
-
-                          {flight.distance_from_search !== undefined && (
-                            <div className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {(flight.distance_from_search / 1000).toFixed(1)} km away
+                        <div className="flex items-center gap-3">
+                          <Plane className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <div className="flex items-baseline gap-2">
+                              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                {flight.registration || flight.callsign}
+                              </h3>
+                              {flight.grouped_count && flight.grouped_count > 1 && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
+                                  <Users className="h-3 w-3 mr-0.5" />
+                                  {flight.grouped_count}
+                                </span>
+                              )}
+                              {flight.id && (
+                                <span className="text-xs text-gray-500 dark:text-gray-500">
+                                  #{flight.id}
+                                </span>
+                              )}
                             </div>
-                          )}
-
-                          {flight.surveillance_score > 0 && (
-                            <div className="mt-1">
-                              <div className="flex items-center gap-1">
-                                <span className="text-xs">Score:</span>
-                                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 max-w-[80px]">
-                                  <div
-                                    className={`h-1.5 rounded-full ${
-                                      flight.surveillance_score > 0.7 ? 'bg-red-500' :
-                                      flight.surveillance_score > 0.4 ? 'bg-yellow-500' : 'bg-green-500'
-                                    }`}
-                                    style={{ width: `${(flight.surveillance_score || 0) * 100}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs">{Math.round((flight.surveillance_score || 0) * 100)}%</span>
-                              </div>
-                            </div>
-                          )}
+                            {flight.surveillance_score > 0.7 ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                                SURVEILLANCE LIKELY
+                              </span>
+                            ) : flight.surveillance_score > 0.4 ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                POSSIBLE SURVEILLANCE
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                ROUTINE PATROL
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
-                      <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0 mt-1" />
                     </div>
+
+                    {/* Key Information Grid */}
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div>
+                        <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                          <Calendar className="h-4 w-4" />
+                          <span className="text-base font-semibold">
+                            {new Date(flight.departure_time).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: new Date(flight.departure_time).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                            })}
+                          </span>
+                        </div>
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 ml-5">
+                          {new Date(flight.departure_time).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                          <Clock className="h-4 w-4" />
+                          <span className="text-base font-medium">
+                            {flight.duration_minutes ? `${Math.round(flight.duration_minutes)} min` : 'In flight'}
+                          </span>
+                        </div>
+                        {flight.arrival_time && (
+                          <div className="text-sm text-gray-600 dark:text-gray-400 ml-5">
+                            Ended {new Date(flight.arrival_time).toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Distance and Additional Info */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        {flight.distance_from_search !== undefined && (
+                          <div className="flex items-center gap-1.5">
+                            <MapPin className="h-4 w-4 text-gray-500" />
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              {(flight.distance_from_search / 1000).toFixed(1)} km from search
+                            </span>
+                          </div>
+                        )}
+
+                        {flight.positions_count && (
+                          <span className="text-xs text-gray-500 dark:text-gray-500">
+                            {flight.positions_count.toLocaleString()} GPS points
+                          </span>
+                        )}
+
+                        {flight.hover_locations && flight.hover_locations.length > 0 && (
+                          <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                            {flight.hover_locations.length} hover location{flight.hover_locations.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Pass search context to detail page
+                          const params = new URLSearchParams()
+                          if (filters.search_coordinates) {
+                            params.set('searchLat', filters.search_coordinates.lat.toString())
+                            params.set('searchLng', filters.search_coordinates.lng.toString())
+                            params.set('searchRadius', filters.search_radius.toString())
+                          }
+                          navigate(`/flight/${flight.id}?${params.toString()}`)
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium flex items-center gap-1"
+                      >
+                        Details
+                        <ChevronRight className="h-3 w-3" />
+                      </button>
+                    </div>
+
+                    {/* Surveillance Score Bar (if significant) */}
+                    {flight.surveillance_score > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                            Surveillance Probability
+                          </span>
+                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                            {Math.round((flight.surveillance_score || 0) * 100)}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              flight.surveillance_score > 0.7 ? 'bg-red-500' :
+                              flight.surveillance_score > 0.4 ? 'bg-yellow-500' : 'bg-green-500'
+                            }`}
+                            style={{ width: `${(flight.surveillance_score || 0) * 100}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

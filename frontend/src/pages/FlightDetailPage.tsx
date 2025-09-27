@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { GoogleMap, Polyline, MarkerF, InfoWindow, Circle } from '@react-google-maps/api'
 import {
   ArrowLeft,
@@ -78,9 +78,99 @@ const mapContainerStyle = {
   height: '500px',
 }
 
+// Dark mode map styles for better visibility
+const darkMapStyles = [
+  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+  {
+    featureType: "administrative.locality",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  {
+    featureType: "poi",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "geometry",
+    stylers: [{ color: "#263c3f" }],
+  },
+  {
+    featureType: "poi.park",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#6b9a76" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry",
+    stylers: [{ color: "#38414e" }],
+  },
+  {
+    featureType: "road",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#212a37" }],
+  },
+  {
+    featureType: "road",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#9ca5b3" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry",
+    stylers: [{ color: "#746855" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "geometry.stroke",
+    stylers: [{ color: "#1f2835" }],
+  },
+  {
+    featureType: "road.highway",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#f3d19c" }],
+  },
+  {
+    featureType: "transit",
+    elementType: "geometry",
+    stylers: [{ color: "#2f3948" }],
+  },
+  {
+    featureType: "transit.station",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  {
+    featureType: "water",
+    elementType: "geometry",
+    stylers: [{ color: "#17263c" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#515c6d" }],
+  },
+  {
+    featureType: "water",
+    elementType: "labels.text.stroke",
+    stylers: [{ color: "#17263c" }],
+  },
+]
+
 export function FlightDetailPage() {
   const { flightId } = useParams<{ flightId: string }>()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  // Get search context from URL parameters
+  const searchContext = {
+    lat: searchParams.get('searchLat') ? parseFloat(searchParams.get('searchLat')!) : null,
+    lng: searchParams.get('searchLng') ? parseFloat(searchParams.get('searchLng')!) : null,
+    radius: searchParams.get('searchRadius') ? parseFloat(searchParams.get('searchRadius')!) : null
+  }
 
   const [flight, setFlight] = useState<FlightDetails | null>(null)
   const [positions, setPositions] = useState<FlightPosition[]>([])
@@ -129,7 +219,7 @@ export function FlightDetailPage() {
       setLoading(true)
 
       // Load flight details
-      const flightResponse = await axios.get(`/api/v1/flights/${flightId}`)
+      const flightResponse = await axios.get(`/api/v1/flights/logs/${flightId}`)
       setFlight(flightResponse.data)
 
       // Load positions
@@ -367,6 +457,11 @@ export function FlightDetailPage() {
               map.fitBounds(bounds)
             }
           }}
+          options={{
+            styles: darkMapStyles,
+            streetViewControl: false,
+            mapTypeControl: false,
+          }}
         >
           {/* Flight path */}
           <Polyline
@@ -451,6 +546,38 @@ export function FlightDetailPage() {
                 )}
               </div>
             </InfoWindow>
+          )}
+
+          {/* Search context visualization - if came from search page */}
+          {searchContext.lat && searchContext.lng && searchContext.radius && (
+            <>
+              {/* Search radius circle */}
+              <Circle
+                center={{ lat: searchContext.lat, lng: searchContext.lng }}
+                radius={searchContext.radius}
+                options={{
+                  fillColor: '#3B82F6',
+                  fillOpacity: 0.1,
+                  strokeColor: '#3B82F6',
+                  strokeOpacity: 0.3,
+                  strokeWeight: 2,
+                }}
+              />
+
+              {/* Blue search point marker */}
+              <MarkerF
+                position={{ lat: searchContext.lat, lng: searchContext.lng }}
+                icon={{
+                  path: window.google.maps.SymbolPath.CIRCLE,
+                  scale: 8,
+                  fillColor: '#3B82F6',
+                  fillOpacity: 1,
+                  strokeColor: '#1E40AF',
+                  strokeWeight: 2,
+                }}
+                title="Search Location"
+              />
+            </>
           )}
         </GoogleMap>
       </div>

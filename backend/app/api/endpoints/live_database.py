@@ -103,10 +103,10 @@ async def get_live_tracking_from_database(
         is_hovering = position.is_hovering or False
         is_circling = position.is_circling or False
         is_surveillance = (
-            is_hovering or 
-            is_circling or 
+            is_hovering or
+            is_circling or
             (position.altitude_feet and position.altitude_feet < 1500) or
-            flight_log.surveillance_likelihood > 0.5
+            (flight_log.surveillance_likelihood and flight_log.surveillance_likelihood > 0.5)
         )
         
         # Create tracking data
