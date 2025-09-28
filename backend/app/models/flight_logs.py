@@ -38,6 +38,11 @@ class FlightLog(Base):
     min_altitude_feet = Column(Integer)
     avg_altitude_feet = Column(Integer)
 
+    # AGL (Above Ground Level) altitude data
+    max_altitude_agl_feet = Column(Integer)
+    min_altitude_agl_feet = Column(Integer)
+    avg_altitude_agl_feet = Column(Integer)
+
     # Cost analysis
     estimated_cost = Column(Float)  # Based on flight duration * hourly rate
     fuel_consumed_gallons = Column(Float)
@@ -100,6 +105,10 @@ class FlightPosition(Base):
     latitude = Column(Float, nullable=False, index=True)
     longitude = Column(Float, nullable=False, index=True)
     altitude_feet = Column(Integer)
+
+    # Ground elevation and AGL (Above Ground Level) data
+    ground_elevation_feet = Column(Integer)  # Terrain elevation at this position
+    altitude_agl_feet = Column(Integer)  # Altitude above ground level
 
     # Flight dynamics
     ground_speed_knots = Column(Float)

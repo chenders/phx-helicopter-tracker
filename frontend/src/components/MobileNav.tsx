@@ -10,6 +10,7 @@ interface MobileNavProps {
 
 export const MobileNav = ({ isOpen, setIsOpen }: MobileNavProps) => {
   const location = useLocation()
+  const [isSystemExpanded, setIsSystemExpanded] = useState(false)
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: '🏠' },
@@ -21,8 +22,12 @@ export const MobileNav = ({ isOpen, setIsOpen }: MobileNavProps) => {
     { path: '/costs', label: 'Cost Analysis', icon: '💰' },
     { path: '/legal', label: 'Legal Docs', icon: '⚖️' },
     { path: '/radio', label: 'Radio Archives', icon: '📻' },
+  ]
+
+  const systemItems = [
     { path: '/data-sources', label: 'Data Sources', icon: '💾' },
     { path: '/tasks', label: 'Tasks', icon: '⚙️' },
+    { path: '/logs', label: 'Logs', icon: '📋' },
   ]
 
   return (
@@ -85,6 +90,47 @@ export const MobileNav = ({ isOpen, setIsOpen }: MobileNavProps) => {
                 <span className="font-medium">{item.label}</span>
               </Link>
             ))}
+
+            {/* System Group */}
+            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => setIsSystemExpanded(!isSystemExpanded)}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all ${
+                  systemItems.some(item => location.pathname === item.path)
+                    ? 'bg-blue-500 dark:bg-blue-600 text-white'
+                    : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <span className="text-xl">⚡</span>
+                  <span className="font-medium">System</span>
+                </div>
+                <span className="text-sm">
+                  {isSystemExpanded ? '▼' : '▶'}
+                </span>
+              </button>
+
+              {/* System Items (shown when expanded) */}
+              {isSystemExpanded && (
+                <div className="mt-1 space-y-1 pl-4">
+                  {systemItems.map((item) => (
+                    <Link
+                      key={item.path}
+                      to={item.path}
+                      onClick={() => setIsOpen(false)}
+                      className={`flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-all ${
+                        location.pathname === item.path
+                          ? 'bg-blue-400 dark:bg-blue-700 text-white'
+                          : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200'
+                      }`}
+                    >
+                      <span className="text-lg">{item.icon}</span>
+                      <span className="text-sm">{item.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Status Info */}

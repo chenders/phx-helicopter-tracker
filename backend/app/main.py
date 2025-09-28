@@ -4,16 +4,29 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 import asyncio
 import json
+import logging
 from typing import List
 
 from app.core.config import settings
+from app.core.logging_config import setup_logging
 from app.api import api_router
 from app.db.database import engine
 from app.models import Base
 from app.services.websocket_manager import WebSocketManager
 
+# Initialize logging
+setup_logging(
+    log_level=settings.LOG_LEVEL if hasattr(settings, 'LOG_LEVEL') else "INFO",
+    log_to_file=True,
+    log_to_console=True,
+    json_format=False
+)
+
+logger = logging.getLogger(__name__)
+
 # Create database tables
 Base.metadata.create_all(bind=engine)
+logger.info("Database tables created/verified")
 
 app = FastAPI(
     title="Phoenix PD Helicopter Tracker - Comprehensive Platform",
@@ -25,6 +38,8 @@ app = FastAPI(
     redirect_slashes=False,
 )
 
+logger.info("FastAPI application initialized")
+
 # Middleware to handle proxy headers and preserve HTTPS
 @app.middleware("http")
 async def proxy_headers_middleware(request, call_next):
@@ -32,8 +47,30 @@ async def proxy_headers_middleware(request, call_next):
     forwarded_proto = request.headers.get("X-Forwarded-Proto")
     if forwarded_proto:
         request.scope["scheme"] = forwarded_proto
-    
+
     response = await call_next(request)
+    return response
+
+# Request logging middleware
+@app.middleware("http")
+async def logging_middleware(request, call_next):
+    import time
+    start_time = time.time()
+
+    # Log request
+    logger.info(f"Request: {request.method} {request.url.path}")
+
+    response = await call_next(request)
+
+    # Calculate request duration
+    duration = time.time() - start_time
+
+    # Log response
+    logger.info(
+        f"Response: {request.method} {request.url.path} "
+        f"- Status: {response.status_code} - Duration: {duration:.3f}s"
+    )
+
     return response
 
 # CORS middleware

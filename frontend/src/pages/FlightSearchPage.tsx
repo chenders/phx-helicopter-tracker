@@ -36,7 +36,7 @@ interface SearchFilters {
     lat: number
     lng: number
   }
-  search_radius: number // in meters
+  search_radius: number // in miles
 }
 
 const mapContainerStyle = {
@@ -152,7 +152,7 @@ export function FlightSearchPage() {
     return {
       start_time: getLocalDateTimeString(oneHourAgo),
       end_time: getLocalDateTimeString(now),
-      search_radius: 1000, // 1km default
+      search_radius: 0.6, // 0.6 miles default
     }
   })
 
@@ -184,7 +184,8 @@ export function FlightSearchPage() {
       )
 
       // Calculate bounds based on radius
-      const radiusInDegrees = filters.search_radius / 111320 // Convert meters to degrees (approximate)
+      const radiusInMeters = filters.search_radius * 1609.34 // Convert miles to meters
+      const radiusInDegrees = radiusInMeters / 111320 // Convert meters to degrees (approximate)
 
       bounds.extend({
         lat: filters.search_coordinates.lat - radiusInDegrees,
@@ -197,15 +198,15 @@ export function FlightSearchPage() {
 
       mapRef.current.fitBounds(bounds)
 
-      // Adjust zoom based on radius
+      // Adjust zoom based on radius (in miles)
       // Smaller radius = higher zoom
-      if (filters.search_radius <= 500) {
+      if (filters.search_radius <= 0.3) {
         mapRef.current.setZoom(16)
-      } else if (filters.search_radius <= 1000) {
+      } else if (filters.search_radius <= 0.6) {
         mapRef.current.setZoom(15)
-      } else if (filters.search_radius <= 2000) {
+      } else if (filters.search_radius <= 1.2) {
         mapRef.current.setZoom(14)
-      } else if (filters.search_radius <= 3000) {
+      } else if (filters.search_radius <= 2) {
         mapRef.current.setZoom(13)
       } else {
         mapRef.current.setZoom(12)
@@ -285,7 +286,7 @@ export function FlightSearchPage() {
         ...(filters.search_coordinates && {
           latitude: filters.search_coordinates.lat,
           longitude: filters.search_coordinates.lng,
-          radius: filters.search_radius,
+          radius: filters.search_radius * 1609.34, // Convert miles to meters for API
         }),
       }
 
@@ -490,15 +491,15 @@ export function FlightSearchPage() {
           {filters.search_coordinates && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Search Radius: {filters.search_radius}m
+                Search Radius: {filters.search_radius} mi
               </label>
               <input
                 type="range"
-                min="100"
-                max="5000"
-                step="100"
+                min="0.1"
+                max="3"
+                step="0.1"
                 value={filters.search_radius}
-                onChange={(e) => setFilters(prev => ({ ...prev, search_radius: parseInt(e.target.value) }))}
+                onChange={(e) => setFilters(prev => ({ ...prev, search_radius: parseFloat(e.target.value) }))}
                 className="w-full"
               />
             </div>
@@ -546,7 +547,7 @@ export function FlightSearchPage() {
               />
               <Circle
                 center={filters.search_coordinates}
-                radius={filters.search_radius}
+                radius={filters.search_radius * 1609.34} // Convert to meters for map
                 options={{
                   fillColor: '#4299e1',
                   fillOpacity: 0.2,
@@ -609,7 +610,7 @@ export function FlightSearchPage() {
                           </div>
                           {filters.search_coordinates && (
                             <div className="text-xs mt-1">
-                              Distance: {(flight.distance_from_search / 1000).toFixed(1)} km
+                              Distance: {(flight.distance_from_search * 0.000621371).toFixed(2)} mi
                             </div>
                           )}
                         </div>
@@ -680,7 +681,7 @@ export function FlightSearchPage() {
                       <div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">Closest Approach</div>
                         <div className="font-medium text-gray-900 dark:text-white">
-                          {(selectedFlight.distance_from_search / 1000).toFixed(2)} km
+                          {(selectedFlight.distance_from_search * 0.000621371).toFixed(2)} mi
                         </div>
                       </div>
                     )}

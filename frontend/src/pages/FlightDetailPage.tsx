@@ -31,9 +31,12 @@ interface FlightDetails {
   flight_duration_minutes: number
   departure_airport: string
   arrival_airport: string
-  max_altitude_feet: number
-  min_altitude_feet: number
-  avg_altitude_feet: number
+  max_altitude_feet: number | null
+  min_altitude_feet: number | null
+  avg_altitude_feet: number | null
+  max_altitude_agl_feet: number | null
+  min_altitude_agl_feet: number | null
+  avg_altitude_agl_feet: number | null
   estimated_cost: number
   fuel_consumed_gallons: number
   hover_locations: any[]
@@ -51,6 +54,7 @@ interface FlightPosition {
   latitude: number
   longitude: number
   altitude_feet: number
+  altitude_agl_feet?: number
   ground_speed_knots: number
   track_degrees: number
   vertical_rate: number
@@ -169,12 +173,21 @@ export function FlightDetailPage() {
   const searchContext = {
     lat: searchParams.get('searchLat') ? parseFloat(searchParams.get('searchLat')!) : null,
     lng: searchParams.get('searchLng') ? parseFloat(searchParams.get('searchLng')!) : null,
-    radius: searchParams.get('searchRadius') ? parseFloat(searchParams.get('searchRadius')!) : null
+    radius: searchParams.get('searchRadius') ? parseFloat(searchParams.get('searchRadius')!) : null,
+    closestDistance: searchParams.get('closestDistance') ? parseFloat(searchParams.get('closestDistance')!) : null,
+    closestTime: searchParams.get('closestTime') || null,
+    closestSpeed: searchParams.get('closestSpeed') ? parseFloat(searchParams.get('closestSpeed')!) : null,
+    closestAltitude: searchParams.get('closestAltitude') ? parseFloat(searchParams.get('closestAltitude')!) : null,
+    closestAltitudeAGL: searchParams.get('closestAltitudeAGL') ? parseFloat(searchParams.get('closestAltitudeAGL')!) : null,
+    closestBearing: searchParams.get('closestBearing') ? parseFloat(searchParams.get('closestBearing')!) : null,
+    isHovering: searchParams.get('isHovering') === 'true',
+    hoverDuration: searchParams.get('hoverDuration') ? parseInt(searchParams.get('hoverDuration')!) : null,
   }
 
   const [flight, setFlight] = useState<FlightDetails | null>(null)
   const [positions, setPositions] = useState<FlightPosition[]>([])
   const [radioFiles, setRadioFiles] = useState<RadioArchive[]>([])
+  const [calculatedClosest, setCalculatedClosest] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [selectedPosition, setSelectedPosition] = useState<FlightPosition | null>(null)
   const [playingAudio, setPlayingAudio] = useState<string | null>(null)
@@ -182,12 +195,23 @@ export function FlightDetailPage() {
   const [isPlaying, setIsPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const animationRef = useRef<number | null>(null)
+  const mapRef = useRef<google.maps.Map | null>(null)
 
   useEffect(() => {
     if (flightId) {
       loadFlightDetails()
     }
   }, [flightId])
+
+  // Calculate closest position if we have search context but no closest data
+  useEffect(() => {
+    if (searchContext.lat && searchContext.lng && positions.length > 0 && !searchContext.closestDistance) {
+      const closest = findClosestPosition()
+      if (closest) {
+        setCalculatedClosest(closest)
+      }
+    }
+  }, [positions, searchContext.lat, searchContext.lng])
 
   useEffect(() => {
     // Animation for flight playback
@@ -198,7 +222,18 @@ export function FlightDetailPage() {
             setIsPlaying(false)
             return prev
           }
-          return prev + 1
+          const nextIndex = prev + 1
+
+          // Pan map to keep aircraft in view
+          if (mapRef.current && positions[nextIndex]) {
+            const currentPos = {
+              lat: positions[nextIndex].latitude,
+              lng: positions[nextIndex].longitude
+            }
+            mapRef.current.panTo(currentPos)
+          }
+
+          return nextIndex
         })
         animationRef.current = requestAnimationFrame(animate)
       }
@@ -227,6 +262,10 @@ export function FlightDetailPage() {
       setPositions(positionsResponse.data)
 
       // Load radio archives for the time period
+      // NOTE: Temporarily disabled - the API endpoint doesn't support time filtering yet
+      // and returns all archives (100+) instead of just those during the flight
+      // TODO: Fix the /api/v1/radio/archives endpoint to properly filter by time
+      /*
       if (flightResponse.data.departure_time && flightResponse.data.arrival_time) {
         const radioResponse = await axios.get('/api/v1/radio/archives', {
           params: {
@@ -236,6 +275,8 @@ export function FlightDetailPage() {
         })
         setRadioFiles(radioResponse.data.archives || [])
       }
+      */
+      setRadioFiles([]) // Temporarily set to empty until API is fixed
     } catch (error) {
       console.error('Failed to load flight details:', error)
     } finally {
@@ -268,6 +309,68 @@ export function FlightDetailPage() {
       lng: pos.longitude
     }))
   }
+
+  const getCompassDirection = (degrees: number) => {
+    const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+    const index = Math.round(degrees / 22.5) % 16
+    return directions[index]
+  }
+
+  // Calculate distance between two coordinates using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371000 // Earth's radius in meters
+    const φ1 = lat1 * Math.PI / 180
+    const φ2 = lat2 * Math.PI / 180
+    const Δφ = (lat2 - lat1) * Math.PI / 180
+    const Δλ = (lon2 - lon1) * Math.PI / 180
+
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) *
+      Math.sin(Δλ / 2) * Math.sin(Δλ / 2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+    return R * c // Distance in meters
+  }
+
+  // Find closest position to search location
+  const findClosestPosition = () => {
+    if (!searchContext.lat || !searchContext.lng || positions.length === 0) {
+      return null
+    }
+
+    let closestPos = null
+    let minDistance = Infinity
+
+    positions.forEach(pos => {
+      if (pos.latitude && pos.longitude) {
+        const distance = calculateDistance(
+          searchContext.lat!,
+          searchContext.lng!,
+          pos.latitude,
+          pos.longitude
+        )
+        if (distance < minDistance) {
+          minDistance = distance
+          closestPos = {
+            ...pos,
+            distance: distance
+          }
+        }
+      }
+    })
+
+    return closestPos
+  }
+
+  // Calculate closest position when positions load but URL params missing
+  useEffect(() => {
+    if (searchContext.lat && searchContext.lng && positions.length > 0 && !searchContext.closestDistance) {
+      const closest = findClosestPosition()
+      if (closest) {
+        setCalculatedClosest(closest)
+      }
+    }
+  }, [positions, searchContext.lat, searchContext.lng, searchContext.closestDistance])
 
   const getMapBounds = () => {
     if (positions.length === 0) return null
@@ -322,7 +425,8 @@ export function FlightDetailPage() {
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
       distance += 6371 * c // Earth radius in km
     }
-    return distance.toFixed(2)
+    // Convert km to miles
+    return (distance * 0.621371).toFixed(2)
   }
 
   const calculateAverageSpeed = () => {
@@ -397,7 +501,7 @@ export function FlightDetailPage() {
           <div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Distance</div>
             <div className="font-semibold text-gray-900 dark:text-white">
-              {calculateTotalDistance()} km
+              {calculateTotalDistance()} mi
             </div>
           </div>
           <div>
@@ -413,6 +517,98 @@ export function FlightDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Closest Approach Details (when coming from search) */}
+        {searchContext.lat && searchContext.lng && (
+          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">
+              Closest Approach to Search Location
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div>
+                <span className="text-blue-700 dark:text-blue-300">Distance:</span>
+                <div className="font-medium text-blue-900 dark:text-blue-100">
+                  {searchContext.closestDistance ? (
+                    searchContext.closestDistance * 0.000621371 < 0.5 ?
+                      `${Math.round(searchContext.closestDistance * 3.28084)} ft` :
+                      `${(searchContext.closestDistance * 0.000621371).toFixed(2)} mi`
+                  ) : calculatedClosest ? (
+                    calculatedClosest.distance * 0.000621371 < 0.5 ?
+                      `${Math.round(calculatedClosest.distance * 3.28084)} ft` :
+                      `${(calculatedClosest.distance * 0.000621371).toFixed(2)} mi`
+                  ) : 'Calculating...'}
+                </div>
+              </div>
+              <div>
+                <span className="text-blue-700 dark:text-blue-300">Speed:</span>
+                <div className="font-medium text-blue-900 dark:text-blue-100">
+                  {searchContext.closestSpeed ?
+                    `${Math.round(searchContext.closestSpeed * 1.15078)} mph (${Math.round(searchContext.closestSpeed)} kts)` :
+                    calculatedClosest?.ground_speed_knots ?
+                      `${Math.round(calculatedClosest.ground_speed_knots * 1.15078)} mph (${Math.round(calculatedClosest.ground_speed_knots)} kts)` :
+                      'N/A'}
+                </div>
+              </div>
+              <div>
+                <span className="text-blue-700 dark:text-blue-300">Altitude:</span>
+                <div>
+                  {(searchContext.closestAltitudeAGL || calculatedClosest?.altitude_agl_feet) ? (
+                    <>
+                      <div className="font-medium text-blue-900 dark:text-blue-100">
+                        {(searchContext.closestAltitudeAGL || calculatedClosest.altitude_agl_feet).toLocaleString()} ft AGL
+                        <span className="text-xs font-normal text-blue-700 dark:text-blue-300 ml-1">
+                          (Above Ground Level)
+                        </span>
+                      </div>
+                      {(searchContext.closestAltitude || calculatedClosest?.altitude_feet) && (
+                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                          {(searchContext.closestAltitude || calculatedClosest.altitude_feet).toLocaleString()} ft MSL
+                          <span className="text-xs text-blue-500 dark:text-blue-300 ml-1">
+                            (Mean Sea Level)
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (searchContext.closestAltitude || calculatedClosest?.altitude_feet) ? (
+                    <div className="font-medium text-blue-900 dark:text-blue-100">
+                      {(searchContext.closestAltitude || calculatedClosest.altitude_feet).toLocaleString()} ft MSL
+                      <span className="text-xs font-normal text-blue-700 dark:text-blue-300 ml-1">
+                        (Mean Sea Level)
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="font-medium text-blue-900 dark:text-blue-100">N/A</div>
+                  )}
+                </div>
+              </div>
+              <div>
+                <span className="text-blue-700 dark:text-blue-300">Heading:</span>
+                <div className="font-medium text-blue-900 dark:text-blue-100">
+                  {searchContext.closestBearing ?
+                    `${Math.round(searchContext.closestBearing)}°` :
+                    calculatedClosest?.track_degrees ?
+                      `${Math.round(calculatedClosest.track_degrees)}°` :
+                      'N/A'}
+                  {(searchContext.closestBearing || calculatedClosest?.track_degrees) && (
+                    <div className="text-xs text-blue-600 dark:text-blue-400">
+                      {getCompassDirection(searchContext.closestBearing || calculatedClosest.track_degrees)}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            {searchContext.closestTime && (
+              <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
+                Time: {formatLocalTime(searchContext.closestTime)}
+                {searchContext.isHovering && (
+                  <span className="ml-2 px-2 py-0.5 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 rounded">
+                    Hovering for {searchContext.hoverDuration}s
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Surveillance Alert */}
         {flight.surveillance_likelihood > 0.5 && (
@@ -439,7 +635,20 @@ export function FlightDetailPage() {
             Flight Path
           </h2>
           <button
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={() => {
+              if (!isPlaying && positions.length > 0) {
+                // Reset to start when playing
+                setCurrentPositionIndex(0)
+                // Optionally pan to the starting position without changing zoom
+                if (mapRef.current && positions[0]) {
+                  mapRef.current.panTo({
+                    lat: positions[0].latitude,
+                    lng: positions[0].longitude
+                  })
+                }
+              }
+              setIsPlaying(!isPlaying)
+            }}
             className="flex items-center gap-2 px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
           >
             {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
@@ -452,8 +661,9 @@ export function FlightDetailPage() {
           zoom={12}
           center={positions[0] ? { lat: positions[0].latitude, lng: positions[0].longitude } : { lat: 33.4484, lng: -112.0740 }}
           onLoad={(map) => {
+            mapRef.current = map
             const bounds = getMapBounds()
-            if (bounds) {
+            if (bounds && !isPlaying) {
               map.fitBounds(bounds)
             }
           }}
@@ -635,25 +845,72 @@ export function FlightDetailPage() {
             <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Altitude Profile
             </h3>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Maximum</span>
-                <span className="font-medium text-gray-900 dark:text-white">
-                  {flight.max_altitude_feet} ft
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Average</span>
-                <span className="font-medium text-gray-900 dark:text-white">
-                  {flight.avg_altitude_feet} ft
-                </span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600 dark:text-gray-400">Minimum</span>
-                <span className="font-medium text-gray-900 dark:text-white">
-                  {flight.min_altitude_feet} ft
-                </span>
-              </div>
+            <div className="space-y-3">
+              {/* MSL Altitudes if available */}
+              {(flight.max_altitude_feet !== null || flight.avg_altitude_feet !== null || flight.min_altitude_feet !== null) && (
+                <div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">MSL (Mean Sea Level)</div>
+                  <div className="space-y-1 pl-2">
+                    {flight.max_altitude_feet !== null && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Maximum</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {flight.max_altitude_feet.toLocaleString()} ft
+                        </span>
+                      </div>
+                    )}
+                    {flight.avg_altitude_feet !== null && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Average</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {Math.round(flight.avg_altitude_feet).toLocaleString()} ft
+                        </span>
+                      </div>
+                    )}
+                    {flight.min_altitude_feet !== null && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Minimum</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {flight.min_altitude_feet.toLocaleString()} ft
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* AGL Altitudes if available */}
+              {(flight.max_altitude_agl_feet !== null || flight.avg_altitude_agl_feet !== null || flight.min_altitude_agl_feet !== null) && (
+                <div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">AGL (Above Ground Level)</div>
+                  <div className="space-y-1 pl-2">
+                    {flight.max_altitude_agl_feet !== null && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Maximum</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {flight.max_altitude_agl_feet.toLocaleString()} ft
+                        </span>
+                      </div>
+                    )}
+                    {flight.avg_altitude_agl_feet !== null && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Average</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {Math.round(flight.avg_altitude_agl_feet).toLocaleString()} ft
+                        </span>
+                      </div>
+                    )}
+                    {flight.min_altitude_agl_feet !== null && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-600 dark:text-gray-400">Minimum</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {flight.min_altitude_agl_feet.toLocaleString()} ft
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

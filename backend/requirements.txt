@@ -34,3 +34,4 @@ Brotli==1.1.0
 requests==2.31.0
 tenacity==8.2.3
 FlightRadarAPI==1.4.0
+geoalchemy2==0.14.2

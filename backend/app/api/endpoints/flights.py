@@ -302,7 +302,7 @@ def search_flights(
         # Use a subquery to find flight_log_ids that have positions within the radius
         from sqlalchemy import text
 
-        # PostGIS spatial query to find flights with positions near location
+        # Use PostGIS for accurate and fast spatial queries
         spatial_query = text("""
             SELECT DISTINCT fp.flight_log_id
             FROM flight_positions fp
@@ -394,7 +394,13 @@ def search_flights(
                     fp.latitude,
                     fp.longitude,
                     fp.timestamp,
-                    fp.altitude_feet
+                    fp.altitude_feet,
+                    fp.altitude_agl_feet,
+                    fp.ground_speed_knots,
+                    fp.track_degrees,
+                    fp.vertical_rate,
+                    fp.is_hovering,
+                    fp.hover_duration_seconds
                 FROM flight_positions fp
                 WHERE fp.flight_log_id = :flight_id
                 AND fp.location IS NOT NULL
@@ -414,7 +420,13 @@ def search_flights(
                     "latitude": result.latitude,
                     "longitude": result.longitude,
                     "timestamp": result.timestamp.isoformat(),
-                    "altitude": result.altitude_feet,
+                    "altitude_feet": result.altitude_feet,
+                    "altitude_agl_feet": result.altitude_agl_feet,
+                    "ground_speed_knots": result.ground_speed_knots,
+                    "track_degrees": result.track_degrees,
+                    "vertical_rate": result.vertical_rate,
+                    "is_hovering": result.is_hovering,
+                    "hover_duration_seconds": result.hover_duration_seconds,
                 }
             else:
                 flight_dict["distance_from_search"] = None

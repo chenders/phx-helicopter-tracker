@@ -37,9 +37,6 @@ vi.mock('../pages/DataSourcesPage', () => ({
   DataSourcesPage: () => <div data-testid="data-sources-page">Data Sources Page</div>
 }))
 
-vi.mock('../components/Navbar', () => ({
-  Navbar: () => <nav data-testid="navbar">Navigation</nav>
-}))
 
 const createTestQueryClient = () => new QueryClient({
   defaultOptions: {

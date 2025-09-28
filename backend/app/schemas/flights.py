@@ -29,6 +29,9 @@ class FlightLogBase(BaseModel):
         None, description="Minimum altitude recorded"
     )
     avg_altitude_feet: Optional[int] = Field(None, description="Average altitude")
+    max_altitude_agl_feet: Optional[int] = Field(None, description="Maximum AGL altitude")
+    min_altitude_agl_feet: Optional[int] = Field(None, description="Minimum AGL altitude")
+    avg_altitude_agl_feet: Optional[int] = Field(None, description="Average AGL altitude")
     estimated_cost: Optional[float] = Field(None, description="Estimated flight cost")
     fuel_consumed_gallons: Optional[float] = Field(None, description="Fuel consumed")
     data_source: str = Field(
@@ -77,6 +80,9 @@ class FlightLogUpdate(BaseModel):
     max_altitude_feet: Optional[int] = None
     min_altitude_feet: Optional[int] = None
     avg_altitude_feet: Optional[int] = None
+    max_altitude_agl_feet: Optional[int] = None
+    min_altitude_agl_feet: Optional[int] = None
+    avg_altitude_agl_feet: Optional[int] = None
     estimated_cost: Optional[float] = None
     fuel_consumed_gallons: Optional[float] = None
     data_source: Optional[str] = None
@@ -120,6 +126,8 @@ class FlightPositionBase(BaseModel):
     latitude: float = Field(..., description="Latitude")
     longitude: float = Field(..., description="Longitude")
     altitude_feet: Optional[int] = Field(None, description="Altitude in feet")
+    ground_elevation_feet: Optional[int] = Field(None, description="Ground elevation in feet")
+    altitude_agl_feet: Optional[int] = Field(None, description="Altitude AGL in feet")
     ground_speed_knots: Optional[float] = Field(
         None, description="Ground speed in knots"
     )

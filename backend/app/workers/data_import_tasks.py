@@ -533,7 +533,7 @@ async def _import_fr24_complete_flights_async(
                                 altitude_feet=pos.altitude_feet,
                                 ground_speed_knots=pos.ground_speed_knots,
                                 track_degrees=pos.track_degrees,
-                                vertical_rate_fpm=pos.vertical_speed_fpm,
+                                vertical_rate=pos.vertical_speed_fpm,
                                 data_source="flightradar24_complete",
                             )
                             flight_position_crud.create(db, obj_in=position_data)

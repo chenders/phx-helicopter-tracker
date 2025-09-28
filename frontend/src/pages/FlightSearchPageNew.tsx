@@ -39,7 +39,7 @@ interface SearchFilters {
     lat: number
     lng: number
   }
-  search_radius: number
+  search_radius: number // in miles
 }
 
 const defaultCenter = {
@@ -172,7 +172,7 @@ export function FlightSearchPageNew() {
     return {
       start_time: getLocalDateTimeString(oneHourAgo),
       end_time: getLocalDateTimeString(now),
-      search_radius: 1000,
+      search_radius: 0.5, // default 0.5 miles
     }
   })
 
@@ -272,7 +272,7 @@ export function FlightSearchPageNew() {
   }, [])
 
   const handleRadiusChange = useCallback((newRadius: number) => {
-    if (newRadius >= 100 && newRadius <= 10000) {
+    if (newRadius >= 0.1 && newRadius <= 5) { // 0.1 to 5 miles
       setFilters(prev => ({ ...prev, search_radius: newRadius }))
 
       if (filters.search_coordinates && mapRef.current) {
@@ -282,7 +282,8 @@ export function FlightSearchPageNew() {
           filters.search_coordinates.lng
         )
 
-        const radiusInDegrees = newRadius / 111320
+        const radiusInMeters = newRadius * 1609.34 // Convert miles to meters
+        const radiusInDegrees = radiusInMeters / 111320
         bounds.extend(new google.maps.LatLng(
           filters.search_coordinates.lat - radiusInDegrees,
           filters.search_coordinates.lng - radiusInDegrees
@@ -341,7 +342,7 @@ export function FlightSearchPageNew() {
       if (filters.search_coordinates) {
         params.latitude = filters.search_coordinates.lat
         params.longitude = filters.search_coordinates.lng
-        params.radius = filters.search_radius
+        params.radius = filters.search_radius * 1609.34 // Convert miles to meters for API
       }
 
       const response = await axios.get('/api/v1/flights/search', { params })
@@ -534,15 +535,15 @@ export function FlightSearchPageNew() {
 
           <div className="w-20">
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Radius
+              Radius (mi)
             </label>
             <input
               type="number"
               value={filters.search_radius}
               onChange={(e) => handleRadiusChange(parseFloat(e.target.value))}
-              min="100"
-              max="10000"
-              step="100"
+              min="0.1"
+              max="5"
+              step="0.1"
               className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             />
           </div>
@@ -709,7 +710,7 @@ export function FlightSearchPageNew() {
                           <div className="flex items-center gap-1.5">
                             <MapPin className="h-4 w-4 text-gray-500" />
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                              {(flight.distance_from_search / 1000).toFixed(1)} km from search
+                              {(flight.distance_from_search * 0.000621371).toFixed(2)} mi from search
                             </span>
                           </div>
                         )}
@@ -730,12 +731,38 @@ export function FlightSearchPageNew() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          // Pass search context to detail page
+                          // Pass search context and closest position details to detail page
                           const params = new URLSearchParams()
                           if (filters.search_coordinates) {
                             params.set('searchLat', filters.search_coordinates.lat.toString())
                             params.set('searchLng', filters.search_coordinates.lng.toString())
-                            params.set('searchRadius', filters.search_radius.toString())
+                            params.set('searchRadius', (filters.search_radius * 1609.34).toString()) // Store in meters for consistency
+
+                            // Add closest position details if available
+                            if (flight.distance_from_search !== null) {
+                              params.set('closestDistance', flight.distance_from_search.toString())
+                            }
+                            if (flight.closest_position) {
+                              params.set('closestTime', flight.closest_position.timestamp)
+                              if (flight.closest_position.ground_speed_knots !== null) {
+                                params.set('closestSpeed', flight.closest_position.ground_speed_knots.toString())
+                              }
+                              if (flight.closest_position.altitude_feet !== null) {
+                                params.set('closestAltitude', flight.closest_position.altitude_feet.toString())
+                              }
+                              if (flight.closest_position.altitude_agl_feet !== null) {
+                                params.set('closestAltitudeAGL', flight.closest_position.altitude_agl_feet.toString())
+                              }
+                              if (flight.closest_position.track_degrees !== null) {
+                                params.set('closestBearing', flight.closest_position.track_degrees.toString())
+                              }
+                              if (flight.closest_position.is_hovering) {
+                                params.set('isHovering', 'true')
+                                if (flight.closest_position.hover_duration_seconds) {
+                                  params.set('hoverDuration', flight.closest_position.hover_duration_seconds.toString())
+                                }
+                              }
+                            }
                           }
                           navigate(`/flight/${flight.id}?${params.toString()}`)
                         }}
@@ -815,7 +842,7 @@ export function FlightSearchPageNew() {
                 />
                 <Circle
                   center={filters.search_coordinates}
-                  radius={filters.search_radius}
+                  radius={filters.search_radius * 1609.34} // Convert to meters for map display
                   options={{
                     fillColor: '#3B82F6',
                     fillOpacity: 0.2,

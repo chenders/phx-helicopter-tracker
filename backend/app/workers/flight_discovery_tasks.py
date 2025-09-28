@@ -14,6 +14,7 @@ from app.models.flight_logs import FlightLog, FlightPosition
 from app.models.aircraft import Aircraft
 from app.services.flightradar24_api_service import fr24_api_service
 from app.schemas.flights import FlightLogCreate, FlightPositionCreate
+from app.services.elevation_service import elevation_service
 from app.crud.flights import flight_log_crud, flight_position_crud
 from app.crud.aircraft import aircraft_crud
 
@@ -495,32 +496,63 @@ async def _download_tracks_async(batch_size: int) -> Dict[str, Any]:
                     existing_log = db.query(FlightLog).filter(
                         FlightLog.flight_id == f"fr24_complete_{flight.fr24_id}"
                     ).first()
-                    
+
                     if existing_log:
-                        logger.info(f"Flight {flight.fr24_id} already exists, skipping")
-                        flight.track_downloaded = True
-                        flight.positions_count = len(positions)
-                        db.commit()
-                        continue
-                    
-                    # Create flight log
-                    flight_log = flight_log_crud.create(
-                        db,
-                        obj_in=FlightLogCreate(
-                            aircraft_id=aircraft.id,
-                            flight_id=f"fr24_complete_{flight.fr24_id}",
-                            callsign=flight.callsign or flight.registration,
-                            departure_time=flight.departure_time or positions[0].timestamp,
-                            arrival_time=flight.arrival_time or positions[-1].timestamp,
-                            flight_duration_minutes=flight.flight_duration_minutes,
-                            departure_airport=flight.origin_airport,
-                            arrival_airport=flight.destination_airport,
-                            data_source="flightradar24_complete"
+                        # Check if positions already exist for this flight
+                        existing_positions_count = db.query(FlightPosition).filter(
+                            FlightPosition.flight_log_id == existing_log.id
+                        ).count()
+
+                        if existing_positions_count > 0:
+                            logger.info(f"Flight {flight.fr24_id} already has {existing_positions_count} positions, skipping")
+                            flight.track_downloaded = True
+                            flight.positions_count = existing_positions_count
+                            db.commit()
+                            continue
+                        else:
+                            logger.info(f"Flight {flight.fr24_id} exists but has no positions, will add them")
+                            flight_log = existing_log
+                    else:
+                        # Create flight log only if it doesn't exist
+                        flight_log = flight_log_crud.create(
+                            db,
+                            obj_in=FlightLogCreate(
+                                aircraft_id=aircraft.id,
+                                flight_id=f"fr24_complete_{flight.fr24_id}",
+                                callsign=flight.callsign or flight.registration,
+                                departure_time=flight.departure_time or positions[0].timestamp,
+                                arrival_time=flight.arrival_time or positions[-1].timestamp,
+                                flight_duration_minutes=flight.flight_duration_minutes,
+                                departure_airport=flight.origin_airport,
+                                arrival_airport=flight.destination_airport,
+                                data_source="flightradar24_complete"
+                            )
                         )
-                    )
                     
+                    # Get elevations for all positions in batch for efficiency
+                    coordinates = [(pos.latitude, pos.longitude) for pos in positions]
+
+                    # Initialize elevation service and get elevations
+                    await elevation_service.initialize()
+                    elevations = await elevation_service.get_elevations_batch(coordinates)
+
+                    # Variables to track AGL stats
+                    agl_altitudes = []
+
                     # Save all positions
                     for pos in positions:
+                        # Get elevation for this position
+                        ground_elevation = elevations.get((pos.latitude, pos.longitude))
+
+                        # Calculate AGL if we have both MSL altitude and ground elevation
+                        altitude_agl = None
+                        if pos.altitude_feet is not None and ground_elevation is not None:
+                            altitude_agl = elevation_service.calculate_agl(
+                                pos.altitude_feet, ground_elevation
+                            )
+                            if altitude_agl is not None:
+                                agl_altitudes.append(altitude_agl)
+
                         position_data = FlightPositionCreate(
                             flight_log_id=flight_log.id,
                             aircraft_id=aircraft.id,
@@ -528,12 +560,21 @@ async def _download_tracks_async(batch_size: int) -> Dict[str, Any]:
                             latitude=pos.latitude,
                             longitude=pos.longitude,
                             altitude_feet=pos.altitude_feet,
+                            ground_elevation_feet=ground_elevation,
+                            altitude_agl_feet=altitude_agl,
                             ground_speed_knots=pos.ground_speed_knots,
                             track_degrees=pos.track_degrees,
-                            vertical_rate_fpm=pos.vertical_speed_fpm,
+                            vertical_rate=pos.vertical_speed_fpm,
                             data_source="flightradar24_complete",
                         )
                         flight_position_crud.create(db, obj_in=position_data)
+
+                    # Update flight log with AGL statistics if we have them
+                    if agl_altitudes:
+                        flight_log.max_altitude_agl_feet = max(agl_altitudes)
+                        flight_log.min_altitude_agl_feet = min(agl_altitudes)
+                        flight_log.avg_altitude_agl_feet = int(sum(agl_altitudes) / len(agl_altitudes))
+                        db.commit()
                     
                     # Update discovery record
                     flight.track_downloaded = True

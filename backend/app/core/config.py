@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     # Application settings
     DEBUG: bool = True
     SECRET_KEY: str = "change_this_in_production"
+    LOG_LEVEL: str = "INFO"
 
     # Broadcastify
     BROADCASTIFY_USERNAME: Optional[str] = "chris@waitingforthefuture.org"

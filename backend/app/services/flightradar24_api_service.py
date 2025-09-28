@@ -22,7 +22,12 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from app.core.config import settings
 from app.services.fr24_rate_limiter import fr24_rate_limiter
 
-logger = logging.getLogger(__name__)
+from app.core.logging_config import get_logger, log_with_context
+from app.services.db_logger import DatabaseLogger
+from app.models.system_logs import LogCategory
+
+logger = get_logger(__name__)
+db_logger = DatabaseLogger("fr24_api_service")
 
 
 class FR24Environment(Enum):
