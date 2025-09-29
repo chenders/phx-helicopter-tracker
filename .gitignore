@@ -30,3 +30,6 @@ Claude.MD
 .claude
 
 data/opendata
+
+# Files marked for deletion
+to_be_deleted/
