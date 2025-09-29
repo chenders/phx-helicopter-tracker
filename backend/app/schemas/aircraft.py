@@ -17,13 +17,13 @@ class AircraftBase(BaseModel):
     unit_designation: Optional[str] = Field(
         None, description="Unit designation (e.g., Air15)"
     )
-    has_flir: bool = Field(default=False, description="Has FLIR camera")
-    has_spotlight: bool = Field(default=False, description="Has searchlight")
-    has_loudspeaker: bool = Field(default=False, description="Has loudspeaker")
+    has_flir: Optional[bool] = Field(default=False, description="Has FLIR camera")
+    has_spotlight: Optional[bool] = Field(default=False, description="Has searchlight")
+    has_loudspeaker: Optional[bool] = Field(default=False, description="Has loudspeaker")
     max_flight_time_minutes: Optional[int] = Field(
         None, description="Maximum flight time"
     )
-    hourly_operating_cost: float = Field(
+    hourly_operating_cost: Optional[float] = Field(
         default=2160.0, description="Operating cost per hour"
     )
     purchase_cost: Optional[float] = Field(None, description="Purchase cost")

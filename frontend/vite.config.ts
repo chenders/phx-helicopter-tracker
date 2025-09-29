@@ -15,8 +15,7 @@ export default defineConfig({
     port: 3000,
     // Configure HMR for Docker environment
     hmr: {
-      host: 'localhost',
-      port: 3000
+      path: '/hmr'
     },
     // Proxy API requests to backend during development
     proxy: {

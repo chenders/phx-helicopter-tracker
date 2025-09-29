@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     PHOENIX_LON_MIN: float = -112.4
     PHOENIX_LON_MAX: float = -111.6
 
+    # Default search address for frontend
+    MAIN_SEARCH_ADDRESS: Optional[str] = None
+
     # Tracking settings
     TRACKING_INTERVAL_SECONDS: int = 30
     DATA_RETENTION_DAYS: int = 365

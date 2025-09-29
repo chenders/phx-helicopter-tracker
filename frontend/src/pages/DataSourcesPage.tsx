@@ -18,9 +18,9 @@ export function DataSourcesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-id="data-sources-container">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6" data-id="data-sources-header">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Data Sources & Integration</h1>
         <p className="text-gray-600 dark:text-gray-300 mb-4">
           Comprehensive data collection from multiple sources including real-time ADS-B tracking, 
@@ -38,7 +38,7 @@ export function DataSourcesPage() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm" data-id="data-sources-tabs">
         <div className="border-b border-gray-200 dark:border-gray-600">
           <nav className="flex space-x-8 p-6">
             <button
@@ -48,6 +48,7 @@ export function DataSourcesPage() {
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
+              data-id="tab-sources"
             >
               Data Sources
             </button>
@@ -58,6 +59,7 @@ export function DataSourcesPage() {
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
+              data-id="tab-records"
             >
               Public Records
             </button>
@@ -68,6 +70,7 @@ export function DataSourcesPage() {
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
+              data-id="tab-integration"
             >
               Data Integration
             </button>
@@ -76,7 +79,7 @@ export function DataSourcesPage() {
 
         {/* Data Sources Tab */}
         {activeTab === 'sources' && (
-          <div className="p-6">
+          <div className="p-6" data-id="tab-content-sources">
             <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Active Data Sources</h2>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -97,10 +100,10 @@ export function DataSourcesPage() {
                     when Phoenix PD helicopters are actively flying.
                   </p>
                   <div className="text-sm text-gray-900 dark:text-gray-300">
-                    <div>Aircraft tracked: N624FB, N623PD, N625FB, N626FB, N627FB</div>
+                    <div>Aircraft tracked: N621FB, N623FB, N624FB, N625FB (active fleet)</div>
                     <div>Update frequency: 5 seconds (when active)</div>
                     <div>Coverage: Worldwide with ADS-B coverage</div>
-                    <div>Monthly credits: 60,000 allocated</div>
+                    <div>Monthly credits: 666,000 (Essential Account)</div>
                   </div>
                 </div>
 
@@ -112,18 +115,18 @@ export function DataSourcesPage() {
                 
                 <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4">
                   <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-medium text-gray-900 dark:text-white">FlightRadar24 Gold Subscription</h4>
+                    <h4 className="font-medium text-gray-900 dark:text-white">FlightRadar24 Essential Account</h4>
                     <div className="flex items-center">
                       <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                       <span className="text-sm text-green-600">Active</span>
                     </div>
                   </div>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    Gold subscription providing up to 1 year of historical flight data. 
+                    Essential Account providing up to 2 years of historical flight data.
                     Download flight paths in CSV and KML formats for evidence collection.
                   </p>
                   <div className="text-sm text-gray-900 dark:text-gray-300">
-                    <div>Historical range: 365 days</div>
+                    <div>Historical range: 730 days (2 years)</div>
                     <div>Export formats: CSV, KML</div>
                     <div>Data points: Position, altitude, speed, heading, timestamps</div>
                     <div>Files imported: 21 flights</div>
@@ -156,17 +159,17 @@ export function DataSourcesPage() {
               <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-white">System Capabilities</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-lg p-4">
-                  <div className="text-2xl font-bold text-green-600">5</div>
-                  <div className="text-sm text-green-700 dark:text-green-300">Phoenix PD Helicopters Tracked</div>
+                  <div className="text-2xl font-bold text-green-600">4</div>
+                  <div className="text-sm text-green-700 dark:text-green-300">Active Phoenix PD Helicopters</div>
                 </div>
                 
                 <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-                  <div className="text-2xl font-bold text-blue-600">365</div>
+                  <div className="text-2xl font-bold text-blue-600">730</div>
                   <div className="text-sm text-blue-700 dark:text-blue-300">Days of Historical Data Available</div>
                 </div>
                 
                 <div className="bg-purple-50 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
-                  <div className="text-2xl font-bold text-purple-600">60k</div>
+                  <div className="text-2xl font-bold text-purple-600">666k</div>
                   <div className="text-sm text-purple-700 dark:text-purple-300">Monthly API Credits</div>
                 </div>
               </div>
@@ -176,7 +179,7 @@ export function DataSourcesPage() {
 
         {/* Public Records Tab */}
         {activeTab === 'records' && (
-          <div className="p-6">
+          <div className="p-6" data-id="tab-content-records">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Public Records Requests</h2>
               <button
@@ -320,7 +323,7 @@ export function DataSourcesPage() {
 
         {/* Data Integration Tab */}
         {activeTab === 'integration' && (
-          <div className="p-6">
+          <div className="p-6" data-id="tab-content-integration">
             <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Data Integration & Analysis</h2>
             
             <div className="space-y-6">
@@ -378,7 +381,7 @@ export function DataSourcesPage() {
                     <div className="text-sm text-gray-600 dark:text-gray-400 mb-4">Raw Data Sources</div>
                     <div className="flex justify-center space-x-4 mb-6">
                       <div className="bg-blue-100 dark:bg-blue-900/30 px-3 py-2 rounded text-sm text-gray-900 dark:text-white">FlightRadar24 API</div>
-                      <div className="bg-blue-100 dark:bg-blue-900/30 px-3 py-2 rounded text-sm text-gray-900 dark:text-white">FR24 Gold Downloads</div>
+                      <div className="bg-blue-100 dark:bg-blue-900/30 px-3 py-2 rounded text-sm text-gray-900 dark:text-white">FR24 Essential Downloads</div>
                       <div className="bg-blue-100 dark:bg-blue-900/30 px-3 py-2 rounded text-sm text-gray-900 dark:text-white">Public Records</div>
                     </div>
                     <div className="text-2xl mb-4">⬇️</div>

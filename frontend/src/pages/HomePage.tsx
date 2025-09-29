@@ -6,26 +6,34 @@ import { formatRelativeTime, formatLocalTime } from '../utils/dateUtils'
 
 interface DashboardStats {
   active_flights: number
-  surveillance_events_today: number
+  surveillance_incidents_today?: number  // This is what the backend returns
+  surveillance_events_today?: number      // Keeping for backward compatibility
   total_cost_today: number
   pattern_alerts: number
 }
 
 export function HomePage() {
   const { data: realtimeFlights } = useRealtimeFlights()
-  const { data: stats } = useStats()
-  
-  const dashboardStats: DashboardStats = stats || {
-    active_flights: 0,
-    surveillance_events_today: 0,
-    total_cost_today: 0,
-    pattern_alerts: 0
+  const { data: stats, isError, error } = useStats()
+
+  // Always provide default values to prevent disappearing numbers
+  const dashboardStats: DashboardStats = {
+    active_flights: stats?.active_flights ?? 0,
+    surveillance_incidents_today: stats?.surveillance_incidents_today ?? 0,
+    surveillance_events_today: stats?.surveillance_events_today ?? 0,
+    total_cost_today: stats?.total_cost_today ?? 0,
+    pattern_alerts: stats?.pattern_alerts ?? 0
+  }
+
+  // Log errors for debugging
+  if (isError) {
+    console.error('Dashboard stats error:', error)
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8" data-id="homepage-container">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6" data-id="homepage-header">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
           Phoenix PD Helicopter Surveillance Tracker
         </h1>
@@ -45,32 +53,34 @@ export function HomePage() {
       </div>
 
       {/* Real-time Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" data-id="homepage-stats-grid">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6" data-id="stat-active-flights">
           <div className="flex items-center">
             <div className="text-3xl mr-4">🚁</div>
             <div>
-              <p className="text-2xl font-bold text-blue-600">{dashboardStats.active_flights}</p>
+              <p className="text-2xl font-bold text-blue-600" data-id="active-flights-value">{dashboardStats.active_flights}</p>
               <p className="text-sm text-gray-600 dark:text-gray-300">Active Flights</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6" data-id="stat-surveillance-events">
           <div className="flex items-center">
             <div className="text-3xl mr-4">👁️</div>
             <div>
-              <p className="text-2xl font-bold text-orange-600">{dashboardStats.surveillance_events_today}</p>
+              <p className="text-2xl font-bold text-orange-600" data-id="surveillance-events-value">
+                {dashboardStats.surveillance_incidents_today ?? dashboardStats.surveillance_events_today ?? 0}
+              </p>
               <p className="text-sm text-gray-600 dark:text-gray-300">Surveillance Events Today</p>
             </div>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6" data-id="stat-taxpayer-cost">
           <div className="flex items-center">
             <div className="text-3xl mr-4">💰</div>
             <div>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-2xl font-bold text-green-600" data-id="taxpayer-cost-value">
                 ${(dashboardStats.total_cost_today || 0).toLocaleString()}
               </p>
               <p className="text-sm text-gray-600 dark:text-gray-300">Taxpayer Cost Today</p>
@@ -78,11 +88,11 @@ export function HomePage() {
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6" data-id="stat-pattern-alerts">
           <div className="flex items-center">
             <div className="text-3xl mr-4">🚨</div>
             <div>
-              <p className="text-2xl font-bold text-red-600">{dashboardStats.pattern_alerts}</p>
+              <p className="text-2xl font-bold text-red-600" data-id="pattern-alerts-value">{dashboardStats.pattern_alerts}</p>
               <p className="text-sm text-gray-600 dark:text-gray-300">Pattern Alerts</p>
             </div>
           </div>
@@ -90,7 +100,7 @@ export function HomePage() {
       </div>
 
       {/* Current Activity */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6" data-id="current-activity-section">
         <h2 className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">Current Phoenix PD Aircraft Activity</h2>
         {realtimeFlights && realtimeFlights.length > 0 ? (
           <div className="space-y-4">
@@ -126,10 +136,11 @@ export function HomePage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-id="quick-actions-grid">
         <Link
           to="/live"
           className="block bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-900 hover:border-blue-400 dark:hover:border-blue-700 rounded-lg p-6 transition-all shadow-sm hover:shadow-md"
+          data-id="quick-action-live-tracking"
         >
           <div className="flex items-center mb-4">
             <div className="text-3xl mr-3">📡</div>
@@ -143,6 +154,7 @@ export function HomePage() {
         <Link
           to="/legal"
           className="block bg-white dark:bg-gray-800 border border-green-200 dark:border-green-900 hover:border-green-400 dark:hover:border-green-700 rounded-lg p-6 transition-all shadow-sm hover:shadow-md"
+          data-id="quick-action-legal-documents"
         >
           <div className="flex items-center mb-4">
             <div className="text-3xl mr-3">⚖️</div>
@@ -156,6 +168,7 @@ export function HomePage() {
         <Link
           to="/patterns"
           className="block bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-900 hover:border-purple-400 dark:hover:border-purple-700 rounded-lg p-6 transition-all shadow-sm hover:shadow-md"
+          data-id="quick-action-pattern-analysis"
         >
           <div className="flex items-center mb-4">
             <div className="text-3xl mr-3">📊</div>
@@ -169,6 +182,7 @@ export function HomePage() {
         <Link
           to="/costs"
           className="block bg-white dark:bg-gray-800 border border-yellow-200 dark:border-yellow-900 hover:border-yellow-400 dark:hover:border-yellow-700 rounded-lg p-6 transition-all shadow-sm hover:shadow-md"
+          data-id="quick-action-cost-analysis"
         >
           <div className="flex items-center mb-4">
             <div className="text-3xl mr-3">💸</div>
@@ -182,6 +196,7 @@ export function HomePage() {
         <Link
           to="/historical"
           className="block bg-white dark:bg-gray-800 border border-indigo-200 dark:border-indigo-900 hover:border-indigo-400 dark:hover:border-indigo-700 rounded-lg p-6 transition-all shadow-sm hover:shadow-md"
+          data-id="quick-action-historical-data"
         >
           <div className="flex items-center mb-4">
             <div className="text-3xl mr-3">📈</div>
@@ -191,10 +206,24 @@ export function HomePage() {
             Analyze past surveillance patterns and build comprehensive case evidence
           </p>
         </Link>
+
+        <Link
+          to="/search"
+          className="block bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900 hover:border-red-400 dark:hover:border-red-700 rounded-lg p-6 transition-all shadow-sm hover:shadow-md"
+          data-id="quick-action-flight-search"
+        >
+          <div className="flex items-center mb-4">
+            <div className="text-3xl mr-3">🔎</div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Flight Search</h3>
+          </div>
+          <p className="text-gray-600 dark:text-gray-300 text-sm">
+            Search and filter flight history by date, location, and surveillance patterns
+          </p>
+        </Link>
       </div>
 
       {/* Key Features & Capabilities */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6" data-id="system-capabilities-section">
         <h2 className="text-xl font-semibold mb-4">System Capabilities</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="flex items-start">

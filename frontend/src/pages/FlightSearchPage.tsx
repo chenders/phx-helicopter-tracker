@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { GoogleMap, MarkerF, Circle, Polyline, Autocomplete } from '@react-google-maps/api'
-import { Search, Calendar, MapPin, Plane, Clock, Radio, ChevronRight, Play, Pause, Volume2 } from 'lucide-react'
+import { Search, Calendar, MapPin, Plane, Clock, Radio, ChevronRight, Play, Pause, Volume2, ArrowUpDown, Users } from 'lucide-react'
 import axios from '@/lib/axios'
 import { useNavigate } from 'react-router-dom'
 import { formatLocalTime } from '../utils/dateUtils'
@@ -8,6 +8,7 @@ import { formatLocalTime } from '../utils/dateUtils'
 interface FlightResult {
   id: number
   aircraft_id: string
+  flight_id?: string
   registration: string
   callsign: string
   departure_time: string
@@ -18,13 +19,15 @@ interface FlightResult {
   positions_count: number
   hover_locations: any[]
   surveillance_score: number
-  distance_from_search: number // Distance in meters from search location
+  distance_from_search: number
   closest_position: {
     latitude: number
     longitude: number
     timestamp: string
     altitude: number
   }
+  grouped_count?: number
+  grouped_flights?: FlightResult[]
 }
 
 interface SearchFilters {
@@ -39,17 +42,20 @@ interface SearchFilters {
   search_radius: number // in miles
 }
 
-const mapContainerStyle = {
-  width: '100%',
-  height: '400px',
-}
-
 const defaultCenter = {
   lat: 33.4484,
-  lng: -112.0740, // Phoenix
+  lng: -112.0740,
 }
 
-// Dark mode map styles - matching other pages
+// Phoenix area bounds for autocomplete
+const phoenixBounds = {
+  north: 33.920,
+  south: 33.290,
+  east: -111.550,
+  west: -112.400,
+}
+
+// Map theme
 const darkMapStyles = [
   { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
@@ -121,16 +127,14 @@ const darkMapStyles = [
   },
 ]
 
-// Helper function to get local timezone or Mountain Time as fallback
 const getLocalTimezone = () => {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone
   } catch {
-    return 'America/Phoenix' // Mountain Time (Phoenix doesn't observe DST)
+    return 'America/Phoenix'
   }
 }
 
-// Helper to format datetime-local input value in local timezone
 const getLocalDateTimeString = (date: Date) => {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -144,15 +148,31 @@ export function FlightSearchPage() {
   const navigate = useNavigate()
   const [timezone] = useState(getLocalTimezone())
 
-  // Initialize with local times
+  // Load saved filters from session storage
   const [filters, setFilters] = useState<SearchFilters>(() => {
+    const savedFilters = sessionStorage.getItem('flightSearchFilters')
+    if (savedFilters) {
+      try {
+        const parsed = JSON.parse(savedFilters)
+        // Restore the search coordinates if they exist
+        if (parsed.search_coordinates) {
+          setTimeout(() => {
+            setMapCenter(parsed.search_coordinates)
+          }, 100)
+        }
+        return parsed
+      } catch (e) {
+        console.error('Error loading saved filters:', e)
+      }
+    }
+
+    // Default values if no saved filters
     const now = new Date()
     const oneHourAgo = new Date(Date.now() - 3600000)
-
     return {
       start_time: getLocalDateTimeString(oneHourAgo),
       end_time: getLocalDateTimeString(now),
-      search_radius: 0.6, // 0.6 miles default
+      search_radius: 0.5, // default 0.5 miles
     }
   })
 
@@ -160,617 +180,748 @@ export function FlightSearchPage() {
   const [selectedFlight, setSelectedFlight] = useState<FlightResult | null>(null)
   const [flightPath, setFlightPath] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
-  const [mapCenter, setMapCenter] = useState(defaultCenter)
-  const [addressInput, setAddressInput] = useState('')
+  const [mapCenter, setMapCenter] = useState(filters.search_coordinates || defaultCenter)
+  const [addressInput, setAddressInput] = useState(() => {
+    return sessionStorage.getItem('flightSearchAddress') || import.meta.env.VITE_MAIN_SEARCH_ADDRESS || ''
+  })
   const [aircraftList, setAircraftList] = useState<string[]>([])
   const [radioFiles, setRadioFiles] = useState<any[]>([])
   const [playingAudio, setPlayingAudio] = useState<string | null>(null)
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'registration'>('date-desc')
+  const [groupByFlightId, setGroupByFlightId] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
 
-  // Fetch aircraft list on mount
+  // Fetch aircraft list on mount and setup dark theme for autocomplete
   useEffect(() => {
-    fetchAircraftList()
-  }, [])
+    const fetchAircraft = async () => {
+      try {
+        const response = await axios.get('/api/v1/aircraft/')
+        setAircraftList(response.data.aircraft.map((a: any) => a.registration))
+      } catch (error) {
+        console.error('Error fetching aircraft:', error)
+      }
+    }
+    fetchAircraft()
 
-  // Auto-adjust map view when search location or radius changes
-  useEffect(() => {
-    if (mapRef.current && filters.search_coordinates) {
-      const bounds = new window.google.maps.LatLngBounds()
-      const center = new window.google.maps.LatLng(
-        filters.search_coordinates.lat,
-        filters.search_coordinates.lng
+    // If there's a default address from env and no saved session address, geocode it
+    if (import.meta.env.VITE_MAIN_SEARCH_ADDRESS && !sessionStorage.getItem('flightSearchAddress') && window.google) {
+      const geocoder = new window.google.maps.Geocoder()
+      geocoder.geocode(
+        { address: import.meta.env.VITE_MAIN_SEARCH_ADDRESS },
+        (results, status) => {
+          if (status === 'OK' && results && results[0]) {
+            const location = results[0].geometry.location
+            const coords = {
+              lat: location.lat(),
+              lng: location.lng()
+            }
+            setFilters(prev => ({
+              ...prev,
+              search_coordinates: coords,
+              search_address: results[0].formatted_address
+            }))
+            setMapCenter(coords)
+          }
+        }
       )
+    }
 
-      // Calculate bounds based on radius
-      const radiusInMeters = filters.search_radius * 1609.34 // Convert miles to meters
-      const radiusInDegrees = radiusInMeters / 111320 // Convert meters to degrees (approximate)
-
-      bounds.extend({
-        lat: filters.search_coordinates.lat - radiusInDegrees,
-        lng: filters.search_coordinates.lng - radiusInDegrees
-      })
-      bounds.extend({
-        lat: filters.search_coordinates.lat + radiusInDegrees,
-        lng: filters.search_coordinates.lng + radiusInDegrees
-      })
-
-      mapRef.current.fitBounds(bounds)
-
-      // Adjust zoom based on radius (in miles)
-      // Smaller radius = higher zoom
-      if (filters.search_radius <= 0.3) {
-        mapRef.current.setZoom(16)
-      } else if (filters.search_radius <= 0.6) {
-        mapRef.current.setZoom(15)
-      } else if (filters.search_radius <= 1.2) {
-        mapRef.current.setZoom(14)
-      } else if (filters.search_radius <= 2) {
-        mapRef.current.setZoom(13)
-      } else {
-        mapRef.current.setZoom(12)
+    // Add dark theme styles for Google autocomplete
+    const style = document.createElement('style')
+    style.innerHTML = `
+      /* Dark theme for Google Autocomplete dropdown */
+      .dark .pac-container {
+        background-color: rgb(31, 41, 55) !important;
+        border: 1px solid rgb(75, 85, 99) !important;
+        border-top: none !important;
+        font-family: inherit !important;
       }
 
-      mapRef.current.setCenter(center)
-    }
-  }, [filters.search_coordinates, filters.search_radius])
+      .dark .pac-item {
+        background-color: rgb(31, 41, 55) !important;
+        color: rgb(243, 244, 246) !important;
+        border-top: 1px solid rgb(55, 65, 81) !important;
+        padding: 8px 12px !important;
+        cursor: pointer !important;
+      }
 
-  const fetchAircraftList = async () => {
-    try {
-      const response = await axios.get('/api/v1/aircraft')
-      const phoenixAircraft = response.data
-        .filter((a: any) => a.is_phoenix_pd)
-        .map((a: any) => a.registration)
-      setAircraftList(phoenixAircraft)
-    } catch (error) {
-      console.error('Failed to fetch aircraft:', error)
+      .dark .pac-item:hover {
+        background-color: rgb(55, 65, 81) !important;
+      }
+
+      .dark .pac-item-selected,
+      .dark .pac-item-selected:hover {
+        background-color: rgb(59, 130, 246) !important;
+        color: white !important;
+      }
+
+      .dark .pac-matched {
+        color: rgb(96, 165, 250) !important;
+        font-weight: bold !important;
+      }
+
+      .dark .pac-item-query {
+        color: rgb(209, 213, 219) !important;
+      }
+
+      .dark .pac-icon {
+        filter: brightness(0.8) !important;
+      }
+    `
+    document.head.appendChild(style)
+
+    return () => {
+      document.head.removeChild(style)
     }
-  }
+  }, [])
+
+  const handleMapClick = useCallback((event: google.maps.MapMouseEvent) => {
+    if (event.latLng) {
+      const coords = {
+        lat: event.latLng.lat(),
+        lng: event.latLng.lng()
+      }
+      const coordString = `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`
+      setFilters(prev => ({
+        ...prev,
+        search_coordinates: coords,
+        search_address: coordString
+      }))
+      setAddressInput(coordString) // Update the input field with coordinates
+      setMapCenter(coords)
+    }
+  }, [])
+
+  const handleRadiusChange = useCallback((newRadius: number) => {
+    if (newRadius >= 0.1 && newRadius <= 5) { // 0.1 to 5 miles
+      setFilters(prev => ({ ...prev, search_radius: newRadius }))
+
+      if (filters.search_coordinates && mapRef.current) {
+        const bounds = new google.maps.LatLngBounds()
+        const center = new google.maps.LatLng(
+          filters.search_coordinates.lat,
+          filters.search_coordinates.lng
+        )
+
+        const radiusInMeters = newRadius * 1609.34 // Convert miles to meters
+        const radiusInDegrees = radiusInMeters / 111320
+        bounds.extend(new google.maps.LatLng(
+          filters.search_coordinates.lat - radiusInDegrees,
+          filters.search_coordinates.lng - radiusInDegrees
+        ))
+        bounds.extend(new google.maps.LatLng(
+          filters.search_coordinates.lat + radiusInDegrees,
+          filters.search_coordinates.lng + radiusInDegrees
+        ))
+
+        mapRef.current.fitBounds(bounds)
+      }
+    }
+  }, [filters.search_coordinates])
 
   const onPlaceSelected = useCallback(() => {
     if (autocompleteRef.current) {
       const place = autocompleteRef.current.getPlace()
-
       if (place.geometry?.location) {
         const coords = {
           lat: place.geometry.location.lat(),
           lng: place.geometry.location.lng()
         }
+        const address = place.formatted_address || place.name || ''
+
         setFilters(prev => ({
           ...prev,
           search_coordinates: coords,
-          search_address: place.formatted_address || place.name || ''
+          search_address: address
         }))
+        setAddressInput(address) // Auto-fill the input field
         setMapCenter(coords)
-        setAddressInput(place.formatted_address || place.name || '')
+
+        if (mapRef.current) {
+          mapRef.current.setCenter(coords)
+          mapRef.current.setZoom(14)
+        }
       }
     }
   }, [])
 
-  const onAutocompleteLoad = useCallback((autocomplete: google.maps.places.Autocomplete) => {
-    autocompleteRef.current = autocomplete
-
-    // Set options to bias toward Phoenix area
-    autocomplete.setOptions({
-      bounds: new window.google.maps.LatLngBounds(
-        new window.google.maps.LatLng(33.2, -112.4), // SW Phoenix area
-        new window.google.maps.LatLng(33.7, -111.7)  // NE Phoenix area
-      ),
-      componentRestrictions: { country: 'us' },
-      fields: ['geometry', 'formatted_address', 'name']
-    })
-  }, [])
-
-  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    if (e.latLng) {
-      const coords = {
-        lat: e.latLng.lat(),
-        lng: e.latLng.lng()
-      }
-      setFilters(prev => ({ ...prev, search_coordinates: coords }))
-    }
-  }, [])
-
-  const searchFlights = async () => {
+  const handleSearch = async () => {
     setLoading(true)
     try {
-      // Convert local datetime strings to ISO format for API
-      const startDate = new Date(filters.start_time)
-      const endDate = new Date(filters.end_time)
+      const startTime = new Date(filters.start_time).toISOString()
+      const endTime = new Date(filters.end_time).toISOString()
 
-      const params = {
-        start_time: startDate.toISOString(),
-        end_time: endDate.toISOString(),
-        ...(filters.aircraft_registration && { aircraft_registration: filters.aircraft_registration }),
-        ...(filters.search_coordinates && {
-          latitude: filters.search_coordinates.lat,
-          longitude: filters.search_coordinates.lng,
-          radius: filters.search_radius * 1609.34, // Convert miles to meters for API
-        }),
+      const params: any = {
+        start_time: startTime,
+        end_time: endTime,
+      }
+
+      if (filters.aircraft_registration) {
+        params.aircraft_registration = filters.aircraft_registration
+      }
+
+      if (filters.search_coordinates) {
+        params.latitude = filters.search_coordinates.lat
+        params.longitude = filters.search_coordinates.lng
+        params.radius = filters.search_radius * 1609.34 // Convert miles to meters for API
       }
 
       const response = await axios.get('/api/v1/flights/search', { params })
       setSearchResults(response.data.flights || [])
 
-      // If location search, sort by distance
-      if (filters.search_coordinates) {
-        setSearchResults(prev => [...prev].sort((a, b) => a.distance_from_search - b.distance_from_search))
+      if (response.data.flights?.length > 0 && filters.search_coordinates) {
+        const firstFlight = response.data.flights[0]
+        if (firstFlight.closest_position) {
+          setMapCenter({
+            lat: firstFlight.closest_position.latitude,
+            lng: firstFlight.closest_position.longitude
+          })
+        }
       }
     } catch (error) {
-      console.error('Search failed:', error)
+      console.error('Search error:', error)
       setSearchResults([])
     } finally {
       setLoading(false)
     }
   }
 
-  const loadFlightDetails = async (flight: FlightResult) => {
-    setSelectedFlight(flight)
-
-    // Load flight path
+  const fetchFlightDetails = async (flight: FlightResult) => {
     try {
       const response = await axios.get(`/api/v1/flights/${flight.id}/positions`)
-      const positions = response.data.map((pos: any) => ({
-        lat: pos.latitude,
-        lng: pos.longitude,
-        altitude: pos.altitude_feet,
-        timestamp: pos.timestamp,
-        is_hovering: pos.is_hovering,
-      }))
-      setFlightPath(positions)
+      if (response.data) {
+        const path = response.data.map((pos: any) => ({
+          lat: pos.latitude,
+          lng: pos.longitude
+        }))
+        setFlightPath(path)
 
-      // Center map on flight path
-      if (positions.length > 0) {
-        const bounds = new window.google.maps.LatLngBounds()
-        positions.forEach((pos: any) => bounds.extend(pos))
-        // We'll handle bounds in the map component
+        if (path.length > 0 && mapRef.current) {
+          const bounds = new google.maps.LatLngBounds()
+          path.forEach(point => bounds.extend(point))
+          mapRef.current.fitBounds(bounds)
+        }
       }
     } catch (error) {
-      console.error('Failed to load flight path:', error)
+      console.error('Error fetching flight details:', error)
+    }
+  }
+
+  useEffect(() => {
+    if (selectedFlight) {
+      fetchFlightDetails(selectedFlight)
+    }
+  }, [selectedFlight])
+
+  // Save filters to session storage whenever they change
+  useEffect(() => {
+    sessionStorage.setItem('flightSearchFilters', JSON.stringify(filters))
+  }, [filters])
+
+  // Save address input to session storage whenever it changes
+  useEffect(() => {
+    sessionStorage.setItem('flightSearchAddress', addressInput)
+  }, [addressInput])
+
+  // Sort and group search results
+  const processedResults = useMemo(() => {
+    let results = [...searchResults]
+
+    // Sort results
+    switch (sortBy) {
+      case 'date-desc':
+        results.sort((a, b) => new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime())
+        break
+      case 'date-asc':
+        results.sort((a, b) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime())
+        break
+      case 'registration':
+        results.sort((a, b) => (a.registration || a.callsign || '').localeCompare(b.registration || b.callsign || ''))
+        break
     }
 
-    // Load radio files for the time period
-    try {
-      const response = await axios.get('/api/v1/radio/archives', {
-        params: {
-          start_time: flight.departure_time,
-          end_time: flight.arrival_time,
+    // Group by flight_id if requested
+    if (groupByFlightId && results.length > 0) {
+      const grouped = new Map<string, FlightResult[]>()
+
+      results.forEach(flight => {
+        const key = flight.flight_id || `single_${flight.id}`
+        if (!grouped.has(key)) {
+          grouped.set(key, [])
+        }
+        grouped.get(key)!.push(flight)
+      })
+
+      // For grouped flights, only show the most recent one from each group
+      results = Array.from(grouped.values()).map(group => {
+        if (group.length === 1) return group[0]
+
+        // Sort group by date and return the most recent
+        const sorted = group.sort((a, b) =>
+          new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime()
+        )
+
+        // Add a count property to indicate how many flights are grouped
+        return {
+          ...sorted[0],
+          grouped_count: group.length,
+          grouped_flights: group
         }
       })
-      setRadioFiles(response.data.archives || [])
-    } catch (error) {
-      console.error('Failed to load radio archives:', error)
-    }
-  }
 
-  const playRadioFile = (filename: string) => {
-    if (playingAudio === filename && audioRef.current) {
-      audioRef.current.pause()
-      setPlayingAudio(null)
-    } else {
-      if (audioRef.current) {
-        audioRef.current.pause()
+      // Re-apply the sort to the grouped results
+      switch (sortBy) {
+        case 'date-desc':
+          results.sort((a, b) => new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime())
+          break
+        case 'date-asc':
+          results.sort((a, b) => new Date(a.departure_time).getTime() - new Date(b.departure_time).getTime())
+          break
+        case 'registration':
+          results.sort((a, b) => (a.registration || a.callsign || '').localeCompare(b.registration || b.callsign || ''))
+          break
       }
-      const audio = new Audio(`/api/v1/radio/archives/${filename}/audio`)
-      audioRef.current = audio
-      audio.play()
-      setPlayingAudio(filename)
-
-      audio.addEventListener('ended', () => {
-        setPlayingAudio(null)
-      })
     }
-  }
 
-  const navigateToFlightDetail = (flightId: number) => {
-    navigate(`/flight/${flightId}`)
-  }
-
-  // Format time for display
-  const formatTimeRange = (start: string, end: string) => {
-    const startDate = new Date(start)
-    const endDate = new Date(end)
-    const duration = (endDate.getTime() - startDate.getTime()) / 60000 // minutes
-
-    return {
-      start: formatLocalTime(start),
-      end: formatLocalTime(end),
-      duration: Math.round(duration)
-    }
-  }
+    return results
+  }, [searchResults, sortBy, groupByFlightId])
 
   return (
-    <div className="space-y-6">
-      {/* Search Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
-          Flight Search
-        </h1>
-
-        {/* Search Filters */}
-        <div className="space-y-4">
-          {/* Date/Time Range */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Start Time
-                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                  ({timezone.includes('America') ? timezone.split('/')[1] : timezone})
-                </span>
-              </label>
-              <input
-                type="datetime-local"
-                value={filters.start_time}
-                onChange={(e) => setFilters(prev => ({ ...prev, start_time: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                End Time
-                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                  ({timezone.includes('America') ? timezone.split('/')[1] : timezone})
-                </span>
-              </label>
-              <input
-                type="datetime-local"
-                value={filters.end_time}
-                onChange={(e) => setFilters(prev => ({ ...prev, end_time: e.target.value }))}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-              />
-            </div>
+    <div className="h-full flex flex-col" data-id="flight-search-container">
+      {/* Compact Search Header */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-3 mb-3" data-id="search-filters-section">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Start Time
+            </label>
+            <input
+              type="datetime-local"
+              value={filters.start_time}
+              onChange={(e) => setFilters(prev => ({ ...prev, start_time: e.target.value }))}
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              data-id="filter-start-time"
+            />
           </div>
 
-          {/* Aircraft Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Aircraft (Optional)
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              End Time
+            </label>
+            <input
+              type="datetime-local"
+              value={filters.end_time}
+              onChange={(e) => setFilters(prev => ({ ...prev, end_time: e.target.value }))}
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              data-id="filter-end-time"
+            />
+          </div>
+
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Aircraft
             </label>
             <select
               value={filters.aircraft_registration || ''}
               onChange={(e) => setFilters(prev => ({ ...prev, aircraft_registration: e.target.value || undefined }))}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              data-id="filter-aircraft"
             >
-              <option value="">All Phoenix PD Helicopters</option>
+              <option value="">All Helicopters</option>
               {aircraftList.map(reg => (
                 <option key={reg} value={reg}>{reg}</option>
               ))}
             </select>
           </div>
 
-          {/* Location Search */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Location (Optional - Click map or enter address)
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Location (click map or type)
             </label>
-            <div className="flex gap-2">
-              <Autocomplete
-                onLoad={onAutocompleteLoad}
-                onPlaceChanged={onPlaceSelected}
-                className="flex-1"
-              >
-                <input
-                  type="text"
-                  value={addressInput}
-                  onChange={(e) => setAddressInput(e.target.value)}
-                  placeholder="Start typing an address..."
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-              </Autocomplete>
-              <button
-                onClick={() => {
-                  if (filters.search_coordinates) {
-                    // Clear location search
-                    setFilters(prev => ({
-                      ...prev,
-                      search_coordinates: undefined,
-                      search_address: undefined
-                    }))
-                    setAddressInput('')
-                    setMapCenter(defaultCenter)
-                    if (mapRef.current) {
-                      mapRef.current.setCenter(defaultCenter)
-                      mapRef.current.setZoom(12)
-                    }
-                  }
-                }}
-                className={`px-4 py-2 rounded-lg ${
-                  filters.search_coordinates
-                    ? 'bg-red-500 hover:bg-red-600'
-                    : 'bg-blue-500 hover:bg-blue-600'
-                } text-white`}
-                title={filters.search_coordinates ? 'Clear location' : 'Search by location'}
-              >
-                <MapPin className="h-5 w-5" />
-              </button>
-            </div>
+            <Autocomplete
+              onLoad={ref => autocompleteRef.current = ref}
+              onPlaceChanged={onPlaceSelected}
+              options={{
+                bounds: phoenixBounds,
+                componentRestrictions: { country: 'us' },
+                types: ['geocode']
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Address or area"
+                value={addressInput}
+                onChange={(e) => setAddressInput(e.target.value)}
+                className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                data-id="filter-location"
+              />
+            </Autocomplete>
           </div>
 
-          {/* Search Radius */}
-          {filters.search_coordinates && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Search Radius: {filters.search_radius} mi
-              </label>
-              <input
-                type="range"
-                min="0.1"
-                max="3"
-                step="0.1"
-                value={filters.search_radius}
-                onChange={(e) => setFilters(prev => ({ ...prev, search_radius: parseFloat(e.target.value) }))}
-                className="w-full"
-              />
-            </div>
-          )}
+          <div className="w-20">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Radius (mi)
+            </label>
+            <input
+              type="number"
+              value={filters.search_radius}
+              onChange={(e) => handleRadiusChange(parseFloat(e.target.value))}
+              min="0.1"
+              max="5"
+              step="0.1"
+              className="w-full px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              data-id="filter-radius"
+            />
+          </div>
 
-          {/* Search Button */}
           <button
-            onClick={searchFlights}
+            onClick={handleSearch}
             disabled={loading}
-            className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-sm font-medium rounded-lg flex items-center gap-2"
+            data-id="search-button"
           >
-            <Search className="h-5 w-5" />
-            {loading ? 'Searching...' : 'Search Flights'}
+            {loading ? 'Searching...' : (
+              <>
+                <Search className="h-4 w-4" />
+                Search
+              </>
+            )}
           </button>
         </div>
       </div>
 
-      {/* Map for location selection */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-          Click to Set Search Location
-        </h2>
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          center={mapCenter}
-          zoom={12}
-          onClick={handleMapClick}
-          onLoad={(map) => {
-            mapRef.current = map
-          }}
-          options={{
-            styles: darkMapStyles,
-            mapTypeControl: false,
-            streetViewControl: false,
-          }}
-        >
-          {/* Search location marker */}
-          {filters.search_coordinates && (
-            <>
-              <MarkerF
-                position={filters.search_coordinates}
-                icon={{
-                  url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
-                }}
-              />
-              <Circle
-                center={filters.search_coordinates}
-                radius={filters.search_radius * 1609.34} // Convert to meters for map
-                options={{
-                  fillColor: '#4299e1',
-                  fillOpacity: 0.2,
-                  strokeColor: '#2b6cb1',
-                  strokeOpacity: 0.8,
-                  strokeWeight: 2,
-                }}
-              />
-            </>
-          )}
+      {/* Main Content - Side by Side */}
+      <div className="flex-1 flex gap-3 min-h-0" data-id="search-main-content">
+        {/* Left Side - Results */}
+        <div className="w-2/5 bg-white dark:bg-gray-800 rounded-lg shadow flex flex-col" data-id="search-results-panel">
+          <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
+                {loading ? 'Searching...' : `Results (${searchResults.length})`}
+              </h2>
+              <div className="flex items-center gap-2">
+                {/* Sort dropdown */}
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                  className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                  disabled={loading || searchResults.length === 0}
+                >
+                  <option value="date-desc">Newest First</option>
+                  <option value="date-asc">Oldest First</option>
+                  <option value="registration">Registration</option>
+                </select>
 
-          {/* Selected flight path */}
-          {flightPath.length > 0 && (
-            <Polyline
-              path={flightPath}
-              options={{
-                strokeColor: selectedFlight?.surveillance_score > 0.5 ? '#ff0000' : '#00ff00',
-                strokeOpacity: 0.8,
-                strokeWeight: 3,
-              }}
-            />
-          )}
-        </GoogleMap>
-      </div>
-
-      {/* Search Results */}
-      {searchResults.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Results List */}
-          <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-lg shadow p-4 max-h-[600px] overflow-y-auto">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-              Found {searchResults.length} Flights
-            </h2>
-            <div className="space-y-2">
-              {searchResults.map((flight) => {
-                const timeInfo = formatTimeRange(flight.departure_time, flight.arrival_time)
-                return (
-                  <div
-                    key={flight.id}
-                    onClick={() => loadFlightDetails(flight)}
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedFlight?.id === flight.id
-                        ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                        : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                          <Plane className="h-4 w-4" />
-                          {flight.registration}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {timeInfo.start}
-                          </div>
-                          <div className="text-xs">
-                            Duration: {timeInfo.duration} min
-                          </div>
-                          {filters.search_coordinates && (
-                            <div className="text-xs mt-1">
-                              Distance: {(flight.distance_from_search * 0.000621371).toFixed(2)} mi
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <ChevronRight className="h-5 w-5 text-gray-400" />
-                    </div>
-                    {flight.surveillance_score > 0.5 && (
-                      <div className="mt-2 text-xs text-red-600 dark:text-red-400">
-                        Surveillance Score: {(flight.surveillance_score * 100).toFixed(0)}%
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+                {/* Group checkbox */}
+                <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                  <input
+                    type="checkbox"
+                    checked={groupByFlightId}
+                    onChange={(e) => setGroupByFlightId(e.target.checked)}
+                    disabled={loading || searchResults.length === 0}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  <Users className="h-3 w-3" />
+                  <span>Group</span>
+                </label>
+              </div>
             </div>
           </div>
 
-          {/* Flight Details */}
-          <div className="lg:col-span-2 space-y-4">
-            {selectedFlight ? (
-              <>
-                {/* Flight Info */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      Flight Details - {selectedFlight.registration}
-                    </h3>
-                    <button
-                      onClick={() => navigateToFlightDetail(selectedFlight.id)}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
-                    >
-                      View Full Details
-                    </button>
-                  </div>
+          <div className="flex-1 overflow-y-auto" data-id="search-results-list">
+            {loading ? (
+              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                Searching flights...
+              </div>
+            ) : processedResults.length > 0 ? (
+              <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                {processedResults.map((flight) => (
+                  <div
+                    key={flight.id}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setSelectedFlight(flight)
+                      fetchFlightDetails(flight)
+                    }}
+                    className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-all ${
+                      selectedFlight?.id === flight.id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500' : ''
+                    }`}
+                    data-id={`search-result-item-${flight.id}`}
+                  >
+                    {/* Header with Registration and Type */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <Plane className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <div className="flex items-baseline gap-2">
+                              <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                                {flight.registration || flight.callsign}
+                              </h3>
+                              {flight.grouped_count && flight.grouped_count > 1 && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
+                                  <Users className="h-3 w-3 mr-0.5" />
+                                  {flight.grouped_count}
+                                </span>
+                              )}
+                              {flight.id && (
+                                <span className="text-xs text-gray-500 dark:text-gray-500">
+                                  #{flight.id}
+                                </span>
+                              )}
+                            </div>
+                            {flight.surveillance_score > 0.7 ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                                SURVEILLANCE LIKELY
+                              </span>
+                            ) : flight.surveillance_score > 0.4 ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                                POSSIBLE SURVEILLANCE
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                ROUTINE PATROL
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-gray-400 flex-shrink-0 mt-1" />
+                    </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Callsign</div>
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {selectedFlight.callsign || 'N/A'}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Duration</div>
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {selectedFlight.duration_minutes} min
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Altitude Range</div>
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {selectedFlight.min_altitude} - {selectedFlight.max_altitude} ft
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Positions</div>
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {selectedFlight.positions_count}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Hover Locations</div>
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {selectedFlight.hover_locations?.length || 0}
-                      </div>
-                    </div>
-                    {filters.search_coordinates && (
+                    {/* Key Information Grid */}
+                    <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">Closest Approach</div>
-                        <div className="font-medium text-gray-900 dark:text-white">
-                          {(selectedFlight.distance_from_search * 0.000621371).toFixed(2)} mi
+                        <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                          <Calendar className="h-4 w-4" />
+                          <span className="text-base font-semibold">
+                            {new Date(flight.departure_time).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: new Date(flight.departure_time).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                            })}
+                          </span>
+                        </div>
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 ml-5">
+                          {new Date(flight.departure_time).toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-1.5 text-gray-600 dark:text-gray-400">
+                          <Clock className="h-4 w-4" />
+                          <span className="text-base font-medium">
+                            {flight.duration_minutes ? `${Math.round(flight.duration_minutes)} min` : 'In flight'}
+                          </span>
+                        </div>
+                        {flight.arrival_time && (
+                          <div className="text-sm text-gray-600 dark:text-gray-400 ml-5">
+                            Ended {new Date(flight.arrival_time).toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Distance and Additional Info */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        {flight.distance_from_search !== undefined && (
+                          <div className="flex items-center gap-1.5">
+                            <MapPin className="h-4 w-4 text-gray-500" />
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              {(flight.distance_from_search * 0.000621371).toFixed(2)} mi from search
+                            </span>
+                          </div>
+                        )}
+
+                        {flight.positions_count && (
+                          <span className="text-xs text-gray-500 dark:text-gray-500">
+                            {flight.positions_count.toLocaleString()} GPS points
+                          </span>
+                        )}
+
+                        {flight.hover_locations && flight.hover_locations.length > 0 && (
+                          <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                            {flight.hover_locations.length} hover location{flight.hover_locations.length !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Pass search context and closest position details to detail page
+                          const params = new URLSearchParams()
+                          if (filters.search_coordinates) {
+                            params.set('searchLat', filters.search_coordinates.lat.toString())
+                            params.set('searchLng', filters.search_coordinates.lng.toString())
+                            params.set('searchRadius', (filters.search_radius * 1609.34).toString()) // Store in meters for consistency
+
+                            // Add closest position details if available
+                            if (flight.distance_from_search !== null) {
+                              params.set('closestDistance', flight.distance_from_search.toString())
+                            }
+                            if (flight.closest_position) {
+                              params.set('closestTime', flight.closest_position.timestamp)
+                              if (flight.closest_position.ground_speed_knots !== null) {
+                                params.set('closestSpeed', flight.closest_position.ground_speed_knots.toString())
+                              }
+                              if (flight.closest_position.altitude_feet !== null) {
+                                params.set('closestAltitude', flight.closest_position.altitude_feet.toString())
+                              }
+                              if (flight.closest_position.altitude_agl_feet !== null) {
+                                params.set('closestAltitudeAGL', flight.closest_position.altitude_agl_feet.toString())
+                              }
+                              if (flight.closest_position.track_degrees !== null) {
+                                params.set('closestBearing', flight.closest_position.track_degrees.toString())
+                              }
+                              if (flight.closest_position.is_hovering) {
+                                params.set('isHovering', 'true')
+                                if (flight.closest_position.hover_duration_seconds) {
+                                  params.set('hoverDuration', flight.closest_position.hover_duration_seconds.toString())
+                                }
+                              }
+                            }
+                          }
+                          navigate(`/flight/${flight.id}?${params.toString()}`)
+                        }}
+                        className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium flex items-center gap-1"
+                      >
+                        Details
+                        <ChevronRight className="h-3 w-3" />
+                      </button>
+                    </div>
+
+                    {/* Surveillance Score Bar (if significant) */}
+                    {flight.surveillance_score > 0 && (
+                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                            Surveillance Probability
+                          </span>
+                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                            {Math.round((flight.surveillance_score || 0) * 100)}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              flight.surveillance_score > 0.7 ? 'bg-red-500' :
+                              flight.surveillance_score > 0.4 ? 'bg-yellow-500' : 'bg-green-500'
+                            }`}
+                            style={{ width: `${(flight.surveillance_score || 0) * 100}%` }}
+                          />
                         </div>
                       </div>
                     )}
                   </div>
-
-                  {selectedFlight.closest_position && (
-                    <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded">
-                      <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                        Closest Position to Search Location
-                      </div>
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        Time: {formatLocalTime(selectedFlight.closest_position.timestamp)}
-                      </div>
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        Altitude: {selectedFlight.closest_position.altitude} ft
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Radio Archives */}
-                {radioFiles.length > 0 && (
-                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                      <Radio className="h-5 w-5" />
-                      Radio Communications
-                    </h3>
-                    <div className="space-y-2">
-                      {radioFiles.map((file) => (
-                        <div
-                          key={file.filename}
-                          className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded"
-                        >
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => playRadioFile(file.filename)}
-                              className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg hover:bg-purple-200 dark:hover:bg-purple-900/50"
-                            >
-                              {playingAudio === file.filename ? (
-                                <Pause className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                              ) : (
-                                <Play className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                              )}
-                            </button>
-                            <div>
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                                {file.timeRange || file.filename}
-                              </div>
-                              <div className="text-xs text-gray-600 dark:text-gray-400">
-                                {file.size_mb.toFixed(1)} MB
-                                {file.has_transcription && ' • Transcribed'}
-                              </div>
-                            </div>
-                          </div>
-                          {file.has_transcription && (
-                            <button
-                              onClick={() => navigate(`/radio?file=${file.filename}`)}
-                              className="text-sm text-purple-600 dark:text-purple-400 hover:underline"
-                            >
-                              View Transcript
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
+                ))}
+              </div>
             ) : (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center text-gray-500 dark:text-gray-400">
-                Select a flight from the results to view details
+              <div className="p-8 text-center">
+                <Search className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  No flights found
+                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  Try adjusting your search criteria
+                </p>
               </div>
             )}
           </div>
         </div>
-      )}
 
-      {/* Empty State */}
-      {!loading && searchResults.length === 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center">
-          <Search className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-          <p className="text-gray-500 dark:text-gray-400">
-            Set your search criteria above to find flights
-          </p>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">
-            Tip: Click on the map to search for flights near a specific location
-          </p>
+        {/* Right Side - Map */}
+        <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow p-3" data-id="search-map-panel">
+          <GoogleMap
+            mapContainerStyle={{ width: '100%', height: '100%' }}
+            center={mapCenter}
+            zoom={11}
+            onClick={handleMapClick}
+            onLoad={map => mapRef.current = map}
+            data-id="search-map"
+            options={{
+              styles: darkMapStyles,
+              streetViewControl: false,
+              mapTypeControl: false,
+            }}
+          >
+            {/* Search area circle */}
+            {filters.search_coordinates && (
+              <>
+                <MarkerF
+                  position={filters.search_coordinates}
+                  icon={{
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: 8,
+                    fillColor: '#3B82F6',
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2,
+                  }}
+                />
+                <Circle
+                  center={filters.search_coordinates}
+                  radius={filters.search_radius * 1609.34} // Convert to meters for map display
+                  options={{
+                    fillColor: '#3B82F6',
+                    fillOpacity: 0.2,
+                    strokeColor: '#3B82F6',
+                    strokeOpacity: 0.8,
+                    strokeWeight: 2,
+                  }}
+                />
+              </>
+            )}
+
+            {/* Flight markers */}
+            {searchResults.map((flight) =>
+              flight.closest_position && (
+                <MarkerF
+                  key={flight.id}
+                  position={{
+                    lat: flight.closest_position.latitude,
+                    lng: flight.closest_position.longitude
+                  }}
+                  onClick={() => setSelectedFlight(flight)}
+                  icon={{
+                    path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                    scale: 6,
+                    fillColor: selectedFlight?.id === flight.id ? '#EF4444' : '#10B981',
+                    fillOpacity: 1,
+                    strokeColor: '#ffffff',
+                    strokeWeight: 2,
+                    rotation: 0,
+                  }}
+                />
+              )
+            )}
+
+            {/* Selected flight path */}
+            {flightPath.length > 0 && (
+              <Polyline
+                path={flightPath}
+                options={{
+                  strokeColor: '#EF4444',
+                  strokeOpacity: 0.8,
+                  strokeWeight: 3,
+                }}
+              />
+            )}
+          </GoogleMap>
         </div>
-      )}
+      </div>
     </div>
   )
 }

@@ -16,10 +16,13 @@ import {
   Home,
   Building2,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  Mountain,
+  Globe
 } from 'lucide-react'
 import axios from '@/lib/axios'
 import { formatLocalTime, formatRelativeTime } from '../utils/dateUtils'
+import { Flight3DMapView } from '../components/Flight3DMapView'
 
 interface FlightDetails {
   id: number
@@ -83,6 +86,44 @@ const mapContainerStyle = {
 }
 
 // Dark mode map styles for better visibility
+// Helicopter icon function - same as used in LiveTrackingPage
+const getHelicopterIcon = (heading: number = 0, isPlaying: boolean = false) => {
+  // Create a detailed helicopter shape using SVG path
+  const helicopterPath = [
+    // Main rotor blades (horizontal and vertical lines forming a cross)
+    'M -12,0 L 12,0',  // Horizontal rotor blade
+    'M 0,-12 L 0,12',   // Vertical rotor blade
+    // Helicopter body (rounded fuselage)
+    'M 0,-6',           // Start at top center
+    'Q -3,-6 -3,-3',    // Curve to left side
+    'L -3,3',           // Left side down
+    'Q -3,6 0,6',       // Curve to bottom center
+    'Q 3,6 3,3',        // Curve to right bottom
+    'L 3,-3',           // Right side up
+    'Q 3,-6 0,-6',      // Curve back to top
+    'Z',                // Close the body
+    // Tail boom
+    'M -1,6 L -1,10 L 1,10 L 1,6',  // Tail boom extending down
+    // Tail rotor
+    'M -3,10 L 3,10'    // Small horizontal tail rotor
+  ].join(' ')
+
+  if (typeof window !== 'undefined' && window.google?.maps) {
+    return {
+      path: helicopterPath,
+      scale: 2.5,  // Larger scale for better visibility
+      fillColor: isPlaying ? '#10b981' : '#6b7280', // Green when playing, gray when stopped
+      fillOpacity: 0.8,
+      strokeColor: '#ffffff',
+      strokeWeight: 1.5,
+      rotation: heading || 0, // Rotate based on heading
+      anchor: new window.google.maps.Point(0, 0),
+    }
+  }
+
+  return null
+}
+
 const darkMapStyles = [
   { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
@@ -193,9 +234,13 @@ export function FlightDetailPage() {
   const [playingAudio, setPlayingAudio] = useState<string | null>(null)
   const [currentPositionIndex, setCurrentPositionIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [use3DView, setUse3DView] = useState(false)
+  const [playbackSpeed, setPlaybackSpeed] = useState(5)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const animationRef = useRef<number | null>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
+  const lastUpdateTimeRef = useRef<number>(0)
+  const accumulatedTimeRef = useRef<number>(0)
 
   useEffect(() => {
     if (flightId) {
@@ -214,28 +259,62 @@ export function FlightDetailPage() {
   }, [positions, searchContext.lat, searchContext.lng])
 
   useEffect(() => {
-    // Animation for flight playback
+    // Animation for flight playback with proper time-based interpolation
     if (isPlaying && positions.length > 0) {
-      const animate = () => {
+      lastUpdateTimeRef.current = performance.now()
+      accumulatedTimeRef.current = 0
+
+      const animate = (currentTime: number) => {
+        const deltaTime = currentTime - lastUpdateTimeRef.current
+        lastUpdateTimeRef.current = currentTime
+
+        // Add the elapsed time multiplied by playback speed
+        accumulatedTimeRef.current += deltaTime * playbackSpeed
+
         setCurrentPositionIndex(prev => {
           if (prev >= positions.length - 1) {
             setIsPlaying(false)
             return prev
           }
-          const nextIndex = prev + 1
+
+          // Calculate how much real time should pass between positions
+          // Assuming positions are recorded at regular intervals
+          let targetIndex = prev
+
+          // Get timestamps to calculate actual time difference
+          while (targetIndex < positions.length - 1) {
+            const currentPos = positions[targetIndex]
+            const nextPos = positions[targetIndex + 1]
+
+            // Calculate time difference in milliseconds
+            const currentTime = new Date(currentPos.timestamp).getTime()
+            const nextTime = new Date(nextPos.timestamp).getTime()
+            const timeDiff = nextTime - currentTime
+
+            // If we've accumulated enough time to move to the next position
+            if (accumulatedTimeRef.current >= timeDiff) {
+              accumulatedTimeRef.current -= timeDiff
+              targetIndex++
+            } else {
+              break
+            }
+          }
 
           // Pan map to keep aircraft in view
-          if (mapRef.current && positions[nextIndex]) {
+          if (mapRef.current && positions[targetIndex] && targetIndex !== prev) {
             const currentPos = {
-              lat: positions[nextIndex].latitude,
-              lng: positions[nextIndex].longitude
+              lat: positions[targetIndex].latitude,
+              lng: positions[targetIndex].longitude
             }
             mapRef.current.panTo(currentPos)
           }
 
-          return nextIndex
+          return targetIndex
         })
-        animationRef.current = requestAnimationFrame(animate)
+
+        if (isPlaying) {
+          animationRef.current = requestAnimationFrame(animate)
+        }
       }
       animationRef.current = requestAnimationFrame(animate)
     } else if (animationRef.current) {
@@ -247,7 +326,28 @@ export function FlightDetailPage() {
         cancelAnimationFrame(animationRef.current)
       }
     }
-  }, [isPlaying, positions])
+  }, [isPlaying, positions, playbackSpeed])
+
+  // Keep current position in view during playback (2D mode)
+  useEffect(() => {
+    if (!use3DView && isPlaying && mapRef.current && positions[currentPositionIndex]) {
+      const currentPos = positions[currentPositionIndex]
+
+      // Check if the current position is within the map bounds
+      const bounds = mapRef.current.getBounds()
+      if (bounds) {
+        const posLatLng = new google.maps.LatLng(currentPos.latitude, currentPos.longitude)
+
+        // If position is outside bounds, pan to it
+        if (!bounds.contains(posLatLng)) {
+          mapRef.current.panTo({
+            lat: currentPos.latitude,
+            lng: currentPos.longitude
+          })
+        }
+      }
+    }
+  }, [currentPositionIndex, isPlaying, use3DView, positions])
 
   const loadFlightDetails = async () => {
     try {
@@ -412,6 +512,162 @@ export function FlightDetailPage() {
     URL.revokeObjectURL(url)
   }
 
+  const exportToKML = () => {
+    if (!flight || positions.length === 0) return
+
+    // Generate KML content
+    const kmlContent = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
+  <Document>
+    <name>Flight ${flight.callsign || flight.aircraft_id} - ${formatLocalTime(flight.departure_time)}</name>
+    <description>
+      Aircraft: ${flight.aircraft_id}
+      Callsign: ${flight.callsign || 'N/A'}
+      Duration: ${flight.flight_duration_minutes} minutes
+      Date: ${formatLocalTime(flight.departure_time)}
+      Surveillance Likelihood: ${flight.surveillance_likelihood}%
+      Pattern Notes: ${flight.pattern_notes || 'None'}
+    </description>
+
+    <!-- Define styles -->
+    <Style id="flightPath">
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>4</width>
+      </LineStyle>
+    </Style>
+
+    <Style id="startPoint">
+      <IconStyle>
+        <color>ff00ff00</color>
+        <scale>1.2</scale>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/paddle/grn-circle.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+
+    <Style id="endPoint">
+      <IconStyle>
+        <color>ff0000ff</color>
+        <scale>1.2</scale>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/paddle/red-circle.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+
+    <Style id="hoverPoint">
+      <IconStyle>
+        <color>ff00ffff</color>
+        <scale>1.0</scale>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/shapes/target.png</href>
+        </Icon>
+      </IconStyle>
+    </Style>
+
+    <!-- Flight path as LineString with altitude -->
+    <Placemark>
+      <name>Flight Path</name>
+      <styleUrl>#flightPath</styleUrl>
+      <LineString>
+        <extrude>1</extrude>
+        <tessellate>1</tessellate>
+        <altitudeMode>absolute</altitudeMode>
+        <coordinates>
+${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet * 0.3048}`).join('\n')}
+        </coordinates>
+      </LineString>
+    </Placemark>
+
+    <!-- Start point -->
+    <Placemark>
+      <name>Start</name>
+      <description>
+        Time: ${formatLocalTime(positions[0].timestamp)}
+        Altitude: ${positions[0].altitude_feet} ft
+        Location: ${positions[0].neighborhood || positions[0].address_nearby || 'Unknown'}
+      </description>
+      <styleUrl>#startPoint</styleUrl>
+      <Point>
+        <altitudeMode>absolute</altitudeMode>
+        <coordinates>${positions[0].longitude},${positions[0].latitude},${positions[0].altitude_feet * 0.3048}</coordinates>
+      </Point>
+    </Placemark>
+
+    <!-- End point -->
+    <Placemark>
+      <name>End</name>
+      <description>
+        Time: ${formatLocalTime(positions[positions.length - 1].timestamp)}
+        Altitude: ${positions[positions.length - 1].altitude_feet} ft
+        Location: ${positions[positions.length - 1].neighborhood || positions[positions.length - 1].address_nearby || 'Unknown'}
+      </description>
+      <styleUrl>#endPoint</styleUrl>
+      <Point>
+        <altitudeMode>absolute</altitudeMode>
+        <coordinates>${positions[positions.length - 1].longitude},${positions[positions.length - 1].latitude},${positions[positions.length - 1].altitude_feet * 0.3048}</coordinates>
+      </Point>
+    </Placemark>
+
+    <!-- Hover locations -->
+    ${getHoverLocations().map((pos, idx) => `
+    <Placemark>
+      <name>Hover Location ${idx + 1}</name>
+      <description>
+        Time: ${formatLocalTime(pos.timestamp)}
+        Duration: ${pos.hover_duration_seconds} seconds
+        Altitude: ${pos.altitude_feet} ft
+        Location: ${pos.neighborhood || pos.address_nearby || 'Unknown'}
+        ${pos.over_private_property ? 'Over private property' : ''}
+      </description>
+      <styleUrl>#hoverPoint</styleUrl>
+      <Point>
+        <altitudeMode>absolute</altitudeMode>
+        <coordinates>${pos.longitude},${pos.latitude},${pos.altitude_feet * 0.3048}</coordinates>
+      </Point>
+    </Placemark>`).join('')}
+
+    <!-- Add a tour for Google Earth Pro -->
+    <gx:Tour>
+      <name>Flight Playback</name>
+      <gx:Playlist>
+        ${positions.map((p, idx) => {
+          const duration = idx > 0
+            ? (new Date(p.timestamp).getTime() - new Date(positions[idx - 1].timestamp).getTime()) / 1000
+            : 2
+          return `
+        <gx:FlyTo>
+          <gx:duration>${Math.min(duration, 10)}</gx:duration>
+          <Camera>
+            <longitude>${p.longitude}</longitude>
+            <latitude>${p.latitude}</latitude>
+            <altitude>${p.altitude_feet * 0.3048 + 100}</altitude>
+            <heading>${p.track_degrees}</heading>
+            <tilt>75</tilt>
+            <roll>0</roll>
+            <altitudeMode>absolute</altitudeMode>
+          </Camera>
+        </gx:FlyTo>`
+        }).join('')}
+      </gx:Playlist>
+    </gx:Tour>
+  </Document>
+</kml>`
+
+    // Create and download the KML file
+    const blob = new Blob([kmlContent], { type: 'application/vnd.google-earth.kml+xml' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `flight_${flight.callsign || flight.aircraft_id}_${flightId}.kml`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
   const calculateTotalDistance = () => {
     let distance = 0
     for (let i = 1; i < positions.length; i++) {
@@ -469,13 +725,23 @@ export function FlightDetailPage() {
             <ArrowLeft className="h-5 w-5" />
             Back
           </button>
-          <button
-            onClick={downloadFlightData}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-          >
-            <Download className="h-4 w-4" />
-            Download Data
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={downloadFlightData}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              <Download className="h-4 w-4" />
+              Download Data
+            </button>
+            <button
+              onClick={exportToKML}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              title="Download KML file for Google Earth"
+            >
+              <Globe className="h-4 w-4" />
+              Open in Google Earth
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-4 mb-4">
@@ -634,34 +900,103 @@ export function FlightDetailPage() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Flight Path
           </h2>
-          <button
-            onClick={() => {
-              if (!isPlaying && positions.length > 0) {
-                // Reset to start when playing
-                setCurrentPositionIndex(0)
-                // Optionally pan to the starting position without changing zoom
-                if (mapRef.current && positions[0]) {
-                  mapRef.current.panTo({
-                    lat: positions[0].latitude,
-                    lng: positions[0].longitude
-                  })
-                }
-              }
-              setIsPlaying(!isPlaying)
-            }}
-            className="flex items-center gap-2 px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
-          >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            {isPlaying ? 'Pause' : 'Play'} Animation
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setUse3DView(!use3DView)}
+              className={`flex items-center gap-2 px-3 py-1 rounded transition-colors ${
+                use3DView
+                  ? 'bg-blue-600 text-white hover:bg-blue-700'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+              }`}
+            >
+              <Mountain className="h-4 w-4" />
+              {use3DView ? '3D View' : 'Standard View'}
+            </button>
+            {!use3DView && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    if (!isPlaying && positions.length > 0) {
+                      // Only reset accumulated time, keep current position
+                      accumulatedTimeRef.current = 0
+                      // If we're at the end, restart from beginning
+                      if (currentPositionIndex >= positions.length - 1) {
+                        setCurrentPositionIndex(0)
+                        // Pan to the starting position without changing zoom
+                        if (mapRef.current && positions[0]) {
+                          mapRef.current.panTo({
+                            lat: positions[0].latitude,
+                            lng: positions[0].longitude
+                          })
+                        }
+                      }
+                    }
+                    setIsPlaying(!isPlaying)
+                  }}
+                  className="flex items-center gap-2 px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700"
+                >
+                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {isPlaying ? 'Pause' : 'Play'}
+                </button>
+                <select
+                  value={playbackSpeed}
+                  onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
+                  className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                >
+                  <option value={1}>1x</option>
+                  <option value={2}>2x</option>
+                  <option value={5}>5x</option>
+                  <option value={10}>10x</option>
+                  <option value={20}>20x</option>
+                  <option value={50}>50x</option>
+                </select>
+              </div>
+            )}
+          </div>
         </div>
 
-        <GoogleMap
-          mapContainerStyle={mapContainerStyle}
-          zoom={12}
+        {use3DView ? (
+          <Flight3DMapView
+            positions={positions}
+            flight={flight}
+            searchContext={searchContext.lat && searchContext.lng ? {
+              lat: searchContext.lat,
+              lng: searchContext.lng,
+              radius: searchContext.radius || 1000
+            } : undefined}
+          />
+        ) : (
+          <GoogleMap
+            mapContainerStyle={mapContainerStyle}
+            zoom={12}
           center={positions[0] ? { lat: positions[0].latitude, lng: positions[0].longitude } : { lat: 33.4484, lng: -112.0740 }}
           onLoad={(map) => {
             mapRef.current = map
+
+            // Add native polyline for flight path
+            if (positions.length > 0) {
+              console.log('2D View: Creating flight path with', positions.length, 'positions');
+              const pathCoordinates = positions.map(p => ({
+                lat: p.latitude,
+                lng: p.longitude
+              }))
+
+              // Create the polyline
+              const flightPath = new google.maps.Polyline({
+                path: pathCoordinates,
+                geodesic: true,
+                strokeColor: '#EF4444',
+                strokeOpacity: 1.0,
+                strokeWeight: 4,
+                map: map
+              })
+
+              console.log('2D View: Flight path created');
+
+              // Store reference for cleanup
+              ;(window as any).flightPath2D = flightPath
+            }
+
             const bounds = getMapBounds()
             if (bounds && !isPlaying) {
               map.fitBounds(bounds)
@@ -677,9 +1012,11 @@ export function FlightDetailPage() {
           <Polyline
             path={getFlightPath()}
             options={{
-              strokeColor: flight.surveillance_likelihood > 0.5 ? '#ff0000' : '#00ff00',
-              strokeOpacity: 0.8,
-              strokeWeight: 3,
+              strokeColor: '#EF4444', // Red like in search page
+              strokeOpacity: 1.0,
+              strokeWeight: 4,
+              geodesic: true,
+              zIndex: 100
             }}
           />
 
@@ -688,9 +1025,14 @@ export function FlightDetailPage() {
             <MarkerF
               position={{ lat: positions[0].latitude, lng: positions[0].longitude }}
               icon={{
-                url: 'http://maps.google.com/mapfiles/ms/icons/green-dot.png'
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: '#10B981', // Green for start
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
               }}
-              title="Departure"
+              title="Start"
             />
           )}
 
@@ -699,25 +1041,23 @@ export function FlightDetailPage() {
             <MarkerF
               position={{ lat: positions[positions.length - 1].latitude, lng: positions[positions.length - 1].longitude }}
               icon={{
-                url: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: '#EF4444', // Red for end
+                fillOpacity: 1,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
               }}
-              title="Arrival"
+              title="End"
             />
           )}
 
-          {/* Current position during animation */}
+          {/* Current position during animation - using helicopter icon */}
           {isPlaying && positions[currentPositionIndex] && (
             <MarkerF
               position={{ lat: positions[currentPositionIndex].latitude, lng: positions[currentPositionIndex].longitude }}
-              icon={{
-                path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-                scale: 6,
-                rotation: positions[currentPositionIndex].track_degrees,
-                fillColor: '#4299e1',
-                fillOpacity: 0.8,
-                strokeColor: '#2b6cb1',
-                strokeWeight: 2,
-              }}
+              icon={getHelicopterIcon(positions[currentPositionIndex].track_degrees, true)}
+              title="Current Position"
             />
           )}
 
@@ -790,6 +1130,7 @@ export function FlightDetailPage() {
             </>
           )}
         </GoogleMap>
+        )}
       </div>
 
       {/* Timeline and Analysis */}

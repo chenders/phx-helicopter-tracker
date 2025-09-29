@@ -58,6 +58,7 @@ services:
       - FR24_MONTHLY_CREDIT_LIMIT=${FR24_MONTHLY_CREDIT_LIMIT}
       - BROADCASTIFY_USERNAME=${BROADCASTIFY_USERNAME}
       - BROADCASTIFY_PASSWORD=${BROADCASTIFY_PASSWORD}
+      - MAIN_SEARCH_ADDRESS=${MAIN_SEARCH_ADDRESS}
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
     volumes:
@@ -84,6 +85,7 @@ services:
       - FR24_MONTHLY_CREDIT_LIMIT=${FR24_MONTHLY_CREDIT_LIMIT}
       - BROADCASTIFY_USERNAME=${BROADCASTIFY_USERNAME}
       - BROADCASTIFY_PASSWORD=${BROADCASTIFY_PASSWORD}
+      - MAIN_SEARCH_ADDRESS=${MAIN_SEARCH_ADDRESS}
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
     volumes:
@@ -151,15 +153,17 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - NODE_ENV=production
+        - NODE_ENV=development
         - VITE_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+        - VITE_MAIN_SEARCH_ADDRESS=${VITE_MAIN_SEARCH_ADDRESS}
     ports:
       - "3000:3000"
     environment:
       # Don't set API URL - let the app use relative URLs to prevent HTTPS issues
       # - REACT_APP_API_URL=http://${APP_HOSTNAME:-localhost}:9080
       - VITE_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
-      - NODE_ENV=production
+      - VITE_MAIN_SEARCH_ADDRESS=${VITE_MAIN_SEARCH_ADDRESS}
+      - NODE_ENV=development
     volumes:
       - ./frontend:/app
       - /app/node_modules

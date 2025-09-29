@@ -15,6 +15,7 @@ from app.api.endpoints import (
     radio,
     live_database,
     logs,
+    config,
 )
 from app.api.v1 import abnormal_patterns
 
@@ -50,3 +51,4 @@ api_router.include_router(
     abnormal_patterns.router, prefix="/abnormal-patterns", tags=["abnormal_patterns"]
 )
 api_router.include_router(logs.router, tags=["logs"])
+api_router.include_router(config.router, prefix="/app", tags=["config"])

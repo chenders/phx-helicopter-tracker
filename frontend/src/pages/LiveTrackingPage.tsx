@@ -310,9 +310,9 @@ export function LiveTrackingPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-id="live-tracking-container">
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6" data-id="live-tracking-header">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Live Flight Tracking</h1>
@@ -335,7 +335,7 @@ export function LiveTrackingPage() {
       </div>
 
       {/* Controls */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4" data-id="live-tracking-controls">
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex items-center space-x-2">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">View:</label>
@@ -343,6 +343,7 @@ export function LiveTrackingPage() {
               value={alertFilter}
               onChange={(e) => setAlertFilter(e.target.value)}
               className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+              data-id="filter-view-select"
             >
               <option value="all">All Flights</option>
               <option value="surveillance">Surveillance Only</option>
@@ -383,6 +384,7 @@ export function LiveTrackingPage() {
               setMapZoom(11)
             }}
             className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+            data-id="reset-view-button"
           >
             Reset View
           </button>
@@ -403,11 +405,12 @@ export function LiveTrackingPage() {
             }}
             disabled={isForceUpdating}
             className={`px-3 py-1 text-sm rounded ${
-              isForceUpdating 
-                ? 'bg-gray-400 text-gray-200 cursor-not-allowed' 
+              isForceUpdating
+                ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
                 : 'bg-orange-500 text-white hover:bg-orange-600'
             }`}
             title="Makes an API call to FR24 for immediate update (uses credits)"
+            data-id="force-update-button"
           >
             {isForceUpdating ? 'Updating...' : '⚡ Force API Update'}
           </button>
@@ -436,12 +439,13 @@ export function LiveTrackingPage() {
       </div>
 
       {/* Map */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4" data-id="live-tracking-map-container">
         <GoogleMap
             mapContainerStyle={mapContainerStyle}
             center={mapCenter}
             zoom={mapZoom}
             options={mapOptions}
+            data-id="live-tracking-map"
             onClick={() => {
               // Prevent map clicks from affecting selection
               // Only helicopter markers should be clickable
@@ -613,7 +617,7 @@ export function LiveTrackingPage() {
 
       {/* Database Status Panel */}
       {trackingStats && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4" data-id="database-status-panel">
           <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Database Tracking Status</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-gray-50 dark:bg-gray-700 rounded p-3">

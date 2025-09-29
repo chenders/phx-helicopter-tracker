@@ -10,6 +10,13 @@ export function useStats() {
     },
     refetchInterval: 30000, // Refresh every 30 seconds
     retry: 2,
-    staleTime: 1000 * 60 * 2 // 2 minutes
+    staleTime: 1000 * 60 * 2, // 2 minutes
+    // Keep previous data on error to prevent values from disappearing
+    refetchOnWindowFocus: false,
+    keepPreviousData: true,
+    // Don't set data to undefined on error
+    onError: (error: any) => {
+      console.error('Failed to fetch dashboard stats:', error)
+    }
   })
 }
