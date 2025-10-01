@@ -15,19 +15,12 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "timescaledb" CASCADE;
 CREATE EXTENSION IF NOT EXISTS "postgis";
 
--- Drop existing tables if they exist (for clean setup)
-DROP TABLE IF EXISTS flight_positions CASCADE;
-DROP TABLE IF EXISTS legal_precedents CASCADE;
-DROP TABLE IF EXISTS constitutional_analyses CASCADE;
-DROP TABLE IF EXISTS legal_documents CASCADE;
-DROP TABLE IF EXISTS task_events CASCADE;
-DROP TABLE IF EXISTS task_metrics CASCADE;
-DROP TABLE IF EXISTS task_history CASCADE;
-DROP TABLE IF EXISTS flight_logs CASCADE;
-DROP TABLE IF EXISTS aircraft CASCADE;
+-- NOTE: Tables are created only if they don't exist
+-- This preserves existing data
+-- To completely reset database, manually drop tables first
 
 -- Aircraft table
-CREATE TABLE aircraft (
+CREATE TABLE IF NOT EXISTS aircraft (
     id SERIAL PRIMARY KEY,
     registration VARCHAR(20) UNIQUE NOT NULL,
     model VARCHAR(100),
@@ -47,11 +40,11 @@ CREATE TABLE aircraft (
 );
 
 -- Create indexes for aircraft
-CREATE INDEX idx_aircraft_registration ON aircraft(registration);
-CREATE INDEX idx_aircraft_is_active ON aircraft(is_active);
+CREATE INDEX IF NOT EXISTS IF NOT EXISTS idx_aircraft_registration ON aircraft(registration);
+CREATE INDEX IF NOT EXISTS IF NOT EXISTS idx_aircraft_is_active ON aircraft(is_active);
 
 -- Flight logs table with JSONB for flexible data storage
-CREATE TABLE flight_logs (
+CREATE TABLE IF NOT EXISTS flight_logs (
     id SERIAL PRIMARY KEY,
     aircraft_id INTEGER REFERENCES aircraft(id) ON DELETE CASCADE,
     registration VARCHAR(20),
@@ -96,18 +89,18 @@ CREATE TABLE flight_logs (
 );
 
 -- Create indexes for flight_logs
-CREATE INDEX idx_flight_logs_aircraft_id ON flight_logs(aircraft_id);
-CREATE INDEX idx_flight_logs_registration ON flight_logs(registration);
-CREATE INDEX idx_flight_logs_start_time ON flight_logs(start_time DESC);
-CREATE INDEX idx_flight_logs_end_time ON flight_logs(end_time DESC);
-CREATE INDEX idx_flight_logs_surveillance_score ON flight_logs(surveillance_score);
-CREATE INDEX idx_flight_logs_privacy_concern ON flight_logs(privacy_concern_level);
-CREATE INDEX idx_flight_logs_import_id ON flight_logs(import_id);
-CREATE INDEX idx_flight_logs_positions_gin ON flight_logs USING GIN (positions);
-CREATE INDEX idx_flight_logs_hover_locations_gin ON flight_logs USING GIN (hover_locations);
+CREATE INDEX IF NOT EXISTS idx_flight_logs_aircraft_id ON flight_logs(aircraft_id);
+CREATE INDEX IF NOT EXISTS idx_flight_logs_registration ON flight_logs(registration);
+CREATE INDEX IF NOT EXISTS idx_flight_logs_start_time ON flight_logs(start_time DESC);
+CREATE INDEX IF NOT EXISTS idx_flight_logs_end_time ON flight_logs(end_time DESC);
+CREATE INDEX IF NOT EXISTS idx_flight_logs_surveillance_score ON flight_logs(surveillance_score);
+CREATE INDEX IF NOT EXISTS idx_flight_logs_privacy_concern ON flight_logs(privacy_concern_level);
+CREATE INDEX IF NOT EXISTS idx_flight_logs_import_id ON flight_logs(import_id);
+CREATE INDEX IF NOT EXISTS idx_flight_logs_positions_gin ON flight_logs USING GIN (positions);
+CREATE INDEX IF NOT EXISTS idx_flight_logs_hover_locations_gin ON flight_logs USING GIN (hover_locations);
 
 -- Flight positions table (time-series data)
-CREATE TABLE flight_positions (
+CREATE TABLE IF NOT EXISTS flight_positions (
     id BIGSERIAL PRIMARY KEY,
     flight_log_id INTEGER REFERENCES flight_logs(id) ON DELETE CASCADE,
     timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -131,13 +124,13 @@ CREATE TABLE flight_positions (
 -- SELECT create_hypertable('flight_positions', 'timestamp', if_not_exists => TRUE);
 
 -- Create indexes for flight_positions
-CREATE INDEX idx_flight_positions_flight_log_id ON flight_positions(flight_log_id);
-CREATE INDEX idx_flight_positions_timestamp ON flight_positions(timestamp DESC);
-CREATE INDEX idx_flight_positions_location ON flight_positions(latitude, longitude);
-CREATE INDEX idx_flight_positions_hovering ON flight_positions(is_hovering) WHERE is_hovering = TRUE;
+CREATE INDEX IF NOT EXISTS idx_flight_positions_flight_log_id ON flight_positions(flight_log_id);
+CREATE INDEX IF NOT EXISTS idx_flight_positions_timestamp ON flight_positions(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_flight_positions_location ON flight_positions(latitude, longitude);
+CREATE INDEX IF NOT EXISTS idx_flight_positions_hovering ON flight_positions(is_hovering) WHERE is_hovering = TRUE;
 
 -- Legal documents table
-CREATE TABLE legal_documents (
+CREATE TABLE IF NOT EXISTS legal_documents (
     id SERIAL PRIMARY KEY,
     document_type VARCHAR(50) NOT NULL,  -- 'complaint', 'motion', 'brief', etc.
     title VARCHAR(500) NOT NULL,
@@ -166,12 +159,12 @@ CREATE TABLE legal_documents (
 );
 
 -- Create indexes for legal_documents
-CREATE INDEX idx_legal_documents_type ON legal_documents(document_type);
-CREATE INDEX idx_legal_documents_status ON legal_documents(status);
-CREATE INDEX idx_legal_documents_case_number ON legal_documents(case_number);
+CREATE INDEX IF NOT EXISTS idx_legal_documents_type ON legal_documents(document_type);
+CREATE INDEX IF NOT EXISTS idx_legal_documents_status ON legal_documents(status);
+CREATE INDEX IF NOT EXISTS idx_legal_documents_case_number ON legal_documents(case_number);
 
 -- Constitutional analyses table
-CREATE TABLE constitutional_analyses (
+CREATE TABLE IF NOT EXISTS constitutional_analyses (
     id SERIAL PRIMARY KEY,
     legal_document_id INTEGER REFERENCES legal_documents(id) ON DELETE CASCADE,
     
@@ -189,7 +182,7 @@ CREATE TABLE constitutional_analyses (
 );
 
 -- Legal precedents table
-CREATE TABLE legal_precedents (
+CREATE TABLE IF NOT EXISTS legal_precedents (
     id SERIAL PRIMARY KEY,
     legal_document_id INTEGER REFERENCES legal_documents(id) ON DELETE CASCADE,
     
@@ -210,7 +203,7 @@ CREATE TABLE legal_precedents (
 );
 
 -- Task history table for background job tracking
-CREATE TABLE task_history (
+CREATE TABLE IF NOT EXISTS task_history (
     id SERIAL PRIMARY KEY,
     task_id UUID DEFAULT uuid_generate_v4(),
     task_name VARCHAR(200) NOT NULL,
@@ -239,13 +232,13 @@ CREATE TABLE task_history (
 );
 
 -- Create indexes for task_history
-CREATE INDEX idx_task_history_task_id ON task_history(task_id);
-CREATE INDEX idx_task_history_task_name ON task_history(task_name);
-CREATE INDEX idx_task_history_status ON task_history(status);
-CREATE INDEX idx_task_history_created_at ON task_history(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_task_history_task_id ON task_history(task_id);
+CREATE INDEX IF NOT EXISTS idx_task_history_task_name ON task_history(task_name);
+CREATE INDEX IF NOT EXISTS idx_task_history_status ON task_history(status);
+CREATE INDEX IF NOT EXISTS idx_task_history_created_at ON task_history(created_at DESC);
 
 -- Task events table for detailed task logging
-CREATE TABLE task_events (
+CREATE TABLE IF NOT EXISTS task_events (
     id SERIAL PRIMARY KEY,
     task_history_id INTEGER REFERENCES task_history(id) ON DELETE CASCADE,
     event_type VARCHAR(50),  -- 'info', 'warning', 'error', 'progress'
@@ -255,7 +248,7 @@ CREATE TABLE task_events (
 );
 
 -- Task metrics table for performance tracking
-CREATE TABLE task_metrics (
+CREATE TABLE IF NOT EXISTS task_metrics (
     id SERIAL PRIMARY KEY,
     task_history_id INTEGER REFERENCES task_history(id) ON DELETE CASCADE,
     metric_name VARCHAR(100),

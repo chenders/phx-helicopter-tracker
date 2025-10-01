@@ -1,0 +1,1 @@
+# Transcription Worker Package for Apple Silicon (M1)

@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import axios from '@/lib/axios'
 import { formatLocalTime, formatRelativeTime } from '../utils/dateUtils'
-import { Flight3DMapView } from '../components/Flight3DMapView'
+import FlightVisualization3DCesium from '../components/FlightVisualization3DCesiumFixed'
 
 interface FlightDetails {
   id: number
@@ -82,7 +82,7 @@ interface RadioArchive {
 
 const mapContainerStyle = {
   width: '100%',
-  height: '500px',
+  height: '400px',
 }
 
 // Dark mode map styles for better visibility
@@ -234,8 +234,8 @@ export function FlightDetailPage() {
   const [playingAudio, setPlayingAudio] = useState<string | null>(null)
   const [currentPositionIndex, setCurrentPositionIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [use3DView, setUse3DView] = useState(false)
-  const [playbackSpeed, setPlaybackSpeed] = useState(5)
+  const [use3DView, setUse3DView] = useState(true) // Default to 3D view
+  const [playbackSpeed, setPlaybackSpeed] = useState(1) // Start at normal speed
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const animationRef = useRef<number | null>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
@@ -956,9 +956,10 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
         </div>
 
         {use3DView ? (
-          <Flight3DMapView
+          <FlightVisualization3DCesium
             positions={positions}
-            flight={flight}
+            currentPositionIndex={currentPositionIndex}
+            isPlaying={isPlaying}
             searchContext={searchContext.lat && searchContext.lng ? {
               lat: searchContext.lat,
               lng: searchContext.lng,

@@ -19,6 +19,7 @@ celery_app = Celery(
         "app.workers.flight_tracking_tasks",
         "app.workers.flight_discovery_tasks",
         "app.workers.abnormal_pattern_tasks",
+        "app.workers.data_maintenance_tasks",
     ],
 )
 
@@ -31,13 +32,23 @@ celery_app.conf.update(
     enable_utc=True,
     task_track_started=True,
     # Task routing for different queues
+    # IMPORTANT: Transcription queue is handled by dedicated GPU workers (WSL2/M1 Mac)
+    # Main workers MUST exclude the 'transcription' queue
     task_routes={
         'app.workers.tracking_tasks.*': {'queue': 'tracking'},
         'app.workers.analysis_tasks.*': {'queue': 'analysis'},
         'app.workers.legal_tasks.*': {'queue': 'legal'},
         'app.workers.data_import_tasks.*': {'queue': 'data_import'},
         'app.workers.radio_tasks.*': {'queue': 'radio'},
-        'app.workers.fr24_scheduler.*': {'queue': 'scheduler'}
+        'app.workers.fr24_scheduler.*': {'queue': 'scheduler'},
+        # TRANSCRIPTION TASKS - ONLY processed by dedicated GPU workers
+        # DO NOT process these on the main server
+        'transcribe_phoenix_pd_archives': {'queue': 'transcription'},
+        'transcribe_audio_file': {'queue': 'transcription'},
+        'batch_transcribe_directory': {'queue': 'transcription'},
+        # Ensure radio download tasks stay on radio queue
+        'download_phoenix_pd_archives': {'queue': 'radio'},
+        'download_broadcastify_archives': {'queue': 'radio'},
     },
     worker_prefetch_multiplier=1,
     task_acks_late=True,
@@ -77,11 +88,12 @@ celery_app.conf.update(
             "task": "app.workers.tracking_tasks.monitor_fr24_credits",
             "schedule": 3600.0,  # Every hour
         },
-        # COMPLETE FLIGHT TRACKING - Captures 100% of positions
-        "monitor-complete-flights": {
-            "task": "monitor_and_download_complete_flights",
-            "schedule": 300.0,  # Every 5 minutes - detect takeoffs/landings
-        },
+        # COMPLETE FLIGHT TRACKING - Reduced frequency to save credits
+        # DISABLED - Consuming too many credits
+        # "monitor-complete-flights": {
+        #     "task": "monitor_and_download_complete_flights",
+        #     "schedule": 300.0,  # Every 5 minutes - detect takeoffs/landings
+        # },
         # DISABLED - Replaced by discover-phoenix-pd-flights which gets complete tracks
         # "download-missed-flights-daily": {
         #     "task": "download_missed_flight_tracks",
@@ -168,15 +180,15 @@ celery_app.conf.update(
         # Flight discovery for historical backfill
         "discover-phoenix-pd-flights": {
             "task": "discover_all_phoenix_pd_flights",
-            "schedule": 86400.0,  # Daily
+            "schedule": 43200.0,  # Twice daily (every 12 hours) for better coverage
         },
-        # Aggressive download schedule - multiple tasks to maximize throughput
-        # Total: 20 flights per minute = 1,200 flights/hour
-        # This will download all 3,500 pending flights in ~3 hours
+        # Balanced download schedule for complete data capture
+        # Runs every 15 minutes to ensure we get tracks before they expire
+        # But not so frequent as to exhaust credits
         "download-discovered-tracks-1": {
             "task": "download_tracks_for_discovered_flights",
-            "schedule": 60.0,  # Every minute
-            "kwargs": {"batch_size": 20}  # 20 flights per batch
+            "schedule": 900.0,  # Every 15 minutes (balanced)
+            "kwargs": {"batch_size": 10}  # 10 flights per batch
         },
         # Additional parallel task for faster downloads (disabled for now, enable if needed)
         # "download-discovered-tracks-2": {
@@ -184,12 +196,12 @@ celery_app.conf.update(
         #     "schedule": 60.0,  # Every minute
         #     "kwargs": {"batch_size": 10}
         # },
-        # Abnormal pattern detection - runs every 30 minutes to process historical data
+        # Abnormal pattern detection - reduced frequency to save credits
         "detect-abnormal-patterns": {
             "task": "detect_abnormal_flight_patterns",
-            "schedule": 1800.0,  # Every 30 minutes
+            "schedule": 86400.0,  # Once per day (was every 30 minutes)
             "kwargs": {
-                "batch_size": 50,  # Process 50 unanalyzed flights per run
+                "batch_size": 100,  # Process 100 unanalyzed flights per run (was 50)
                 "min_complexity_threshold": 2.0
             }
         },

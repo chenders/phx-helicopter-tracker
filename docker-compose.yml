@@ -58,7 +58,6 @@ services:
       - FR24_MONTHLY_CREDIT_LIMIT=${FR24_MONTHLY_CREDIT_LIMIT}
       - BROADCASTIFY_USERNAME=${BROADCASTIFY_USERNAME}
       - BROADCASTIFY_PASSWORD=${BROADCASTIFY_PASSWORD}
-      - MAIN_SEARCH_ADDRESS=${MAIN_SEARCH_ADDRESS}
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
     volumes:
@@ -85,7 +84,6 @@ services:
       - FR24_MONTHLY_CREDIT_LIMIT=${FR24_MONTHLY_CREDIT_LIMIT}
       - BROADCASTIFY_USERNAME=${BROADCASTIFY_USERNAME}
       - BROADCASTIFY_PASSWORD=${BROADCASTIFY_PASSWORD}
-      - MAIN_SEARCH_ADDRESS=${MAIN_SEARCH_ADDRESS}
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
     volumes:
@@ -96,7 +94,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    # IMPORTANT: Exclude transcription queue - handled by dedicated GPU workers
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 --queues=celery,tracking,analysis,legal,data_import,radio,scheduler
 
   celery-beat:
     build:
@@ -155,14 +154,12 @@ services:
       args:
         - NODE_ENV=development
         - VITE_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
-        - VITE_MAIN_SEARCH_ADDRESS=${VITE_MAIN_SEARCH_ADDRESS}
     ports:
       - "3000:3000"
     environment:
       # Don't set API URL - let the app use relative URLs to prevent HTTPS issues
       # - REACT_APP_API_URL=http://${APP_HOSTNAME:-localhost}:9080
       - VITE_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
-      - VITE_MAIN_SEARCH_ADDRESS=${VITE_MAIN_SEARCH_ADDRESS}
       - NODE_ENV=development
     volumes:
       - ./frontend:/app

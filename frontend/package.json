@@ -15,6 +15,7 @@
     "@react-google-maps/api": "^2.19.2",
     "@tanstack/react-query": "^4.36.1",
     "axios": "^1.6.0",
+    "cesium": "^1.133.1",
     "date-fns": "^2.30.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.543.0",
@@ -24,7 +25,8 @@
     "react-router-dom": "^6.17.0",
     "recharts": "^2.8.0",
     "socket.io-client": "^4.7.2",
-    "tailwindcss": "^3.3.5"
+    "tailwindcss": "^3.3.5",
+    "vite-plugin-cesium": "^1.2.23"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.8.0",

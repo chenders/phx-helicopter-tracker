@@ -1,0 +1,85 @@
+# robots.txt for Phoenix Helicopter Tracker API
+# Block all web crawlers and bots from the entire API
+
+# Block all bots from all endpoints
+User-agent: *
+Disallow: /
+Crawl-delay: 86400
+
+# No API documentation should be indexed
+User-agent: *
+Disallow: /docs
+Disallow: /redoc
+Disallow: /openapi.json
+
+# Block all API endpoints
+User-agent: *
+Disallow: /api/
+
+# Specifically block major search engines
+User-agent: Googlebot
+Disallow: /
+
+User-agent: Bingbot
+Disallow: /
+
+User-agent: Slurp
+Disallow: /
+
+User-agent: DuckDuckBot
+Disallow: /
+
+User-agent: Baiduspider
+Disallow: /
+
+User-agent: YandexBot
+Disallow: /
+
+# Block social media bots
+User-agent: facebookexternalhit
+Disallow: /
+
+User-agent: Twitterbot
+Disallow: /
+
+User-agent: LinkedInBot
+Disallow: /
+
+# Block archiving bots
+User-agent: ia_archiver
+Disallow: /
+
+User-agent: Wayback Machine
+Disallow: /
+
+# Block SEO analysis bots
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+# Block AI/ML training bots
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ChatGPT-User
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+# No sitemap
+Sitemap:
