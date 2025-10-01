@@ -687,8 +687,8 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
 
   const calculateAverageSpeed = () => {
     const speeds = positions.map(p => p.ground_speed_knots).filter(s => s > 0)
-    if (speeds.length === 0) return 0
-    return (speeds.reduce((a, b) => a + b, 0) / speeds.length).toFixed(1)
+    if (speeds.length === 0) return '0'
+    return (speeds.reduce((a, b) => a + b, 0) / speeds.length).toFixed(2)
   }
 
   if (loading) {
@@ -761,7 +761,9 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
           <div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Duration</div>
             <div className="font-semibold text-gray-900 dark:text-white">
-              {flight.flight_duration_minutes} min
+              {typeof flight.flight_duration_minutes === 'number'
+                ? flight.flight_duration_minutes.toFixed(2)
+                : flight.flight_duration_minutes} min
             </div>
           </div>
           <div>
@@ -773,7 +775,10 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
           <div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Avg Speed</div>
             <div className="font-semibold text-gray-900 dark:text-white">
-              {calculateAverageSpeed()} kts
+              {(parseFloat(calculateAverageSpeed()) * 1.15078).toFixed(2)} mph
+              <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">
+                ({calculateAverageSpeed()} kts)
+              </span>
             </div>
           </div>
           <div>
@@ -1088,7 +1093,10 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
               <div className="p-2">
                 <div className="font-medium">{formatLocalTime(selectedPosition.timestamp)}</div>
                 <div className="text-sm">Altitude: {selectedPosition.altitude_feet} ft</div>
-                <div className="text-sm">Speed: {selectedPosition.ground_speed_knots} kts</div>
+                <div className="text-sm">
+                  Speed: {(selectedPosition.ground_speed_knots * 1.15078).toFixed(2)} mph
+                  <span className="text-gray-500 ml-1">({selectedPosition.ground_speed_knots.toFixed(2)} kts)</span>
+                </div>
                 {selectedPosition.is_hovering && (
                   <div className="text-sm text-red-600">Hovering: {selectedPosition.hover_duration_seconds}s</div>
                 )}

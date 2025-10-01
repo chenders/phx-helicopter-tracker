@@ -44,12 +44,13 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isAnimating, setIsAnimating] = useState(false);
   const animationRef = useRef<any>(null);
+  const animationFunctionRef = useRef<any>(null);
   const mountedRef = useRef(true);
 
   // Clean up function
   const cleanup = useCallback(() => {
     if (animationRef.current) {
-      clearInterval(animationRef.current);
+      clearTimeout(animationRef.current);
       animationRef.current = null;
     }
 
@@ -138,13 +139,15 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
         const Cesium = window.Cesium;
 
-        // Set Cesium Ion default access token
-        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1kMTNjYmFkZjU3NjQiLCJpZCI6NTU3NjYsImlhdCI6MTYyMzI1NTU5OH0.WafrBABTcvHp9HzHpBKDZfZuHg5cRjeVZwIhIOM5iyY';
+        // Suppress the sandboxed iframe warning
+        window.CESIUM_BASE_URL = 'https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/';
 
-        // Create the Cesium Viewer
+        // Set Cesium Ion default access token (your personal token)
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiM2FlZDAyOS00ZjE4LTQ0NjItOTY4ZC0xNzQyNGIzNjhhOTkiLCJpZCI6MzQ2MjQ4LCJpYXQiOjE3NTkzMDkyMjl9.zkS_2D4Y8scZkqmS_lckpl2G_7c8sGaFwMazm26eAT0';
+
+        // Create the Cesium Viewer with no base imagery (to avoid grid)
         const viewer = new Cesium.Viewer(cesiumContainer, {
           terrainProvider: undefined,
-          imageryProvider: false,
           baseLayerPicker: false,
           geocoder: false,
           homeButton: false,
@@ -154,11 +157,22 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           timeline: false,
           fullscreenButton: false,
           vrButton: false,
-          requestRenderMode: true,
+          requestRenderMode: false, // Keep rendering continuously for 3D tiles
           maximumRenderTimeChange: Infinity,
           shadows: false,
-          shouldAnimate: true
+          shouldAnimate: true,
+          useBrowserRecommendedResolution: true,
+          automaticallyTrackDataSourceClocks: false,
+          contextOptions: {
+            webgl: {
+              preserveDrawingBuffer: true
+            }
+          },
+          orderIndependentTranslucency: false
         });
+
+        // Remove all default imagery providers to get rid of the grid
+        viewer.imageryLayers.removeAll();
 
         if (!mountedRef.current) {
           viewer.destroy();
@@ -170,12 +184,14 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
         // Hide credits
         viewer.cesiumWidget.creditContainer.style.display = 'none';
 
-        // Configure scene - keep globe visible initially as fallback
-        viewer.scene.globe.show = true;
-        viewer.scene.globe.depthTestAgainstTerrain = true;
-        viewer.scene.skyBox.show = true;
-        viewer.scene.sun.show = true;
+        // Configure scene - completely hide the globe to avoid grid
+        viewer.scene.globe.show = false; // Hide globe completely from the start
+        viewer.scene.globe.depthTestAgainstTerrain = false;
+        viewer.scene.skyBox.show = false; // Hide skybox
+        viewer.scene.sun.show = false;
         viewer.scene.moon.show = false;
+        viewer.scene.backgroundColor = Cesium.Color.BLACK; // Black background
+        viewer.scene.fog.enabled = false; // Disable fog
 
         // Set a default terrain provider using the correct API
         viewer.terrainProvider = new Cesium.EllipsoidTerrainProvider();
@@ -183,31 +199,57 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
         // Add Google Photorealistic 3D Tiles
         try {
           const apiKey = import.meta.env.VITE_GOOGLE_TILES_API_KEY || import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+          console.log('Using Google Tiles API Key:', apiKey ? 'Key present' : 'No key found');
+
           if (!apiKey) {
             throw new Error('Google Maps API key not configured');
           }
 
+          // Remove quotes if present in the API key
+          const cleanApiKey = apiKey.replace(/['"]/g, '');
+
+          console.log('Loading Google 3D Tiles from:', `https://tile.googleapis.com/v1/3dtiles/root.json?key=${cleanApiKey.substring(0, 10)}...`);
+
           const tileset = await Cesium.Cesium3DTileset.fromUrl(
-            `https://tile.googleapis.com/v1/3dtiles/root.json?key=${apiKey}`,
+            `https://tile.googleapis.com/v1/3dtiles/root.json?key=${cleanApiKey}`,
             {
               showCreditsOnScreen: true,
-              maximumScreenSpaceError: 2,
-              maximumMemoryUsage: 512,
-              skipLevelOfDetail: false,
-              immediatelyLoadDesiredLevelOfDetail: true,
+              maximumScreenSpaceError: 8, // Start with lower quality for faster loading
+              maximumMemoryUsage: 1024, // More memory for tiles
+              skipLevelOfDetail: true,
+              immediatelyLoadDesiredLevelOfDetail: false,
               loadSiblings: true,
-              cullWithChildrenBounds: false
+              cullWithChildrenBounds: true,
+              dynamicScreenSpaceError: true,
+              dynamicScreenSpaceErrorDensity: 0.00278,
+              dynamicScreenSpaceErrorFactor: 4.0
             }
           );
+
+          console.log('Google 3D Tileset loaded successfully');
 
           if (mountedRef.current) {
             viewer.scene.primitives.add(tileset);
 
+            // Store tileset reference on viewer for access during animation
+            viewer.googleTileset = tileset;
+
             // Wait for initial tiles to load
             await tileset.readyPromise;
+            console.log('Google 3D Tiles ready');
 
-            // Hide the globe once 3D tiles are loaded successfully
+            // Configure tileset for better rendering
+            tileset.maximumScreenSpaceError = 4; // Higher value = faster loading, lower quality
+            tileset.skipLevelOfDetail = true; // Speed up loading
+
+            // Keep the globe hidden - don't change this during animation
             viewer.scene.globe.show = false;
+
+            // Also ensure the globe stays hidden during rendering
+            viewer.scene.globe.enableLighting = false;
+
+            // Force a render
+            viewer.scene.requestRender();
           }
         } catch (tileError) {
           console.warn('Could not load Google 3D tiles, using default terrain:', tileError);
@@ -300,105 +342,309 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           show: false
         });
 
+        // Store helicopter reference on viewer for access in animation function
+        viewer.helicopterEntity = helicopter;
+
         // Start with first-person pilot view
         const startPos = positions[0];
-        // Ensure minimum altitude above ground
-        const minAltitude = Math.max(startPos.altitude_feet, 500);
+        // Higher altitude to see more tiles
+        const startAltitude = 2000; // Higher altitude to load more tiles
         const startCartesian = Cesium.Cartesian3.fromDegrees(
           startPos.longitude,
           startPos.latitude,
-          minAltitude * 0.3048
+          startAltitude * 0.3048
         );
 
         // Set initial first-person view with proper pitch
         const heading = Cesium.Math.toRadians(startPos.track_degrees || 0);
-        const pitchAngle = -15; // 15 degrees below horizon, typical pilot view
+        const pitchAngle = -25; // Moderate downward angle
 
-        // Use setView with a small delay to ensure scene is ready
-        viewer.scene.globe.show = true; // Ensure globe is visible initially
+        // Initial camera setup
+        console.log('Setting initial camera position:', {
+          lat: startPos.latitude,
+          lon: startPos.longitude,
+          alt: startAltitude,
+          heading: startPos.track_degrees || 0,
+          pitch: pitchAngle
+        });
 
+        // Set camera immediately with Phoenix coordinates
+        viewer.camera.setView({
+          destination: startCartesian,
+          orientation: {
+            heading: heading,
+            pitch: Cesium.Math.toRadians(pitchAngle),
+            roll: 0
+          }
+        });
+
+        // Force a render
+        viewer.scene.requestRender();
+
+        // After tiles load, set camera again to ensure proper view
         setTimeout(() => {
+          console.log('Resetting camera after tiles load');
           viewer.camera.setView({
             destination: startCartesian,
             orientation: {
               heading: heading,
-              pitch: Cesium.Math.toRadians(pitchAngle),
+              pitch: Cesium.Math.toRadians(-25),
               roll: 0
             }
           });
 
-          // Force a render to ensure everything is loaded
+          // Ensure we're rendering the tiles
           viewer.scene.requestRender();
-        }, 100);
+        }, 2000);
 
-        // Animation function
+        // Smooth interpolation function
+        const lerp = (start: number, end: number, t: number) => {
+          return start + (end - start) * t;
+        };
+
+        // Create animation state on the viewer itself to ensure persistence
+        if (viewer && !viewer.animationState) {
+          viewer.animationState = {
+            currentIndex: 0,
+            interpolationProgress: 0,
+            frameCount: 0
+          };
+        }
+
+        // Animation function with smooth interpolation
         const animateFlight = () => {
+          console.log('Starting animation with', positions.length, 'positions');
+          console.log('Viewer exists:', !!viewer);
+          console.log('Helicopter entity exists:', !!viewer.helicopterEntity);
+
           if (animationRef.current) {
-            clearInterval(animationRef.current);
+            console.log('Clearing existing animation timeout');
+            clearTimeout(animationRef.current);
           }
 
           setIsAnimating(true);
-          let index = 0;
-          const stepSize = Math.max(1, Math.floor(playbackSpeed));
 
-          animationRef.current = setInterval(() => {
-            if (!mountedRef.current || index >= positions.length) {
-              if (animationRef.current) {
-                clearInterval(animationRef.current);
-                setIsAnimating(false);
+          // Reset animation state for new animation
+          viewer.animationState.currentIndex = 0;
+          viewer.animationState.interpolationProgress = 0;
+          viewer.animationState.frameCount = 0;
+
+          const framesPerSecond = 30; // Smooth 30 FPS animation
+          const interpolationSteps = Math.max(5, Math.floor(15 / playbackSpeed)); // Fewer steps for faster movement
+          const intervalMs = 1000 / framesPerSecond;
+
+          console.log(`Animation settings: ${framesPerSecond} FPS, ${interpolationSteps} steps, ${intervalMs}ms interval`);
+
+          // Use recursive setTimeout instead of setInterval for better reliability
+          const animate = () => {
+            try {
+              // Ensure animationState exists
+              if (!viewer.animationState) {
+                console.error('Animation state not initialized');
+                return;
               }
+
+              viewer.animationState.frameCount++;
+
+              // Simple frame counter log
+              console.log(`FRAME ${viewer.animationState.frameCount}`);
+
+              // Log first few frames to confirm animation is running
+              if (viewer.animationState.frameCount <= 5) {
+                console.log(`Animation frame ${viewer.animationState.frameCount} running at ${new Date().toISOString()}`);
+              }
+
+              // Test simplest case first
+              if (viewer.animationState.frameCount === 1) {
+                console.log('Testing viewer access:', !!viewer);
+                console.log('Testing positions access:', positions.length);
+                console.log('Testing window.Cesium access:', !!window.Cesium);
+              }
+
+              // Check end conditions more carefully
+              console.log('Checking conditions:', {
+                mounted: mountedRef.current,
+                viewer: !!viewer,
+                currentIndex: viewer.animationState.currentIndex,
+                positionsLength: positions.length
+              });
+
+              if (!mountedRef.current || !viewer) {
+                console.log('Animation stopped: component unmounted or viewer destroyed');
+                setIsAnimating(false);
+                return;
+              }
+
+              if (viewer.animationState.currentIndex >= positions.length - 1) {
+                console.log(`Animation completed: reached end at index ${viewer.animationState.currentIndex} of ${positions.length} after ${viewer.animationState.frameCount} frames`);
+                setIsAnimating(false);
+                return;
+              }
+
+            // Get current and next positions for interpolation
+            const currentPos = positions[viewer.animationState.currentIndex];
+            const nextPos = positions[Math.min(viewer.animationState.currentIndex + 1, positions.length - 1)];
+
+            // Debug log every new position
+            if (viewer.animationState.interpolationProgress === 0) {
+              console.log(`Animating: index ${viewer.animationState.currentIndex}/${positions.length}, pos: ${currentPos.latitude.toFixed(4)}, ${currentPos.longitude.toFixed(4)}`);
+              console.log(`Next index will be: ${viewer.animationState.currentIndex + 1}, interpolation steps: ${interpolationSteps}`);
+            }
+
+            // Additional debug logging
+            if (!currentPos || !nextPos) {
+              console.error('Missing position data:', { currentPos: !!currentPos, nextPos: !!nextPos, index: viewer.animationState.currentIndex });
+              setIsAnimating(false);
               return;
             }
 
-            const currentPos = positions[index];
-            const cartesianPos = Cesium.Cartesian3.fromDegrees(
-              currentPos.longitude,
-              currentPos.latitude,
-              currentPos.altitude_feet * 0.3048
+            // Calculate interpolation factor (0 to 1)
+            const t = viewer.animationState.interpolationProgress / interpolationSteps;
+
+            // Smoothly interpolate position
+            const interpolatedLat = lerp(currentPos.latitude, nextPos.latitude, t);
+            const interpolatedLon = lerp(currentPos.longitude, nextPos.longitude, t);
+            // Ensure minimum altitude of 1500 feet to stay above ground
+            const rawAlt = lerp(currentPos.altitude_feet, nextPos.altitude_feet, t);
+            const interpolatedAlt = Math.max(rawAlt, 1500);
+
+            // Interpolate heading (handling wrap-around at 360 degrees)
+            let currentHeading = currentPos.track_degrees || 0;
+            let nextHeading = nextPos.track_degrees || currentHeading;
+
+            // Handle heading wrap-around (e.g., 350° to 10°)
+            if (Math.abs(nextHeading - currentHeading) > 180) {
+              if (currentHeading > nextHeading) {
+                nextHeading += 360;
+              } else {
+                currentHeading += 360;
+              }
+            }
+            const interpolatedHeading = lerp(currentHeading, nextHeading, t) % 360;
+
+            // Create smooth position (use window.Cesium to ensure access)
+            const cartesianPos = window.Cesium.Cartesian3.fromDegrees(
+              interpolatedLon,
+              interpolatedLat,
+              interpolatedAlt * 0.3048
             );
 
-            // Update helicopter position
-            helicopter.position = cartesianPos;
+            // Update helicopter position (use stored reference)
+            if (viewer.helicopterEntity) {
+              viewer.helicopterEntity.position = cartesianPos;
+            }
 
-            // Set camera to first-person pilot view
-            // Look FROM the helicopter position in the direction of travel
-            const heading = Cesium.Math.toRadians(currentPos.track_degrees || 0);
+            // Set camera to first-person pilot view with interpolated heading
+            const heading = window.Cesium.Math.toRadians(interpolatedHeading);
+            const pitchAngle = -20; // More horizontal view to keep tiles loaded
 
-            // Calculate look direction - forward and slightly down
-            // Pilots typically look 10-15 degrees below horizon
-            const pitchAngle = -15; // degrees below horizon
-            const distance = 2000; // Look 2km ahead
-
-            // Calculate the look-at point using proper spherical coordinates
-            const cosLat = Math.cos(currentPos.latitude * Math.PI / 180);
-            const lookAtLat = currentPos.latitude + (distance * Math.cos(heading) / 111000);
-            const lookAtLon = currentPos.longitude + (distance * Math.sin(heading) / (111000 * cosLat));
-
-            // Look point should be below current altitude based on pitch angle
-            const verticalDistance = distance * Math.tan(pitchAngle * Math.PI / 180);
-            const lookAtAlt = (currentPos.altitude_feet * 0.3048) + verticalDistance;
-
-            const lookAtPoint = Cesium.Cartesian3.fromDegrees(lookAtLon, lookAtLat, lookAtAlt);
-
-            // Position camera at helicopter with proper orientation
-            viewer.camera.setView({
-              destination: cartesianPos,
-              orientation: {
-                heading: heading,
-                pitch: Cesium.Math.toRadians(pitchAngle),
-                roll: 0
+            // Smooth camera movement
+            try {
+              // Log camera position periodically
+              if (viewer.animationState.frameCount % 30 === 0) {
+                console.log(`Camera update: alt=${interpolatedAlt}ft, lat=${interpolatedLat.toFixed(4)}, lon=${interpolatedLon.toFixed(4)}`);
+                console.log(`Globe visible: ${viewer.scene.globe.show}, Tiles count: ${viewer.scene.primitives.length}`);
               }
+
+              viewer.camera.setView({
+                destination: cartesianPos,
+                orientation: {
+                  heading: heading,
+                  pitch: window.Cesium.Math.toRadians(pitchAngle),
+                  roll: 0
+                }
+              });
+
+              // Force tiles to stay visible
+              if (viewer.scene.globe.show) {
+                console.warn('Globe became visible again, hiding it');
+                viewer.scene.globe.show = false;
+              }
+
+              // Ensure Google tiles are still in the scene
+              if (viewer.googleTileset && !viewer.scene.primitives.contains(viewer.googleTileset)) {
+                console.warn('Google tileset was removed, re-adding it');
+                viewer.scene.primitives.add(viewer.googleTileset);
+              }
+
+              // Request render to ensure tiles are displayed
+              viewer.scene.requestRender();
+            } catch (error) {
+              console.error('Error setting camera view:', error);
+            }
+
+            // Advance interpolation
+            console.log('Before advancing:', {
+              progress: viewer.animationState.interpolationProgress,
+              index: viewer.animationState.currentIndex,
+              steps: interpolationSteps
             });
 
-            index += stepSize;
-          }, 1000 / playbackSpeed);
+            viewer.animationState.interpolationProgress++;
+            if (viewer.animationState.interpolationProgress >= interpolationSteps) {
+              viewer.animationState.interpolationProgress = 0;
+              viewer.animationState.currentIndex++;
+            }
+
+            console.log('After advancing:', {
+              progress: viewer.animationState.interpolationProgress,
+              index: viewer.animationState.currentIndex
+            });
+
+            // Schedule next frame - try both methods for reliability
+            console.log(`About to schedule frame ${viewer.animationState.frameCount + 1}`);
+
+            // Try requestAnimationFrame with delay
+            const nextFrameTime = Date.now() + intervalMs;
+
+            const scheduleNext = () => {
+              if (Date.now() >= nextFrameTime) {
+                console.log(`Frame ${viewer.animationState.frameCount + 1} executing`);
+                animate();
+              } else {
+                requestAnimationFrame(scheduleNext);
+              }
+            };
+
+            // Start the next frame scheduling
+            requestAnimationFrame(scheduleNext);
+
+            // Also set a backup timeout in case RAF fails
+            animationRef.current = setTimeout(() => {
+              console.log(`Backup timeout fired for frame ${viewer.animationState.frameCount + 1}`);
+              animate();
+            }, intervalMs + 100);
+
+            console.log(`Scheduled next frame with RAF and backup timeout`);
+
+            } catch (error) {
+              console.error('Error in animation frame:', error);
+              console.error('Stack trace:', error.stack);
+              setIsAnimating(false);
+            }
+          };
+
+          // Start the animation
+          console.log('Starting animation loop with recursive setTimeout');
+
+          // Call animate directly first to test if it works
+          try {
+            console.log('Calling animate function directly');
+            animate();
+          } catch (error) {
+            console.error('Error in animate function:', error);
+          }
         };
 
-        // Store functions
+        // Store animation function in ref to preserve closure
+        animationFunctionRef.current = animateFlight;
+
+        // Also store on viewer for backwards compatibility
         viewer.animateFlight = animateFlight;
         viewer.resetView = () => {
           if (animationRef.current) {
-            clearInterval(animationRef.current);
+            clearTimeout(animationRef.current);
+            animationRef.current = null;
             setIsAnimating(false);
           }
           viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
@@ -423,15 +669,124 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
     return cleanup;
   }, [positions, cleanup]);
 
+  // Handle external position updates with smooth interpolation
+  useEffect(() => {
+    if (!viewerRef.current || !mountedRef.current || positions.length === 0) return;
+    if (currentPositionIndex < 0 || currentPositionIndex >= positions.length) return;
+
+    const targetPos = positions[currentPositionIndex];
+    const viewer = viewerRef.current;
+
+    // If we have a previous position, interpolate smoothly
+    if (currentPositionIndex > 0 && !isAnimating) {
+      const prevIndex = Math.max(0, currentPositionIndex - 1);
+      const prevPos = positions[prevIndex];
+
+      // Calculate number of interpolation steps based on distance
+      const distance = Math.sqrt(
+        Math.pow(targetPos.latitude - prevPos.latitude, 2) +
+        Math.pow(targetPos.longitude - prevPos.longitude, 2)
+      );
+      const steps = Math.min(15, Math.max(5, Math.floor(distance * 10000)));
+
+      let step = 0;
+      const interpolationInterval = setInterval(() => {
+        if (!mountedRef.current || step >= steps) {
+          clearInterval(interpolationInterval);
+          return;
+        }
+
+        const t = step / steps;
+        const smoothT = t * t * (3 - 2 * t); // Smoothstep function for even smoother motion
+
+        // Interpolate position
+        const lat = prevPos.latitude + (targetPos.latitude - prevPos.latitude) * smoothT;
+        const lon = prevPos.longitude + (targetPos.longitude - prevPos.longitude) * smoothT;
+        const alt = prevPos.altitude_feet + (targetPos.altitude_feet - prevPos.altitude_feet) * smoothT;
+
+        // Interpolate heading
+        let prevHeading = prevPos.track_degrees || 0;
+        let targetHeading = targetPos.track_degrees || prevHeading;
+
+        // Handle wrap-around
+        if (Math.abs(targetHeading - prevHeading) > 180) {
+          if (prevHeading > targetHeading) {
+            targetHeading += 360;
+          } else {
+            prevHeading += 360;
+          }
+        }
+        const heading = (prevHeading + (targetHeading - prevHeading) * smoothT) % 360;
+
+        const cartesianPos = window.Cesium.Cartesian3.fromDegrees(lon, lat, alt * 0.3048);
+
+        viewer.camera.setView({
+          destination: cartesianPos,
+          orientation: {
+            heading: window.Cesium.Math.toRadians(heading),
+            pitch: window.Cesium.Math.toRadians(-15),
+            roll: 0
+          }
+        });
+
+        step++;
+      }, 16); // ~60 FPS for very smooth motion
+    } else {
+      // Direct jump if no previous position or during animation
+      const cartesianPos = window.Cesium.Cartesian3.fromDegrees(
+        targetPos.longitude,
+        targetPos.latitude,
+        targetPos.altitude_feet * 0.3048
+      );
+
+      viewer.camera.setView({
+        destination: cartesianPos,
+        orientation: {
+          heading: window.Cesium.Math.toRadians(targetPos.track_degrees || 0),
+          pitch: window.Cesium.Math.toRadians(-15),
+          roll: 0
+        }
+      });
+    }
+  }, [currentPositionIndex, positions, isAnimating]);
+
+  // Handle external play/pause control
+  useEffect(() => {
+    if (!viewerRef.current && !animationFunctionRef.current) return;
+
+    if (isPlaying && !isAnimating) {
+      if (animationFunctionRef.current) {
+        console.log('Starting animation via external play control');
+        animationFunctionRef.current();
+      } else if (viewerRef.current?.animateFlight) {
+        viewerRef.current.animateFlight();
+      }
+    } else if (!isPlaying && isAnimating) {
+      if (animationRef.current) {
+        clearTimeout(animationRef.current);
+        animationRef.current = null;
+        setIsAnimating(false);
+      }
+    }
+  }, [isPlaying, isAnimating]);
+
   const handleStartAnimation = () => {
-    if (viewerRef.current?.animateFlight) {
+    console.log('handleStartAnimation called');
+    if (animationFunctionRef.current) {
+      console.log('Calling animation function from ref');
+      animationFunctionRef.current();
+    } else if (viewerRef.current?.animateFlight) {
+      console.log('Calling animation function from viewer');
       viewerRef.current.animateFlight();
+    } else {
+      console.log('No animation function available');
     }
   };
 
   const handleStopAnimation = () => {
     if (animationRef.current) {
-      clearInterval(animationRef.current);
+      clearTimeout(animationRef.current);
+      animationRef.current = null;
       setIsAnimating(false);
     }
   };

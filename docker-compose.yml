@@ -154,12 +154,14 @@ services:
       args:
         - NODE_ENV=development
         - VITE_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+        - VITE_GOOGLE_TILES_API_KEY=${GOOGLE_TILES_API_KEY}
     ports:
       - "3000:3000"
     environment:
       # Don't set API URL - let the app use relative URLs to prevent HTTPS issues
       # - REACT_APP_API_URL=http://${APP_HOSTNAME:-localhost}:9080
       - VITE_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - VITE_GOOGLE_TILES_API_KEY=${GOOGLE_TILES_API_KEY}
       - NODE_ENV=development
     volumes:
       - ./frontend:/app

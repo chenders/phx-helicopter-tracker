@@ -100,7 +100,7 @@ class FR24OfficialAPI:
                 flights = data.get("data", [])
                 logger.info(f"Found {len(flights)} flights in Phoenix area")
                 # Cache the successful response
-                cache_service.set(cache_key, flights, ttl=300)
+                cache_service.set(cache_key, flights, ttl_seconds=300)
                 return flights
             elif response.status_code == 401:
                 logger.error("FR24 API authentication failed - check API token")

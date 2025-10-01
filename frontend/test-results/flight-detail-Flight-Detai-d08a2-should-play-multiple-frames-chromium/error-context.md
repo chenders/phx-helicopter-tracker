@@ -1,0 +1,160 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - complementary [ref=e5]:
+    - generic [ref=e7]:
+      - link "🚁 Phoenix PD Helicopter Tracker" [ref=e8] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e9] [cursor=pointer]: 🚁
+        - generic [ref=e10] [cursor=pointer]:
+          - heading "Phoenix PD" [level=1] [ref=e11] [cursor=pointer]
+          - paragraph [ref=e12] [cursor=pointer]: Helicopter Tracker
+      - button "Collapse sidebar" [ref=e13] [cursor=pointer]:
+        - img [ref=e14] [cursor=pointer]
+    - navigation [ref=e16]:
+      - link "🏠 Dashboard" [ref=e17] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e18] [cursor=pointer]: 🏠
+        - generic [ref=e19] [cursor=pointer]: Dashboard
+      - link "🔎 Flight Search" [ref=e20] [cursor=pointer]:
+        - /url: /search
+        - generic [ref=e21] [cursor=pointer]: 🔎
+        - generic [ref=e22] [cursor=pointer]: Flight Search
+      - link "📡 Live Tracking" [ref=e23] [cursor=pointer]:
+        - /url: /live
+        - generic [ref=e24] [cursor=pointer]: 📡
+        - generic [ref=e25] [cursor=pointer]: Live Tracking
+      - link "📊 Historical" [ref=e26] [cursor=pointer]:
+        - /url: /historical
+        - generic [ref=e27] [cursor=pointer]: 📊
+        - generic [ref=e28] [cursor=pointer]: Historical
+      - link "🔍 Patterns" [ref=e29] [cursor=pointer]:
+        - /url: /patterns
+        - generic [ref=e30] [cursor=pointer]: 🔍
+        - generic [ref=e31] [cursor=pointer]: Patterns
+      - link "⚠️ Abnormal Patterns" [ref=e32] [cursor=pointer]:
+        - /url: /abnormal
+        - generic [ref=e33] [cursor=pointer]: ⚠️
+        - generic [ref=e34] [cursor=pointer]: Abnormal Patterns
+      - link "💰 Cost Analysis" [ref=e35] [cursor=pointer]:
+        - /url: /costs
+        - generic [ref=e36] [cursor=pointer]: 💰
+        - generic [ref=e37] [cursor=pointer]: Cost Analysis
+      - link "⚖️ Legal Docs" [ref=e38] [cursor=pointer]:
+        - /url: /legal
+        - generic [ref=e39] [cursor=pointer]: ⚖️
+        - generic [ref=e40] [cursor=pointer]: Legal Docs
+      - link "📻 Radio Archives" [ref=e41] [cursor=pointer]:
+        - /url: /radio
+        - generic [ref=e42] [cursor=pointer]: 📻
+        - generic [ref=e43] [cursor=pointer]: Radio Archives
+      - button "⚡ System ▶" [ref=e45] [cursor=pointer]:
+        - generic [ref=e46] [cursor=pointer]:
+          - generic [ref=e47] [cursor=pointer]: ⚡
+          - generic [ref=e48] [cursor=pointer]: System
+        - generic [ref=e49] [cursor=pointer]: ▶
+  - banner [ref=e50]:
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - generic [ref=e53]: "Status:"
+        - generic [ref=e54]: Online
+      - generic [ref=e57]:
+        - generic [ref=e58]: "Data:"
+        - generic [ref=e59]: Live
+    - button "Theme selector" [ref=e61] [cursor=pointer]:
+      - generic [ref=e62] [cursor=pointer]: 🌑️
+      - generic [ref=e63] [cursor=pointer]: Darker
+      - img [ref=e64] [cursor=pointer]
+  - main [ref=e66]:
+    - generic [ref=e67]:
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - button "Back" [ref=e70] [cursor=pointer]:
+            - img [ref=e71] [cursor=pointer]
+            - text: Back
+          - generic [ref=e73]:
+            - button "Download Data" [ref=e74] [cursor=pointer]:
+              - img [ref=e75] [cursor=pointer]
+              - text: Download Data
+            - button "Open in Google Earth" [ref=e78] [cursor=pointer]:
+              - img [ref=e79] [cursor=pointer]
+              - text: Open in Google Earth
+        - generic [ref=e82]:
+          - img [ref=e83]
+          - generic [ref=e85]:
+            - heading "Flight fr24_complete_3c507155" [level=1] [ref=e86]
+            - paragraph [ref=e87]: 201 • N623FB
+        - generic [ref=e88]:
+          - generic [ref=e89]:
+            - generic [ref=e90]: Duration
+            - generic [ref=e91]: 43.73 min
+          - generic [ref=e92]:
+            - generic [ref=e93]: Distance
+            - generic [ref=e94]: 169.65 mi
+          - generic [ref=e95]:
+            - generic [ref=e96]: Avg Speed
+            - generic [ref=e97]:
+              - text: 65.13 mph
+              - generic [ref=e98]: (56.60 kts)
+          - generic [ref=e99]:
+            - generic [ref=e100]: Est. Cost
+            - generic [ref=e101]: $1,574.4
+      - generic [ref=e102]:
+        - generic [ref=e103]:
+          - heading "Flight Path" [level=2] [ref=e104]
+          - button "3D View" [ref=e106] [cursor=pointer]:
+            - img [ref=e107] [cursor=pointer]
+            - text: 3D View
+        - generic [ref=e110]:
+          - generic [ref=e111]: ⚠️ Error Loading CesiumJS
+          - generic [ref=e117]: "Failed to load 3D visualization: Cannot read properties of undefined (reading 'animationState')"
+      - generic [ref=e118]:
+        - generic [ref=e119]:
+          - heading "Flight Timeline" [level=2] [ref=e120]
+          - generic [ref=e121]:
+            - generic [ref=e122]:
+              - img [ref=e123]
+              - generic [ref=e126]:
+                - generic [ref=e127]: Departure
+                - generic [ref=e128]: 09:46:36 AM
+                - generic [ref=e129]: KDVT
+            - generic [ref=e130]:
+              - img [ref=e131]
+              - generic [ref=e133]:
+                - generic [ref=e134]: Flight Time
+                - generic [ref=e135]: 43.733333333333334 minutes
+                - generic [ref=e136]: 3290 position reports
+            - generic [ref=e137]:
+              - img [ref=e138]
+              - generic [ref=e141]:
+                - generic [ref=e142]: Arrival
+                - generic [ref=e143]: 10:29:23 AM
+                - generic [ref=e144]: KDVT
+          - generic [ref=e145]:
+            - heading "Altitude Profile" [level=3] [ref=e146]
+            - generic [ref=e148]:
+              - generic [ref=e149]: AGL (Above Ground Level)
+              - generic [ref=e150]:
+                - generic [ref=e151]:
+                  - generic [ref=e152]: Maximum
+                  - generic [ref=e153]: 1,139 ft
+                - generic [ref=e154]:
+                  - generic [ref=e155]: Average
+                  - generic [ref=e156]: 631 ft
+                - generic [ref=e157]:
+                  - generic [ref=e158]: Minimum
+                  - generic [ref=e159]: 0 ft
+        - generic [ref=e160]:
+          - heading "Surveillance Analysis" [level=2] [ref=e161]
+          - generic [ref=e162]:
+            - generic [ref=e163]:
+              - img [ref=e164]
+              - text: Hover Locations
+            - generic [ref=e167]: 0 locations
+          - generic [ref=e168]:
+            - generic [ref=e169]:
+              - img [ref=e170]
+              - text: Low Altitude Over Residential
+            - generic [ref=e173]: 0 segments
+```
