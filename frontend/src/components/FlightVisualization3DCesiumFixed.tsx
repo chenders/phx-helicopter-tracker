@@ -181,6 +181,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
         viewerRef.current = viewer;
 
+        // Also store globally for testing
+        (window as any).cesiumViewer = viewer;
+
         // Hide credits
         viewer.cesiumWidget.creditContainer.style.display = 'none';
 
@@ -412,8 +415,24 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
         }
 
         // Animation function with smooth interpolation
-        const animateFlight = () => {
-          console.log('Starting animation with', positions.length, 'positions');
+        const animateFlight = (speed?: number) => {
+          // Validate prerequisites
+          if (!positions || positions.length < 2) {
+            console.error('Cannot start animation: not enough positions', positions?.length || 0);
+            setIsAnimating(false);
+            return;
+          }
+
+          if (!viewer) {
+            console.error('Cannot start animation: viewer not ready');
+            setIsAnimating(false);
+            return;
+          }
+
+          // Use provided speed or get from viewer settings or fallback to 1
+          const currentSpeed = speed || viewer.animationSettings?.playbackSpeed || 1;
+
+          console.log('Starting animation with', positions.length, 'positions at', currentSpeed, 'x speed');
           console.log('Viewer exists:', !!viewer);
           console.log('Helicopter entity exists:', !!viewer.helicopterEntity);
 
@@ -429,14 +448,25 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           viewer.animationState.interpolationProgress = 0;
           viewer.animationState.frameCount = 0;
 
-          const framesPerSecond = 30; // Smooth 30 FPS animation
-          const interpolationSteps = Math.max(5, Math.floor(15 / playbackSpeed)); // Fewer steps for faster movement
-          const intervalMs = 1000 / framesPerSecond;
+          // Extremely slow animation optimized for tile loading
+          // Real helicopter speed is too fast for Google tiles to load
+          // We need to move slowly enough that tiles can stream in
+          const framesPerSecond = 10; // 10 FPS for smooth animation
+          const interpolationSteps = 30; // Fixed interpolation steps for smooth movement
+          const baseIntervalMs = 1000 / framesPerSecond; // 100ms between frames at 1x speed
 
-          console.log(`Animation settings: ${framesPerSecond} FPS, ${interpolationSteps} steps, ${intervalMs}ms interval`);
+          // Store animation settings in viewer for access in animate function with current speed
+          viewer.animationSettings = {
+            intervalMs: baseIntervalMs / currentSpeed,
+            interpolationSteps: interpolationSteps,
+            playbackSpeed: currentSpeed
+          };
+
+          console.log('Animation settings:', viewer.animationSettings);
 
           // Use recursive setTimeout instead of setInterval for better reliability
           const animate = () => {
+
             try {
               // Ensure animationState exists
               if (!viewer.animationState) {
@@ -446,28 +476,10 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
               viewer.animationState.frameCount++;
 
-              // Simple frame counter log
-              console.log(`FRAME ${viewer.animationState.frameCount}`);
-
-              // Log first few frames to confirm animation is running
-              if (viewer.animationState.frameCount <= 5) {
-                console.log(`Animation frame ${viewer.animationState.frameCount} running at ${new Date().toISOString()}`);
+              // Log frame progress every 10 frames
+              if (viewer.animationState.frameCount % 10 === 1) {
+                console.log(`Frame ${viewer.animationState.frameCount}, Position ${viewer.animationState.currentIndex}/${positions.length}`);
               }
-
-              // Test simplest case first
-              if (viewer.animationState.frameCount === 1) {
-                console.log('Testing viewer access:', !!viewer);
-                console.log('Testing positions access:', positions.length);
-                console.log('Testing window.Cesium access:', !!window.Cesium);
-              }
-
-              // Check end conditions more carefully
-              console.log('Checking conditions:', {
-                mounted: mountedRef.current,
-                viewer: !!viewer,
-                currentIndex: viewer.animationState.currentIndex,
-                positionsLength: positions.length
-              });
 
               if (!mountedRef.current || !viewer) {
                 console.log('Animation stopped: component unmounted or viewer destroyed');
@@ -485,10 +497,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             const currentPos = positions[viewer.animationState.currentIndex];
             const nextPos = positions[Math.min(viewer.animationState.currentIndex + 1, positions.length - 1)];
 
-            // Debug log every new position
-            if (viewer.animationState.interpolationProgress === 0) {
-              console.log(`Animating: index ${viewer.animationState.currentIndex}/${positions.length}, pos: ${currentPos.latitude.toFixed(4)}, ${currentPos.longitude.toFixed(4)}`);
-              console.log(`Next index will be: ${viewer.animationState.currentIndex + 1}, interpolation steps: ${interpolationSteps}`);
+            // Debug log every new position (less verbose)
+            if (viewer.animationState.interpolationProgress === 0 && viewer.animationState.currentIndex % 10 === 0) {
+              console.log(`Position ${viewer.animationState.currentIndex}: ${currentPos.latitude.toFixed(4)}, ${currentPos.longitude.toFixed(4)}`);
             }
 
             // Additional debug logging
@@ -499,7 +510,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             }
 
             // Calculate interpolation factor (0 to 1)
-            const t = viewer.animationState.interpolationProgress / interpolationSteps;
+            const t = viewer.animationState.interpolationProgress / (viewer.animationSettings?.interpolationSteps || 30);
 
             // Smoothly interpolate position
             const interpolatedLat = lerp(currentPos.latitude, nextPos.latitude, t);
@@ -523,11 +534,18 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             const interpolatedHeading = lerp(currentHeading, nextHeading, t) % 360;
 
             // Create smooth position (use window.Cesium to ensure access)
-            const cartesianPos = window.Cesium.Cartesian3.fromDegrees(
-              interpolatedLon,
-              interpolatedLat,
-              interpolatedAlt * 0.3048
-            );
+            let cartesianPos;
+            try {
+              cartesianPos = window.Cesium.Cartesian3.fromDegrees(
+                interpolatedLon,
+                interpolatedLat,
+                interpolatedAlt * 0.3048
+              );
+            } catch (e) {
+              console.error('Error creating Cartesian position:', e);
+              setIsAnimating(false);
+              return;
+            }
 
             // Update helicopter position (use stored reference)
             if (viewer.helicopterEntity) {
@@ -536,16 +554,13 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
             // Set camera to first-person pilot view with interpolated heading
             const heading = window.Cesium.Math.toRadians(interpolatedHeading);
-            const pitchAngle = -20; // More horizontal view to keep tiles loaded
+            const pitchAngle = -15; // Shallower angle to see more tiles ahead
+
+            // Enable tile preloading
+            viewer.scene.preloadTilesWhenIdle = true;
 
             // Smooth camera movement
             try {
-              // Log camera position periodically
-              if (viewer.animationState.frameCount % 30 === 0) {
-                console.log(`Camera update: alt=${interpolatedAlt}ft, lat=${interpolatedLat.toFixed(4)}, lon=${interpolatedLon.toFixed(4)}`);
-                console.log(`Globe visible: ${viewer.scene.globe.show}, Tiles count: ${viewer.scene.primitives.length}`);
-              }
-
               viewer.camera.setView({
                 destination: cartesianPos,
                 orientation: {
@@ -555,30 +570,15 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
                 }
               });
 
-              // Force tiles to stay visible
-              if (viewer.scene.globe.show) {
-                console.warn('Globe became visible again, hiding it');
-                viewer.scene.globe.show = false;
-              }
-
-              // Ensure Google tiles are still in the scene
-              if (viewer.googleTileset && !viewer.scene.primitives.contains(viewer.googleTileset)) {
-                console.warn('Google tileset was removed, re-adding it');
-                viewer.scene.primitives.add(viewer.googleTileset);
-              }
-
               // Request render to ensure tiles are displayed
               viewer.scene.requestRender();
             } catch (error) {
               console.error('Error setting camera view:', error);
+              // Don't stop animation on camera errors - keep going
             }
 
             // Advance interpolation
-            console.log('Before advancing:', {
-              progress: viewer.animationState.interpolationProgress,
-              index: viewer.animationState.currentIndex,
-              steps: interpolationSteps
-            });
+            const interpolationSteps = viewer.animationSettings?.interpolationSteps || 30;
 
             viewer.animationState.interpolationProgress++;
             if (viewer.animationState.interpolationProgress >= interpolationSteps) {
@@ -586,37 +586,25 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               viewer.animationState.currentIndex++;
             }
 
-            console.log('After advancing:', {
-              progress: viewer.animationState.interpolationProgress,
-              index: viewer.animationState.currentIndex
-            });
+            // Schedule next frame with proper delay
+            const animationInterval = viewer.animationSettings?.intervalMs || 100;
+            const delay = animationInterval;
 
-            // Schedule next frame - try both methods for reliability
-            console.log(`About to schedule frame ${viewer.animationState.frameCount + 1}`);
-
-            // Try requestAnimationFrame with delay
-            const nextFrameTime = Date.now() + intervalMs;
-
-            const scheduleNext = () => {
-              if (Date.now() >= nextFrameTime) {
-                console.log(`Frame ${viewer.animationState.frameCount + 1} executing`);
-                animate();
-              } else {
-                requestAnimationFrame(scheduleNext);
+            // Use setTimeout with the calculated interval
+            const timeoutId = setTimeout(() => {
+              if (viewer.animationState.frameCount % 10 === 0) {
+                console.log(`Frame ${viewer.animationState.frameCount} timeout fired, continuing animation...`);
               }
-            };
-
-            // Start the next frame scheduling
-            requestAnimationFrame(scheduleNext);
-
-            // Also set a backup timeout in case RAF fails
-            animationRef.current = setTimeout(() => {
-              console.log(`Backup timeout fired for frame ${viewer.animationState.frameCount + 1}`);
               animate();
-            }, intervalMs + 100);
+            }, delay);
+            animationRef.current = timeoutId;
 
-            console.log(`Scheduled next frame with RAF and backup timeout`);
-
+            // Verify the timeout was actually set
+            if (!animationRef.current) {
+              console.error('Failed to set timeout!');
+              setIsAnimating(false);
+              return;
+            }
             } catch (error) {
               console.error('Error in animation frame:', error);
               console.error('Stack trace:', error.stack);
@@ -627,13 +615,18 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           // Start the animation
           console.log('Starting animation loop with recursive setTimeout');
 
-          // Call animate directly first to test if it works
-          try {
-            console.log('Calling animate function directly');
-            animate();
-          } catch (error) {
-            console.error('Error in animate function:', error);
-          }
+          // Start animation with initial delay to ensure everything is ready
+          console.log('Scheduling initial animation frame...');
+          setTimeout(() => {
+            try {
+              console.log('Starting first animation frame now');
+              animate();
+            } catch (error) {
+              console.error('Error starting animation:', error);
+              console.error('Stack:', error.stack);
+              setIsAnimating(false);
+            }
+          }, 100); // Small delay to ensure everything is initialized
         };
 
         // Store animation function in ref to preserve closure
@@ -771,13 +764,13 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
   }, [isPlaying, isAnimating]);
 
   const handleStartAnimation = () => {
-    console.log('handleStartAnimation called');
-    if (animationFunctionRef.current) {
-      console.log('Calling animation function from ref');
-      animationFunctionRef.current();
+    console.log('handleStartAnimation called with speed:', playbackSpeed);
+    if (viewerRef.current && animationFunctionRef.current) {
+      // Call animation function with current speed
+      animationFunctionRef.current(playbackSpeed);
     } else if (viewerRef.current?.animateFlight) {
-      console.log('Calling animation function from viewer');
-      viewerRef.current.animateFlight();
+      // Fallback to viewer method
+      viewerRef.current.animateFlight(playbackSpeed);
     } else {
       console.log('No animation function available');
     }
@@ -835,6 +828,17 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               </h3>
             </div>
 
+            {isAnimating && (
+              <div className="mb-2 p-2 bg-yellow-100 dark:bg-yellow-900 rounded text-xs">
+                <div className="text-yellow-800 dark:text-yellow-200">
+                  ⚠️ Tile Loading Mode
+                </div>
+                <div className="text-yellow-700 dark:text-yellow-300 mt-1">
+                  Animation slowed for optimal 3D tile loading
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2 mb-3">
               <label className="text-xs text-gray-600 dark:text-gray-400">
                 Playback Speed
@@ -845,10 +849,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
                 className="w-full px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600"
                 disabled={isAnimating}
               >
-                <option value={0.5}>0.5x (Slow)</option>
+                <option value={0.1}>0.1x (Very Slow - Best for Tiles)</option>
+                <option value={0.25}>0.25x (Slow)</option>
+                <option value={0.5}>0.5x (Medium)</option>
                 <option value={1}>1x (Normal)</option>
                 <option value={2}>2x (Fast)</option>
-                <option value={5}>5x (Very Fast)</option>
+                <option value={3}>3x (Very Fast)</option>
               </select>
 
               {!isAnimating ? (
