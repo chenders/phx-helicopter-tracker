@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import '../styles/slider.css';
 
 declare global {
   interface Window {
@@ -46,6 +47,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
   const animationRef = useRef<any>(null);
   const animationFunctionRef = useRef<any>(null);
   const mountedRef = useRef(true);
+  const [sliderPosition, setSliderPosition] = useState(0);
+  const [closestPointIndex, setClosestPointIndex] = useState<number | null>(null);
+  const [tileLoadingMode, setTileLoadingMode] = useState(false);
 
   // Clean up function
   const cleanup = useCallback(() => {
@@ -80,6 +84,33 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
       cleanup();
     };
   }, [cleanup]);
+
+  // Calculate closest point to search location
+  useEffect(() => {
+    if (!searchContext || positions.length === 0) {
+      setClosestPointIndex(null);
+      return;
+    }
+
+    let minDistance = Infinity;
+    let closestIdx = -1;
+
+    positions.forEach((pos, idx) => {
+      const latDiff = pos.latitude - searchContext.lat;
+      const lngDiff = pos.longitude - searchContext.lng;
+      // Simple Euclidean distance (good enough for small areas)
+      const distance = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestIdx = idx;
+      }
+    });
+
+    if (closestIdx >= 0) {
+      setClosestPointIndex(closestIdx);
+    }
+  }, [positions, searchContext]);
 
   useEffect(() => {
     if (!containerRef.current || positions.length === 0) return;
@@ -445,24 +476,50 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
           // Reset animation state for new animation
           viewer.animationState.currentIndex = 0;
-          viewer.animationState.interpolationProgress = 0;
+          viewer.animationState.continuousPosition = 0;
           viewer.animationState.frameCount = 0;
 
-          // Extremely slow animation optimized for tile loading
-          // Real helicopter speed is too fast for Google tiles to load
-          // We need to move slowly enough that tiles can stream in
-          const framesPerSecond = 10; // 10 FPS for smooth animation
-          const interpolationSteps = 30; // Fixed interpolation steps for smooth movement
-          const baseIntervalMs = 1000 / framesPerSecond; // 100ms between frames at 1x speed
+          // Animation timing configuration
+          const positionCount = positions.length;
+          let framesPerSecond = 30; // Target FPS
 
-          // Store animation settings in viewer for access in animate function with current speed
+          // Calculate total animation duration based on mode and speed
+          let targetDurationSeconds;
+
+          if (tileLoadingMode) {
+            // High quality mode - much slower for tile loading
+            targetDurationSeconds = Math.max(120, positionCount / (10 * currentSpeed)); // Min 2 minutes
+            framesPerSecond = 15; // Lower FPS for tile loading
+          } else {
+            // Normal mode - reasonable speed
+            targetDurationSeconds = Math.max(30, positionCount / (50 * currentSpeed)); // Min 30 seconds
+          }
+
+          // Calculate how much progress to make per frame
+          const totalFrames = targetDurationSeconds * framesPerSecond;
+          const progressPerFrame = (positionCount - 1) / totalFrames;
+
+          const baseIntervalMs = 1000 / framesPerSecond;
+
+          // Store animation settings in viewer for access in animate function
           viewer.animationSettings = {
-            intervalMs: baseIntervalMs / currentSpeed,
-            interpolationSteps: interpolationSteps,
-            playbackSpeed: currentSpeed
+            intervalMs: baseIntervalMs,
+            progressPerFrame: progressPerFrame,
+            playbackSpeed: currentSpeed,
+            totalFrames: totalFrames
           };
 
-          console.log('Animation settings:', viewer.animationSettings);
+          // Store continuous position tracker
+          viewer.animationState.continuousPosition = 0; // Float value for smooth interpolation
+
+          console.log('Animation settings:', {
+            positionCount,
+            currentSpeed,
+            framesPerSecond,
+            targetDuration: `${Math.round(targetDurationSeconds)} seconds`,
+            progressPerFrame: progressPerFrame.toFixed(3),
+            tileLoadingMode
+          });
 
           // Use recursive setTimeout instead of setInterval for better reliability
           const animate = () => {
@@ -476,9 +533,16 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
               viewer.animationState.frameCount++;
 
-              // Log frame progress every 10 frames
-              if (viewer.animationState.frameCount % 10 === 1) {
-                console.log(`Frame ${viewer.animationState.frameCount}, Position ${viewer.animationState.currentIndex}/${positions.length}`);
+              // Advance the continuous position smoothly
+              if (!viewer.animationState.continuousPosition) {
+                viewer.animationState.continuousPosition = 0;
+              }
+              viewer.animationState.continuousPosition += viewer.animationSettings.progressPerFrame;
+
+              // Log progress periodically
+              if (viewer.animationState.frameCount % 60 === 0) {
+                const progress = (viewer.animationState.continuousPosition / (positions.length - 1) * 100).toFixed(1);
+                console.log(`Animation progress: ${progress}% (position ${viewer.animationState.continuousPosition.toFixed(1)}/${positions.length})`);
               }
 
               if (!mountedRef.current || !viewer) {
@@ -487,30 +551,26 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
                 return;
               }
 
-              if (viewer.animationState.currentIndex >= positions.length - 1) {
-                console.log(`Animation completed: reached end at index ${viewer.animationState.currentIndex} of ${positions.length} after ${viewer.animationState.frameCount} frames`);
+              // Check if animation is complete
+              if (viewer.animationState.continuousPosition >= positions.length - 1) {
+                console.log('Animation completed');
                 setIsAnimating(false);
+                viewer.animationState.continuousPosition = 0;
+                viewer.animationState.currentIndex = 0;
                 return;
               }
 
-            // Get current and next positions for interpolation
-            const currentPos = positions[viewer.animationState.currentIndex];
-            const nextPos = positions[Math.min(viewer.animationState.currentIndex + 1, positions.length - 1)];
+            // Get the two positions we're interpolating between
+            const currentIdx = Math.floor(viewer.animationState.continuousPosition);
+            const nextIdx = Math.min(currentIdx + 1, positions.length - 1);
+            const currentPos = positions[currentIdx];
+            const nextPos = positions[nextIdx];
 
-            // Debug log every new position (less verbose)
-            if (viewer.animationState.interpolationProgress === 0 && viewer.animationState.currentIndex % 10 === 0) {
-              console.log(`Position ${viewer.animationState.currentIndex}: ${currentPos.latitude.toFixed(4)}, ${currentPos.longitude.toFixed(4)}`);
-            }
+            // Calculate smooth interpolation factor between the two positions
+            const t = viewer.animationState.continuousPosition - currentIdx;
 
-            // Additional debug logging
-            if (!currentPos || !nextPos) {
-              console.error('Missing position data:', { currentPos: !!currentPos, nextPos: !!nextPos, index: viewer.animationState.currentIndex });
-              setIsAnimating(false);
-              return;
-            }
-
-            // Calculate interpolation factor (0 to 1)
-            const t = viewer.animationState.interpolationProgress / (viewer.animationSettings?.interpolationSteps || 30);
+            // Update the visible index for UI
+            viewer.animationState.currentIndex = currentIdx;
 
             // Smoothly interpolate position
             const interpolatedLat = lerp(currentPos.latitude, nextPos.latitude, t);
@@ -577,14 +637,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               // Don't stop animation on camera errors - keep going
             }
 
-            // Advance interpolation
-            const interpolationSteps = viewer.animationSettings?.interpolationSteps || 30;
-
-            viewer.animationState.interpolationProgress++;
-            if (viewer.animationState.interpolationProgress >= interpolationSteps) {
-              viewer.animationState.interpolationProgress = 0;
-              viewer.animationState.currentIndex++;
-            }
+            // Update slider position based on continuous position
+            const percentage = (viewer.animationState.continuousPosition / (positions.length - 1)) * 100;
+            setSliderPosition(percentage);
 
             // Schedule next frame with proper delay
             const animationInterval = viewer.animationSettings?.intervalMs || 100;
@@ -790,9 +845,45 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
     }
   };
 
+  const handleSliderChange = (value: number) => {
+    setSliderPosition(value);
+
+    // Stop animation if playing
+    if (isAnimating) {
+      handleStopAnimation();
+    }
+
+    // Update the camera view to the selected position
+    const targetIndex = Math.floor((value / 100) * (positions.length - 1));
+    if (viewerRef.current && positions[targetIndex]) {
+      const targetPos = positions[targetIndex];
+      const cartesianPos = window.Cesium.Cartesian3.fromDegrees(
+        targetPos.longitude,
+        targetPos.latitude,
+        targetPos.altitude_feet * 0.3048
+      );
+
+      viewerRef.current.camera.setView({
+        destination: cartesianPos,
+        orientation: {
+          heading: window.Cesium.Math.toRadians(targetPos.track_degrees || 0),
+          pitch: window.Cesium.Math.toRadians(-15),
+          roll: 0
+        }
+      });
+    }
+  };
+
+  const handleJumpToClosest = () => {
+    if (closestPointIndex !== null) {
+      const percentage = (closestPointIndex / (positions.length - 1)) * 100;
+      handleSliderChange(percentage);
+    }
+  };
+
   if (error) {
     return (
-      <div className="w-full h-[400px] flex items-center justify-center bg-gray-900 rounded-lg">
+      <div className="w-full h-[800px] flex items-center justify-center bg-gray-900 rounded-lg">
         <div className="text-center text-white">
           <div className="text-red-400 mb-2">⚠️ Error Loading CesiumJS</div>
           <div className="text-sm text-gray-400">{error}</div>
@@ -805,7 +896,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
     <div className="relative w-full">
       <div
         ref={containerRef}
-        className="w-full h-[400px] bg-gray-900 rounded-lg relative"
+        className="w-full h-[800px] bg-gray-900 rounded-lg relative"
       >
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center z-50 bg-gray-900">
@@ -829,17 +920,34 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             </div>
 
             {isAnimating && (
-              <div className="mb-2 p-2 bg-yellow-100 dark:bg-yellow-900 rounded text-xs">
-                <div className="text-yellow-800 dark:text-yellow-200">
-                  ⚠️ Tile Loading Mode
+              <div className="mb-2 p-2 bg-blue-100 dark:bg-blue-900 rounded text-xs">
+                <div className="text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                  <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                  Animation Playing
                 </div>
-                <div className="text-yellow-700 dark:text-yellow-300 mt-1">
-                  Animation slowed for optimal 3D tile loading
+                <div className="text-blue-700 dark:text-blue-300 mt-1">
+                  Speed: {playbackSpeed}x
                 </div>
               </div>
             )}
 
             <div className="space-y-2 mb-3">
+              {/* Tile Loading Mode Toggle */}
+              <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-700 rounded">
+                <input
+                  type="checkbox"
+                  id="tileLoadingMode"
+                  checked={tileLoadingMode}
+                  onChange={(e) => setTileLoadingMode(e.target.checked)}
+                  disabled={isAnimating}
+                  className="w-4 h-4"
+                />
+                <label htmlFor="tileLoadingMode" className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer">
+                  <div className="font-medium">High Quality Mode</div>
+                  <div className="text-xs opacity-75">Slower animation for better 3D tiles</div>
+                </label>
+              </div>
+
               <label className="text-xs text-gray-600 dark:text-gray-400">
                 Playback Speed
               </label>
@@ -849,12 +957,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
                 className="w-full px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600"
                 disabled={isAnimating}
               >
-                <option value={0.1}>0.1x (Very Slow - Best for Tiles)</option>
-                <option value={0.25}>0.25x (Slow)</option>
-                <option value={0.5}>0.5x (Medium)</option>
+                <option value={0.5}>0.5x (Slow)</option>
                 <option value={1}>1x (Normal)</option>
                 <option value={2}>2x (Fast)</option>
-                <option value={3}>3x (Very Fast)</option>
+                <option value={3}>3x (Faster)</option>
+                <option value={5}>5x (Very Fast)</option>
+                <option value={10}>10x (Maximum)</option>
               </select>
 
               {!isAnimating ? (
@@ -891,6 +999,71 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               </ul>
             </div>
           </div>
+
+          {/* Flight Timeline Slider */}
+          {positions.length > 0 && (
+            <div className="absolute bottom-4 left-4 right-4 bg-white/95 dark:bg-gray-800/95 backdrop-blur p-4 rounded-lg shadow-xl z-40">
+              <div className="flex items-center gap-3">
+                <div className="flex-grow">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                      Flight Timeline
+                    </span>
+                    {searchContext && closestPointIndex !== null && (
+                      <button
+                        onClick={handleJumpToClosest}
+                        className="text-xs bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600 transition-colors"
+                      >
+                        📍 Jump to Closest
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={sliderPosition}
+                      onChange={(e) => handleSliderChange(Number(e.target.value))}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 slider-thumb"
+                      style={{
+                        background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${sliderPosition}%, #E5E7EB ${sliderPosition}%, #E5E7EB 100%)`
+                      }}
+                    />
+
+                    {/* Closest point marker */}
+                    {searchContext && closestPointIndex !== null && (
+                      <div
+                        className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-orange-500 rounded-full shadow-md pointer-events-none"
+                        style={{
+                          left: `${(closestPointIndex / (positions.length - 1)) * 100}%`,
+                          transform: 'translateX(-50%) translateY(-50%)',
+                          zIndex: 10
+                        }}
+                        title="Closest to search location"
+                      >
+                        <div className="absolute inset-0 bg-orange-500 rounded-full animate-ping opacity-75"></div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between mt-1">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {positions[0] ? new Date(positions[0].timestamp).toLocaleTimeString() : 'Start'}
+                    </span>
+                    <span className="text-xs text-gray-600 dark:text-gray-300 font-medium">
+                      Position {Math.floor((sliderPosition / 100) * (positions.length - 1)) + 1} of {positions.length}
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {positions[positions.length - 1] ? new Date(positions[positions.length - 1].timestamp).toLocaleTimeString() : 'End'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Status */}
           <div className="absolute top-4 left-4 bg-black/80 backdrop-blur text-white px-3 py-2 rounded-lg text-xs z-40">

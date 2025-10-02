@@ -1,0 +1,68 @@
+/* Custom slider styles for flight timeline */
+.slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* Track */
+.slider-thumb::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
+  background: inherit;
+}
+
+.slider-thumb::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: inherit;
+}
+
+/* Thumb */
+.slider-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3B82F6;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  margin-top: -6px;
+  transition: all 0.2s ease;
+}
+
+.slider-thumb::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3B82F6;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease;
+}
+
+/* Hover state */
+.slider-thumb:hover::-webkit-slider-thumb {
+  background: #2563EB;
+  transform: scale(1.1);
+}
+
+.slider-thumb:hover::-moz-range-thumb {
+  background: #2563EB;
+  transform: scale(1.1);
+}
+
+/* Active state */
+.slider-thumb:active::-webkit-slider-thumb {
+  background: #1D4ED8;
+  transform: scale(1.05);
+}
+
+.slider-thumb:active::-moz-range-thumb {
+  background: #1D4ED8;
+  transform: scale(1.05);
+}
