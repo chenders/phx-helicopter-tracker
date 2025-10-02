@@ -1,0 +1,14 @@
+# Docker Compose Override - Prevents accidental data loss
+# This file is automatically merged with docker-compose.yml
+
+services:
+  db:
+    # Extra safety: ensure database always restarts
+    restart: always
+
+    # Log rotation to prevent disk fill
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

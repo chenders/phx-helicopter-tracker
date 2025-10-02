@@ -1,6 +1,8 @@
 services:
   db:
-    image: timescale/timescaledb-ha:pg15-latest
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
     environment:
       POSTGRES_DB: phoenix_helicopters
       POSTGRES_USER: postgres
@@ -9,7 +11,10 @@ services:
     ports:
       - "5433:5432"
     volumes:
+      # CRITICAL: This must match where PostgreSQL actually stores data
       - postgres_data:/var/lib/postgresql/data
+      # Mount backups directory for easy access
+      - ./backups:/backups:ro
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     command: >
       postgres
@@ -27,6 +32,7 @@ services:
       -c log_checkpoints=on
       -c random_page_cost=1.1
       -c effective_io_concurrency=200
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 30s

@@ -1,0 +1,26 @@
+FROM postgres:15-bullseye
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-15-postgis-3 \
+    postgresql-15-postgis-3-scripts \
+    postgis \
+    wget \
+    ca-certificates \
+    lsb-release \
+    gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install TimescaleDB
+RUN echo "deb https://packagecloud.io/timescale/timescaledb/debian/ bullseye main" > /etc/apt/sources.list.d/timescaledb.list \
+    && wget --quiet -O - https://packagecloud.io/timescale/timescaledb/gpgkey | apt-key add - \
+    && apt-get update \
+    && apt-get install -y timescaledb-2-postgresql-15 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Configure PostgreSQL for TimescaleDB
+RUN echo "shared_preload_libraries = 'timescaledb'" >> /usr/share/postgresql/postgresql.conf.sample
+
+# Copy initialization scripts
+COPY docker-entrypoint-initdb.d/* /docker-entrypoint-initdb.d/
+RUN chmod +x /docker-entrypoint-initdb.d/*.sh || true
