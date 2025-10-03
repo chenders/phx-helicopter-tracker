@@ -441,7 +441,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           viewer.animationState = {
             currentIndex: 0,
             interpolationProgress: 0,
-            frameCount: 0
+            frameCount: 0,
+            continuousPosition: 0
           };
         }
 
@@ -853,24 +854,56 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
       handleStopAnimation();
     }
 
+    // Get the actual Cesium viewer from window
+    const viewer = (window as any).cesiumViewer;
+    if (!viewer || !window.Cesium) {
+      console.error('Cesium viewer not available');
+      return;
+    }
+
+    // Initialize animation state if it doesn't exist
+    if (!viewer.animationState) {
+      viewer.animationState = {
+        currentIndex: 0,
+        interpolationProgress: 0,
+        frameCount: 0,
+        continuousPosition: 0
+      };
+    }
+
     // Update the camera view to the selected position
     const targetIndex = Math.floor((value / 100) * (positions.length - 1));
-    if (viewerRef.current && positions[targetIndex]) {
-      const targetPos = positions[targetIndex];
-      const cartesianPos = window.Cesium.Cartesian3.fromDegrees(
-        targetPos.longitude,
-        targetPos.latitude,
-        targetPos.altitude_feet * 0.3048
-      );
 
-      viewerRef.current.camera.setView({
-        destination: cartesianPos,
-        orientation: {
-          heading: window.Cesium.Math.toRadians(targetPos.track_degrees || 0),
-          pitch: window.Cesium.Math.toRadians(-15),
-          roll: 0
+    if (positions[targetIndex]) {
+      const targetPos = positions[targetIndex];
+
+      // Update animation state to match slider position
+      viewer.animationState.continuousPosition = targetIndex;
+      viewer.animationState.currentIndex = targetIndex;
+
+      try {
+        const cartesianPos = window.Cesium.Cartesian3.fromDegrees(
+          targetPos.longitude,
+          targetPos.latitude,
+          targetPos.altitude_feet * 0.3048
+        );
+
+        viewer.camera.setView({
+          destination: cartesianPos,
+          orientation: {
+            heading: window.Cesium.Math.toRadians(targetPos.track_degrees || 0),
+            pitch: window.Cesium.Math.toRadians(-15),
+            roll: 0
+          }
+        });
+
+        // Update helicopter entity position if it exists
+        if (viewer.helicopterEntity) {
+          viewer.helicopterEntity.position = cartesianPos;
         }
-      });
+      } catch (error) {
+        console.error('Error updating camera position:', error);
+      }
     }
   };
 
