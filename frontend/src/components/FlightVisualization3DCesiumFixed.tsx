@@ -138,7 +138,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             const cesiumCSS = document.createElement('link');
             cesiumCSS.id = 'cesium-css';
             cesiumCSS.rel = 'stylesheet';
-            cesiumCSS.href = 'https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css';
+            cesiumCSS.href = 'https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/Widgets/widgets.css';
             document.head.appendChild(cesiumCSS);
           }
 
@@ -149,7 +149,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               return;
             }
             const script = document.createElement('script');
-            script.src = 'https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js';
+            script.src = 'https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/Cesium.js';
             script.onload = resolve;
             script.onerror = reject;
             document.head.appendChild(script);
@@ -171,7 +171,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
         const Cesium = window.Cesium;
 
         // Suppress the sandboxed iframe warning
-        window.CESIUM_BASE_URL = 'https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/';
+        window.CESIUM_BASE_URL = 'https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/';
 
         // Set Cesium Ion default access token (your personal token)
         Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiM2FlZDAyOS00ZjE4LTQ0NjItOTY4ZC0xNzQyNGIzNjhhOTkiLCJpZCI6MzQ2MjQ4LCJpYXQiOjE3NTkzMDkyMjl9.zkS_2D4Y8scZkqmS_lckpl2G_7c8sGaFwMazm26eAT0';
@@ -185,10 +185,10 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           sceneModePicker: false,
           navigationHelpButton: false,
           animation: false,
-          timeline: false,
+          timeline: true,
           fullscreenButton: false,
           vrButton: false,
-          requestRenderMode: false, // Keep rendering continuously for 3D tiles
+          requestRenderMode: true, // Keep rendering continuously for 3D tiles
           maximumRenderTimeChange: Infinity,
           shadows: false,
           shouldAnimate: true,
@@ -243,6 +243,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           const cleanApiKey = apiKey.replace(/['"]/g, '');
 
           console.log('Loading Google 3D Tiles from:', `https://tile.googleapis.com/v1/3dtiles/root.json?key=${cleanApiKey.substring(0, 10)}...`);
+          Cesium.RequestScheduler.requestsByServer["tile.googleapis.com:443"] = 50;
 
           const tileset = await Cesium.Cesium3DTileset.fromUrl(
             `https://tile.googleapis.com/v1/3dtiles/root.json?key=${cleanApiKey}`,
@@ -302,6 +303,27 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           );
         });
 
+        // The SampledPositionedProperty stores the position and timestamp for each sample along the radar sample series.
+       const positionProperty = new Cesium.SampledPositionProperty();
+       const start = Cesium.JulianDate.fromIso8601(positions[0].timestamp)
+       for (let i = 0; i < positions.length; i++) {
+         const dataPoint = positions[i];
+	 const dataTime = new Date(dataPoint.timestamp).getTime();
+         const posStart = Cesium.JulianDate.fromIso8601(dataPoint.timestamp)
+         // Declare the time for this individual sample and store it in a new JulianDate instance.
+         const time = Cesium.JulianDate.addSeconds(start, dataTime / 1000, new Cesium.JulianDate());
+         const position = Cesium.Cartesian3.fromDegrees(dataPoint.longitude, dataPoint.latitude, dataPoint.altitude_feet);
+         // Store the position along with its timestamp.
+         // Here we add the positions all upfront, but these can be added at run-time as samples are received from a server.
+         positionProperty.addSample(time, position);
+
+/*         viewer.entities.add({
+           description: `Location: (${dataPoint.longitude}, ${dataPoint.latitude}, ${dataPoint.latitude})`,
+           position: position,
+           point: { pixelSize: 10, color: Cesium.Color.RED }
+         }); */
+        }
+
         // Create flight path
         const flightPath = viewer.entities.add({
           name: 'Flight Path',
@@ -316,6 +338,20 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             show: true
           }
         });
+
+	const timeStepInSeconds = 30;
+//        const totalSeconds = timeStepInSeconds * (flightData.length - 1);
+	const startDate = new Date(positions[0].timestamp);
+	const endDate = new Date(positions[positions.length - 1].timestamp);
+	const totalSeconds = (endDate.getTime() - startDate.getTime()) / 1000
+        const stop = Cesium.JulianDate.addSeconds(start, totalSeconds, new Cesium.JulianDate());
+        viewer.clock.startTime = start.clone();
+        viewer.clock.stopTime = stop.clone();
+        viewer.clock.currentTime = start.clone();
+        viewer.timeline.zoomTo(start, stop);
+        // Speed up the playback speed 50x.
+        viewer.clock.multiplier = 2;
+        // Start playing the scene.
 
         // Add start marker
         viewer.entities.add({
@@ -497,21 +533,20 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           }
 
           // Calculate how much progress to make per frame
-          const totalFrames = targetDurationSeconds * framesPerSecond;
+          const totalFrames = targetDurationSeconds * framesPerSecond / 5;
           const progressPerFrame = (positionCount - 1) / totalFrames;
 
           const baseIntervalMs = 1000 / framesPerSecond;
 
           // Store animation settings in viewer for access in animate function
-          viewer.animationSettings = {
+/*          viewer.animationSettings = {
             intervalMs: baseIntervalMs,
             progressPerFrame: progressPerFrame,
             playbackSpeed: currentSpeed,
             totalFrames: totalFrames
-          };
+          }; 
 
           // Store continuous position tracker
-          viewer.animationState.continuousPosition = 0; // Float value for smooth interpolation
 
           console.log('Animation settings:', {
             positionCount,
@@ -520,7 +555,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             targetDuration: `${Math.round(targetDurationSeconds)} seconds`,
             progressPerFrame: progressPerFrame.toFixed(3),
             tileLoadingMode
-          });
+          }); */
+          viewer.animationState.continuousPosition = 0; // Float value for smooth interpolation
 
           // Use recursive setTimeout instead of setInterval for better reliability
           const animate = () => {
@@ -538,13 +574,14 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               if (!viewer.animationState.continuousPosition) {
                 viewer.animationState.continuousPosition = 0;
               }
-              viewer.animationState.continuousPosition += viewer.animationSettings.progressPerFrame;
+	      viewer.animationState.continuousPosition += 4;
+//              viewer.animationState.continuousPosition += viewer.animationSettings.progressPerFrame;
 
               // Log progress periodically
-              if (viewer.animationState.frameCount % 60 === 0) {
+/*              if (viewer.animationState.frameCount % 60 === 0) {
                 const progress = (viewer.animationState.continuousPosition / (positions.length - 1) * 100).toFixed(1);
                 console.log(`Animation progress: ${progress}% (position ${viewer.animationState.continuousPosition.toFixed(1)}/${positions.length})`);
-              }
+              } */
 
               if (!mountedRef.current || !viewer) {
                 console.log('Animation stopped: component unmounted or viewer destroyed');
@@ -637,7 +674,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               console.error('Error setting camera view:', error);
               // Don't stop animation on camera errors - keep going
             }
-
+/*
             // Update slider position based on continuous position
             const percentage = (viewer.animationState.continuousPosition / (positions.length - 1)) * 100;
             setSliderPosition(percentage);
@@ -645,14 +682,14 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             // Schedule next frame with proper delay
             const animationInterval = viewer.animationSettings?.intervalMs || 100;
             const delay = animationInterval;
-
+*/
             // Use setTimeout with the calculated interval
             const timeoutId = setTimeout(() => {
               if (viewer.animationState.frameCount % 10 === 0) {
                 console.log(`Frame ${viewer.animationState.frameCount} timeout fired, continuing animation...`);
               }
               animate();
-            }, delay);
+            }, 100);
             animationRef.current = timeoutId;
 
             // Verify the timeout was actually set
@@ -660,7 +697,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               console.error('Failed to set timeout!');
               setIsAnimating(false);
               return;
-            }
+            } 
             } catch (error) {
               console.error('Error in animation frame:', error);
               console.error('Stack trace:', error.stack);
@@ -736,8 +773,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
         Math.pow(targetPos.latitude - prevPos.latitude, 2) +
         Math.pow(targetPos.longitude - prevPos.longitude, 2)
       );
-      const steps = Math.min(15, Math.max(5, Math.floor(distance * 10000)));
-
+//      const steps = Math.min(15, Math.max(5, Math.floor(distance * 10000)));
+      const steps = positions.length;
       let step = 0;
       const interpolationInterval = setInterval(() => {
         if (!mountedRef.current || step >= steps) {

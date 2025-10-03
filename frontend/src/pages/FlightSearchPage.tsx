@@ -316,7 +316,16 @@ export function FlightSearchPage() {
           filters.search_coordinates.lng + radiusInDegrees
         ))
 
-        mapRef.current.fitBounds(bounds)
+        // Add padding to ensure the search area fits within 95% of the container
+        const mapContainer = document.querySelector('[data-id="search-map-panel"]') as HTMLElement
+        const padding = mapContainer ? {
+          top: mapContainer.offsetHeight * 0.05,
+          right: mapContainer.offsetWidth * 0.05,
+          bottom: mapContainer.offsetHeight * 0.05,
+          left: mapContainer.offsetWidth * 0.05
+        } : 50
+
+        mapRef.current.fitBounds(bounds, padding)
       }
     }
   }, [filters.search_coordinates])
@@ -401,7 +410,18 @@ export function FlightSearchPage() {
         if (path.length > 0 && mapRef.current) {
           const bounds = new google.maps.LatLngBounds()
           path.forEach(point => bounds.extend(point))
-          mapRef.current.fitBounds(bounds)
+
+          // Add padding to ensure the flight path fits within 95% of the container
+          // This gives a nice margin around the flight path
+          const mapContainer = document.querySelector('[data-id="search-map-panel"]') as HTMLElement
+          const padding = mapContainer ? {
+            top: mapContainer.offsetHeight * 0.05,    // 5% padding
+            right: mapContainer.offsetWidth * 0.05,   // 5% padding
+            bottom: mapContainer.offsetHeight * 0.05, // 5% padding
+            left: mapContainer.offsetWidth * 0.05     // 5% padding
+          } : 50 // Fallback to 50px padding if container not found
+
+          mapRef.current.fitBounds(bounds, padding)
         }
       }
     } catch (error) {
@@ -592,10 +612,10 @@ export function FlightSearchPage() {
         </div>
       </div>
 
-      {/* Main Content - Side by Side */}
-      <div className="flex-1 flex gap-3 min-h-0" data-id="search-main-content">
-        {/* Left Side - Results */}
-        <div className="w-2/5 bg-white dark:bg-gray-800 rounded-lg shadow flex flex-col" data-id="search-results-panel">
+      {/* Main Content - Side by Side - Use calc to get exact available height */}
+      <div className="flex gap-3 h-[calc(100vh-12rem)] overflow-hidden" data-id="search-main-content">
+        {/* Left Side - Results - Fixed height with internal scrolling */}
+        <div className="w-2/5 bg-white dark:bg-gray-800 rounded-lg shadow flex flex-col h-full overflow-hidden" data-id="search-results-panel">
           <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -842,8 +862,8 @@ export function FlightSearchPage() {
           </div>
         </div>
 
-        {/* Right Side - Map */}
-        <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow p-3" data-id="search-map-panel">
+        {/* Right Side - Map - Fixed height matching results panel */}
+        <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow p-3 h-full overflow-hidden" data-id="search-map-panel">
           <GoogleMap
             mapContainerStyle={{ width: '100%', height: '100%' }}
             center={mapCenter}

@@ -7,7 +7,10 @@ test('debug animation', async ({ page }) => {
     const text = msg.text();
     // Log everything for debugging
     logs.push(text);
-    console.log('[CONSOLE]', text);
+    if (text.includes('Frame') || text.includes('Position') || text.includes('setTimeout') ||
+        text.includes('animation') || text.includes('ERROR') || text.includes('error')) {
+      console.log('[CONSOLE]', text);
+    }
   });
 
   // Navigate to flight page
@@ -26,8 +29,8 @@ test('debug animation', async ({ page }) => {
   await expect(startButton).toBeVisible({ timeout: 10000 });
   await startButton.click();
 
-  // Wait and collect logs
-  await page.waitForTimeout(5000);
+  // Wait and collect logs for longer to see multiple frames
+  await page.waitForTimeout(10000);
 
   // Print last 30 logs
   console.log('\n=== Last 30 Animation Logs ===');
