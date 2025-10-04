@@ -201,7 +201,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
         // Set Cesium Ion default access token (your personal token)
         Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiM2FlZDAyOS00ZjE4LTQ0NjItOTY4ZC0xNzQyNGIzNjhhOTkiLCJpZCI6MzQ2MjQ4LCJpYXQiOjE3NTkzMDkyMjl9.zkS_2D4Y8scZkqmS_lckpl2G_7c8sGaFwMazm26eAT0';
 
-        // Create the Cesium Viewer with no base imagery (to avoid grid)
+        // Create the Cesium Viewer with performance optimizations
         const viewer = new Cesium.Viewer(cesiumContainer, {
           terrainProvider: undefined,
           baseLayerPicker: false,
@@ -210,21 +210,26 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           sceneModePicker: false,
           navigationHelpButton: false,
           animation: false,
-          timeline: true,
+          timeline: false,
           fullscreenButton: false,
           vrButton: false,
-          requestRenderMode: true, // Keep rendering continuously for 3D tiles
+          requestRenderMode: false, // Disable request render mode for smoother animation
           maximumRenderTimeChange: Infinity,
           shadows: false,
           shouldAnimate: true,
-          useBrowserRecommendedResolution: true,
+          useBrowserRecommendedResolution: false,
+          resolutionScale: 0.75, // Render at 75% resolution for better performance
           automaticallyTrackDataSourceClocks: false,
           contextOptions: {
             webgl: {
-              preserveDrawingBuffer: true
+              preserveDrawingBuffer: false, // Better performance
+              antialias: false, // Disable antialiasing for performance
+              powerPreference: "high-performance" // Use high-performance GPU
             }
           },
-          orderIndependentTranslucency: false
+          orderIndependentTranslucency: false,
+          targetFrameRate: 30, // Limit to 30 FPS
+          scene3DOnly: true // Optimize for 3D only
         });
 
         // Remove all default imagery providers to get rid of the grid
@@ -280,25 +285,27 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           const tileset = await Cesium.Cesium3DTileset.fromUrl(
             `https://tile.googleapis.com/v1/3dtiles/root.json?key=${cleanApiKey}`,
             {
-              showCreditsOnScreen: true,
-              maximumScreenSpaceError: 4, // Balanced quality setting (lower can cause artifacts)
-              cacheBytes: 2 * 1024 * 1024 * 1024, // 2GB cache for tiles
-              maximumCacheOverflowBytes: 1024 * 1024 * 1024, // Allow 1GB overflow
-              skipLevelOfDetail: false, // Don't skip levels to prevent artifacts
-              immediatelyLoadDesiredLevelOfDetail: false, // Progressive loading for stability
-              loadSiblings: true,
-              cullWithChildrenBounds: true, // Standard occlusion handling
-              dynamicScreenSpaceError: true, // Enable dynamic adjustment for stability
+              showCreditsOnScreen: false, // Hide credits for performance
+              maximumScreenSpaceError: 8, // Higher error tolerance for better performance
+              cacheBytes: 512 * 1024 * 1024, // 512MB cache - smaller for faster access
+              maximumCacheOverflowBytes: 256 * 1024 * 1024, // 256MB overflow
+              skipLevelOfDetail: true, // Skip levels for faster loading
+              immediatelyLoadDesiredLevelOfDetail: false, // Don't force immediate loading
+              loadSiblings: false, // Don't load siblings for performance
+              cullWithChildrenBounds: true, // Cull for performance
+              dynamicScreenSpaceError: true, // Dynamic adjustment for performance
               dynamicScreenSpaceErrorDensity: 0.00278,
-              dynamicScreenSpaceErrorFactor: 4.0, // Standard factor
-              dynamicScreenSpaceErrorHeightFalloff: 0.25,
-              progressiveResolutionHeightFraction: 0.3, // Progressive loading prevents artifacts
-              foveatedConeSize: 0.1, // Standard foveated rendering
-              foveatedMinimumScreenSpaceErrorRelaxation: 0.0,
-              cullRequestsWhileMoving: true, // Standard culling while moving
-              cullRequestsWhileMovingMultiplier: 0.6, // Reduce quality slightly while moving
-              preferLeaves: false, // Don't force highest detail to prevent artifacts
-              maximumMemoryUsage: 2048 // 2GB memory usage limit
+              dynamicScreenSpaceErrorFactor: 8.0, // More aggressive factor for performance
+              dynamicScreenSpaceErrorHeightFalloff: 0.5,
+              progressiveResolutionHeightFraction: 0.5, // Faster progressive loading
+              foveatedConeSize: 0.2, // Larger cone for more aggressive foveation
+              foveatedMinimumScreenSpaceErrorRelaxation: 0.5, // More relaxation
+              cullRequestsWhileMoving: true, // Cull while moving
+              cullRequestsWhileMovingMultiplier: 0.3, // Aggressive culling while moving
+              preferLeaves: false,
+              maximumMemoryUsage: 512, // 512MB limit for faster tile swapping
+              preloadWhenHidden: false, // Don't preload hidden tiles
+              preloadFlightDestinations: false // Don't preload ahead
             }
           );
 
@@ -331,8 +338,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               geometricErrorScale: tileset.geometricErrorScale
             });
 
-            // Set reasonable quality after loading
-            tileset.maximumScreenSpaceError = 4; // Balanced quality to prevent artifacts
+            // Set performance-optimized quality after loading
+            tileset.maximumScreenSpaceError = 8; // Higher tolerance for performance
             // Don't modify geometricErrorScale as it can cause rendering issues
 
             // Monitor tile loading progress
@@ -855,8 +862,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             const heading = window.Cesium.Math.toRadians(interpolatedHeading);
             const pitchAngle = -15; // Shallower angle to see more tiles ahead
 
-            // Enable tile preloading
-            viewer.scene.preloadTilesWhenIdle = true;
+            // Disable tile preloading for performance
+            viewer.scene.preloadTilesWhenIdle = false;
             viewer.scene.requestRenderMode = false; // Continuous rendering for smooth animation
 
             // Preload tiles ahead of current position
@@ -888,12 +895,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
                 }
               });
 
-              // Maintain reasonable quality during animation
+              // Optimize quality for performance during animation
               if (viewer.googleTileset) {
                 viewer.animationState.lastPosition = viewer.animationState.continuousPosition;
 
-                // Keep balanced quality to prevent artifacts
-                viewer.googleTileset.maximumScreenSpaceError = 4;
+                // Higher error tolerance for better performance
+                viewer.googleTileset.maximumScreenSpaceError = 12; // Even more tolerant during movement
               }
 
               // Request render to ensure tiles are displayed
