@@ -93,7 +93,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
   // Calculate closest point to search location
   useEffect(() => {
+    console.log('Calculating closest point. SearchContext:', searchContext, 'Positions length:', positions.length);
     if (!searchContext || positions.length === 0) {
+      console.log('No search context or positions, clearing closest index');
       setClosestPointIndex(null);
       return;
     }
@@ -114,6 +116,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
     });
 
     if (closestIdx >= 0) {
+      console.log('Found closest point at index:', closestIdx, 'distance:', minDistance);
       setClosestPointIndex(closestIdx);
     }
   }, [positions, searchContext]);
@@ -272,23 +275,22 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             `https://tile.googleapis.com/v1/3dtiles/root.json?key=${cleanApiKey}`,
             {
               showCreditsOnScreen: true,
-              maximumScreenSpaceError: 2, // Higher quality (lower value = better quality)
-              cacheBytes: 4 * 1024 * 1024 * 1024, // 4GB cache for tiles
-              maximumCacheOverflowBytes: 2 * 1024 * 1024 * 1024, // Allow 2GB overflow
+              maximumScreenSpaceError: 1, // Maximum quality (lower value = better quality)
+              cacheBytes: 8 * 1024 * 1024 * 1024, // 8GB cache for tiles
+              maximumCacheOverflowBytes: 4 * 1024 * 1024 * 1024, // Allow 4GB overflow
               skipLevelOfDetail: false, // Load all detail levels properly
-              immediatelyLoadDesiredLevelOfDetail: false,
+              immediatelyLoadDesiredLevelOfDetail: true, // Load best quality immediately
               loadSiblings: true,
               cullWithChildrenBounds: false, // Better occlusion handling
-              dynamicScreenSpaceError: true,
-              dynamicScreenSpaceErrorDensity: 0.00278,
-              dynamicScreenSpaceErrorFactor: 4.0,
+              dynamicScreenSpaceError: false, // Disable dynamic adjustment to maintain quality
               preloadFlightDestinations: true, // Preload tiles at camera destinations
               preloadWhenHidden: true, // Preload before showing
-              progressiveResolutionHeightFraction: 0.3, // Quick low-res first, then high-res
+              progressiveResolutionHeightFraction: 0.5, // Load more high-res tiles
               foveatedConeSize: 0.1, // Prioritize center of view
               foveatedMinimumScreenSpaceErrorRelaxation: 0.0,
               cullRequestsWhileMoving: false, // Keep loading tiles during movement
-              cullRequestsWhileMovingMultiplier: 1.0
+              cullRequestsWhileMovingMultiplier: 1.0,
+              preferLeaves: true // Prefer highest detail tiles
             }
           );
 
@@ -452,8 +454,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
         viewer.helicopterEntity = helicopter;
 
         // Add blue marker for search location if present
-        if (searchContext && closestPointIndex !== null) {
-          console.log('Creating search location marker at:', searchContext.lat, searchContext.lng);
+        if (searchContext) {
+          console.log('Creating search location marker at:', searchContext.lat, searchContext.lng, 'closestIndex:', closestPointIndex);
 
           const searchMarker = viewer.entities.add({
             name: 'Search Location',
@@ -698,7 +700,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             viewer.animationState.currentIndex = currentIdx;
 
             // Check if we've reached the closest point to search location
-            if (searchContext && closestPointIndex !== null && !viewer.animationState.hasStoppedAtClosest) {
+            if (searchContext && closestPointIndex !== null && closestPointIndex >= 0 && !viewer.animationState.hasStoppedAtClosest) {
               // Check if we've reached or passed the closest point
               if (currentIdx >= closestPointIndex) {
                 console.log('Reached closest point to search location at index', closestPointIndex);
@@ -792,24 +794,22 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             viewer.scene.preloadTilesWhenIdle = true;
             viewer.scene.requestRenderMode = false; // Continuous rendering for smooth animation
 
-            // Preload tiles ahead of current position by updating view bounds
+            // Preload tiles ahead of current position
             const preloadDistance = 10; // Look ahead 10 positions
-            for (let i = 1; i <= Math.min(preloadDistance, positions.length - currentIdx - 1); i++) {
-              const preloadIdx = currentIdx + i;
-              const preloadPos = positions[preloadIdx];
+            if (viewer.googleTileset && currentIdx % 30 === 0) { // Only update every 30 frames to avoid performance issues
+              // Instead of restricting tile loading, we'll adjust the camera frustum to load more tiles
+              const currentTileset = viewer.googleTileset;
 
-              // Create bounding sphere for preload position
-              const preloadCartesian = window.Cesium.Cartesian3.fromDegrees(
-                preloadPos.longitude,
-                preloadPos.latitude,
-                preloadPos.altitude_feet * 0.3048
-              );
-
-              // This triggers tile loading by adding position to view frustum calculations
-              if (viewer.googleTileset) {
-                const boundingSphere = new window.Cesium.BoundingSphere(preloadCartesian, 500); // 500m radius
-                viewer.googleTileset.viewerRequestVolume = boundingSphere;
+              // Temporarily increase screen space error to load more tiles faster
+              if (currentTileset.maximumScreenSpaceError > 1) {
+                currentTileset.maximumScreenSpaceError = Math.max(1, currentTileset.maximumScreenSpaceError - 0.1);
               }
+
+              // Ensure tiles are being loaded by not restricting the view
+              currentTileset.viewerRequestVolume = undefined; // Remove any volume restrictions
+
+              // Force tile updates
+              viewer.scene.requestRender();
             }
 
             // Smooth camera movement
@@ -823,19 +823,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
                 }
               });
 
-              // Dynamically adjust tile quality based on speed
+              // Keep consistent high quality - don't adjust dynamically as it causes blurriness
               if (viewer.googleTileset) {
-                const speedFactor = viewer.animationState.continuousPosition - viewer.animationState.lastPosition || 0;
                 viewer.animationState.lastPosition = viewer.animationState.continuousPosition;
 
-                // Lower quality during fast movement, higher during slow/hover
-                if (speedFactor > 5) {
-                  viewer.googleTileset.maximumScreenSpaceError = 4; // Lower quality for speed
-                } else if (speedFactor < 1) {
-                  viewer.googleTileset.maximumScreenSpaceError = 1; // Highest quality when slow/hovering
-                } else {
-                  viewer.googleTileset.maximumScreenSpaceError = 2; // Normal quality
-                }
+                // Always maintain high quality
+                viewer.googleTileset.maximumScreenSpaceError = 1;
               }
 
               // Request render to ensure tiles are displayed
