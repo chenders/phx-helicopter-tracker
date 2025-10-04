@@ -243,21 +243,27 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           const cleanApiKey = apiKey.replace(/['"]/g, '');
 
           console.log('Loading Google 3D Tiles from:', `https://tile.googleapis.com/v1/3dtiles/root.json?key=${cleanApiKey.substring(0, 10)}...`);
-          Cesium.RequestScheduler.requestsByServer["tile.googleapis.com:443"] = 50;
+          // Increase request limit for faster tile loading
+          Cesium.RequestScheduler.requestsByServer["tile.googleapis.com:443"] = 100;
 
           const tileset = await Cesium.Cesium3DTileset.fromUrl(
             `https://tile.googleapis.com/v1/3dtiles/root.json?key=${cleanApiKey}`,
             {
               showCreditsOnScreen: true,
-              maximumScreenSpaceError: 8, // Start with lower quality for faster loading
-              maximumMemoryUsage: 1024, // More memory for tiles
-              skipLevelOfDetail: true,
+              maximumScreenSpaceError: 2, // Higher quality (lower value = better quality)
+              maximumMemoryUsage: 2048, // Double memory for better caching
+              skipLevelOfDetail: false, // Load all detail levels properly
               immediatelyLoadDesiredLevelOfDetail: false,
               loadSiblings: true,
-              cullWithChildrenBounds: true,
+              cullWithChildrenBounds: false, // Better occlusion handling
               dynamicScreenSpaceError: true,
               dynamicScreenSpaceErrorDensity: 0.00278,
-              dynamicScreenSpaceErrorFactor: 4.0
+              dynamicScreenSpaceErrorFactor: 4.0,
+              preloadFlightDestinations: true, // Preload tiles at camera destinations
+              preloadWhenHidden: true, // Preload before showing
+              progressiveResolutionHeightFraction: 0.3, // Quick low-res first, then high-res
+              foveatedConeSize: 0.1, // Prioritize center of view
+              foveatedMinimumScreenSpaceErrorRelaxation: 0.0
             }
           );
 
@@ -273,9 +279,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             await tileset.readyPromise;
             console.log('Google 3D Tiles ready');
 
-            // Configure tileset for better rendering
-            tileset.maximumScreenSpaceError = 4; // Higher value = faster loading, lower quality
-            tileset.skipLevelOfDetail = true; // Speed up loading
+            // Keep high quality settings after loading
+            // tileset.maximumScreenSpaceError is already set in constructor
+            // Don't override the quality settings here
 
             // Keep the globe hidden - don't change this during animation
             viewer.scene.globe.show = false;
@@ -478,7 +484,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             currentIndex: 0,
             interpolationProgress: 0,
             frameCount: 0,
-            continuousPosition: 0
+            continuousPosition: 0,
+            lastPosition: 0 // Track last position for speed calculation
           };
         }
 
@@ -515,6 +522,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           viewer.animationState.currentIndex = 0;
           viewer.animationState.continuousPosition = 0;
           viewer.animationState.frameCount = 0;
+          viewer.animationState.lastPosition = 0;
 
           // Animation timing configuration
           const positionCount = positions.length;
@@ -523,30 +531,34 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           // Calculate total animation duration based on mode and speed
           let targetDurationSeconds;
 
+          // Calculate realistic flight time based on actual timestamps
+          const actualFlightTimeMs = new Date(positions[positions.length - 1].timestamp).getTime() -
+                                     new Date(positions[0].timestamp).getTime();
+          const actualFlightSeconds = actualFlightTimeMs / 1000;
+
           if (tileLoadingMode) {
-            // High quality mode - much slower for tile loading
-            targetDurationSeconds = Math.max(120, positionCount / (10 * currentSpeed)); // Min 2 minutes
-            framesPerSecond = 15; // Lower FPS for tile loading
+            // High quality mode - slower for tile loading, but based on real time
+            targetDurationSeconds = Math.max(60, actualFlightSeconds / (currentSpeed * 10)); // Scale down by 10x at 1x speed
+            framesPerSecond = 20; // Moderate FPS for quality
           } else {
-            // Normal mode - reasonable speed
-            targetDurationSeconds = Math.max(30, positionCount / (50 * currentSpeed)); // Min 30 seconds
+            // Normal mode - faster playback
+            targetDurationSeconds = Math.max(20, actualFlightSeconds / (currentSpeed * 30)); // Scale down by 30x at 1x speed
+            framesPerSecond = 30; // Higher FPS for smoothness
           }
 
           // Calculate how much progress to make per frame
-          const totalFrames = targetDurationSeconds * framesPerSecond / 5;
+          const totalFrames = targetDurationSeconds * framesPerSecond;
           const progressPerFrame = (positionCount - 1) / totalFrames;
 
           const baseIntervalMs = 1000 / framesPerSecond;
 
           // Store animation settings in viewer for access in animate function
-/*          viewer.animationSettings = {
+          viewer.animationSettings = {
             intervalMs: baseIntervalMs,
             progressPerFrame: progressPerFrame,
             playbackSpeed: currentSpeed,
             totalFrames: totalFrames
-          }; 
-
-          // Store continuous position tracker
+          };
 
           console.log('Animation settings:', {
             positionCount,
@@ -554,8 +566,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             framesPerSecond,
             targetDuration: `${Math.round(targetDurationSeconds)} seconds`,
             progressPerFrame: progressPerFrame.toFixed(3),
-            tileLoadingMode
-          }); */
+            tileLoadingMode,
+            actualFlightTime: `${Math.round(actualFlightSeconds)} seconds`
+          });
           viewer.animationState.continuousPosition = 0; // Float value for smooth interpolation
 
           // Use recursive setTimeout instead of setInterval for better reliability
@@ -574,14 +587,20 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               if (!viewer.animationState.continuousPosition) {
                 viewer.animationState.continuousPosition = 0;
               }
-	      viewer.animationState.continuousPosition += 4;
-//              viewer.animationState.continuousPosition += viewer.animationSettings.progressPerFrame;
+              // Use calculated progress per frame for proper speed control
+              viewer.animationState.continuousPosition += viewer.animationSettings.progressPerFrame;
 
-              // Log progress periodically
-/*              if (viewer.animationState.frameCount % 60 === 0) {
+                  // Log progress periodically
+              if (viewer.animationState.frameCount % 60 === 0) {
                 const progress = (viewer.animationState.continuousPosition / (positions.length - 1) * 100).toFixed(1);
                 console.log(`Animation progress: ${progress}% (position ${viewer.animationState.continuousPosition.toFixed(1)}/${positions.length})`);
-              } */
+
+                // Check tile loading status if tileset exists
+                if (viewer.googleTileset) {
+                  const tileset = viewer.googleTileset;
+                  console.log(`Tiles - Loaded: ${tileset.statistics.numberOfTilesLoaded}, Total: ${tileset.statistics.numberOfTilesTotal}, Memory: ${(tileset.totalMemoryUsageInBytes / 1048576).toFixed(1)}MB`);
+                }
+              }
 
               if (!mountedRef.current || !viewer) {
                 console.log('Animation stopped: component unmounted or viewer destroyed');
@@ -656,6 +675,27 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
             // Enable tile preloading
             viewer.scene.preloadTilesWhenIdle = true;
+            viewer.scene.requestRenderMode = false; // Continuous rendering for smooth animation
+
+            // Preload tiles ahead of current position by updating view bounds
+            const preloadDistance = 10; // Look ahead 10 positions
+            for (let i = 1; i <= Math.min(preloadDistance, positions.length - currentIdx - 1); i++) {
+              const preloadIdx = currentIdx + i;
+              const preloadPos = positions[preloadIdx];
+
+              // Create bounding sphere for preload position
+              const preloadCartesian = window.Cesium.Cartesian3.fromDegrees(
+                preloadPos.longitude,
+                preloadPos.latitude,
+                preloadPos.altitude_feet * 0.3048
+              );
+
+              // This triggers tile loading by adding position to view frustum calculations
+              if (viewer.googleTileset) {
+                const boundingSphere = new window.Cesium.BoundingSphere(preloadCartesian, 500); // 500m radius
+                viewer.googleTileset.viewerRequestVolume = boundingSphere;
+              }
+            }
 
             // Smooth camera movement
             try {
@@ -668,28 +708,37 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
                 }
               });
 
+              // Dynamically adjust tile quality based on speed
+              if (viewer.googleTileset) {
+                const speedFactor = viewer.animationState.continuousPosition - viewer.animationState.lastPosition || 0;
+                viewer.animationState.lastPosition = viewer.animationState.continuousPosition;
+
+                // Lower quality during fast movement, higher during slow/hover
+                if (speedFactor > 5) {
+                  viewer.googleTileset.maximumScreenSpaceError = 4; // Lower quality for speed
+                } else if (speedFactor < 1) {
+                  viewer.googleTileset.maximumScreenSpaceError = 1; // Highest quality when slow/hovering
+                } else {
+                  viewer.googleTileset.maximumScreenSpaceError = 2; // Normal quality
+                }
+              }
+
               // Request render to ensure tiles are displayed
               viewer.scene.requestRender();
             } catch (error) {
               console.error('Error setting camera view:', error);
               // Don't stop animation on camera errors - keep going
             }
-/*
             // Update slider position based on continuous position
             const percentage = (viewer.animationState.continuousPosition / (positions.length - 1)) * 100;
             setSliderPosition(percentage);
 
             // Schedule next frame with proper delay
-            const animationInterval = viewer.animationSettings?.intervalMs || 100;
-            const delay = animationInterval;
-*/
+            const animationInterval = viewer.animationSettings?.intervalMs || 33; // Default to 30 FPS
             // Use setTimeout with the calculated interval
             const timeoutId = setTimeout(() => {
-              if (viewer.animationState.frameCount % 10 === 0) {
-                console.log(`Frame ${viewer.animationState.frameCount} timeout fired, continuing animation...`);
-              }
               animate();
-            }, 100);
+            }, animationInterval);
             animationRef.current = timeoutId;
 
             // Verify the timeout was actually set
@@ -904,7 +953,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
         currentIndex: 0,
         interpolationProgress: 0,
         frameCount: 0,
-        continuousPosition: 0
+        continuousPosition: 0,
+        lastPosition: 0
       };
     }
 
