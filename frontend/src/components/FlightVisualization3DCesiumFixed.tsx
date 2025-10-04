@@ -458,7 +458,10 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
         viewer.clock.startTime = start.clone();
         viewer.clock.stopTime = stop.clone();
         viewer.clock.currentTime = start.clone();
-        viewer.timeline.zoomTo(start, stop);
+        // Only zoom timeline if it exists (we disabled it for performance)
+        if (viewer.timeline) {
+          viewer.timeline.zoomTo(start, stop);
+        }
         // Speed up the playback speed 50x.
         viewer.clock.multiplier = 2;
         // Start playing the scene.
