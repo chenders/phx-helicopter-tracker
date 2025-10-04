@@ -404,8 +404,27 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
         if (!mountedRef.current) return;
 
+        // When we have a search context, only use positions around the closest point
+        let displayPositions = positions;
+        let adjustedClosestIndex = closestPointIndex;
+
+        if (searchContext && closestPointIndex !== null && closestPointIndex >= 0) {
+          // Calculate how many positions represent approximately 1 minute
+          // Assuming positions are logged every 1-2 seconds on average
+          const positionsPerMinute = 30; // Approximate
+
+          // Start 1 minute before closest point, end at closest point
+          const startIdx = Math.max(0, closestPointIndex - positionsPerMinute);
+          const endIdx = Math.min(positions.length - 1, closestPointIndex + 5); // Add a few positions after for smooth stop
+
+          displayPositions = positions.slice(startIdx, endIdx + 1);
+          adjustedClosestIndex = closestPointIndex - startIdx; // Adjust index for sliced array
+
+          console.log(`Using reduced positions: ${displayPositions.length} (from ${startIdx} to ${endIdx}, closest at ${adjustedClosestIndex})`);
+        }
+
         // Convert positions to Cesium format
-        const cartesianPositions = positions.map(pos => {
+        const cartesianPositions = displayPositions.map(pos => {
           return Cesium.Cartesian3.fromDegrees(
             pos.longitude,
             pos.latitude,
@@ -415,9 +434,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
         // The SampledPositionedProperty stores the position and timestamp for each sample along the radar sample series.
        const positionProperty = new Cesium.SampledPositionProperty();
-       const start = Cesium.JulianDate.fromIso8601(positions[0].timestamp)
-       for (let i = 0; i < positions.length; i++) {
-         const dataPoint = positions[i];
+       const start = Cesium.JulianDate.fromIso8601(displayPositions[0].timestamp)
+       for (let i = 0; i < displayPositions.length; i++) {
+         const dataPoint = displayPositions[i];
 	 const dataTime = new Date(dataPoint.timestamp).getTime();
          const posStart = Cesium.JulianDate.fromIso8601(dataPoint.timestamp)
          // Declare the time for this individual sample and store it in a new JulianDate instance.
@@ -451,8 +470,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
 	const timeStepInSeconds = 30;
 //        const totalSeconds = timeStepInSeconds * (flightData.length - 1);
-	const startDate = new Date(positions[0].timestamp);
-	const endDate = new Date(positions[positions.length - 1].timestamp);
+	const startDate = new Date(displayPositions[0].timestamp);
+	const endDate = new Date(displayPositions[displayPositions.length - 1].timestamp);
 	const totalSeconds = (endDate.getTime() - startDate.getTime()) / 1000
         const stop = Cesium.JulianDate.addSeconds(start, totalSeconds, new Cesium.JulianDate());
         viewer.clock.startTime = start.clone();
@@ -565,7 +584,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
         }
 
         // Start with first-person pilot view
-        const startPos = positions[0];
+        const startPos = displayPositions[0];
         // Use reasonable altitude to prevent rendering artifacts
         const startAltitude = Math.max(startPos.altitude_feet || 1000, 1000); // Minimum 1000ft to prevent artifacts
         const startCartesian = Cesium.Cartesian3.fromDegrees(
@@ -636,8 +655,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
         // Animation function with smooth interpolation
         const animateFlight = (speed?: number) => {
           // Validate prerequisites
-          if (!positions || positions.length < 2) {
-            console.error('Cannot start animation: not enough positions', positions?.length || 0);
+          if (!displayPositions || displayPositions.length < 2) {
+            console.error('Cannot start animation: not enough positions', displayPositions?.length || 0);
             setIsAnimating(false);
             return;
           }
@@ -651,7 +670,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           // Use provided speed or get from viewer settings or fallback to 1
           const currentSpeed = speed || viewer.animationSettings?.playbackSpeed || 1;
 
-          console.log('Starting animation with', positions.length, 'positions at', currentSpeed, 'x speed');
+          console.log('Starting animation with', displayPositions.length, 'positions at', currentSpeed, 'x speed');
           console.log('Viewer exists:', !!viewer);
           console.log('Helicopter entity exists:', !!viewer.helicopterEntity);
 
@@ -670,15 +689,15 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           viewer.animationState.hasStoppedAtClosest = false; // Reset the flag when starting new animation
 
           // Animation timing configuration
-          const positionCount = positions.length;
+          const positionCount = displayPositions.length;
           let framesPerSecond = 30; // Target FPS
 
           // Calculate total animation duration based on mode and speed
           let targetDurationSeconds;
 
           // Calculate realistic flight time based on actual timestamps
-          const actualFlightTimeMs = new Date(positions[positions.length - 1].timestamp).getTime() -
-                                     new Date(positions[0].timestamp).getTime();
+          const actualFlightTimeMs = new Date(displayPositions[displayPositions.length - 1].timestamp).getTime() -
+                                     new Date(displayPositions[0].timestamp).getTime();
           const actualFlightSeconds = actualFlightTimeMs / 1000;
 
           if (tileLoadingMode) {
@@ -737,8 +756,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
                   // Log progress periodically
               if (viewer.animationState.frameCount % 60 === 0) {
-                const progress = (viewer.animationState.continuousPosition / (positions.length - 1) * 100).toFixed(1);
-                console.log(`Animation progress: ${progress}% (position ${viewer.animationState.continuousPosition.toFixed(1)}/${positions.length})`);
+                const progress = (viewer.animationState.continuousPosition / (displayPositions.length - 1) * 100).toFixed(1);
+                console.log(`Animation progress: ${progress}% (position ${viewer.animationState.continuousPosition.toFixed(1)}/${displayPositions.length})`);
 
                 // Check tile loading status if tileset exists
                 if (viewer.googleTileset) {
@@ -754,7 +773,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               }
 
               // Check if animation is complete
-              if (viewer.animationState.continuousPosition >= positions.length - 1) {
+              if (viewer.animationState.continuousPosition >= displayPositions.length - 1) {
                 console.log('Animation completed');
                 setIsAnimating(false);
                 viewer.animationState.continuousPosition = 0;
@@ -764,9 +783,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
             // Get the two positions we're interpolating between
             const currentIdx = Math.floor(viewer.animationState.continuousPosition);
-            const nextIdx = Math.min(currentIdx + 1, positions.length - 1);
-            const currentPos = positions[currentIdx];
-            const nextPos = positions[nextIdx];
+            const nextIdx = Math.min(currentIdx + 1, displayPositions.length - 1);
+            const currentPos = displayPositions[currentIdx];
+            const nextPos = displayPositions[nextIdx];
 
             // Calculate smooth interpolation factor between the two positions
             const t = viewer.animationState.continuousPosition - currentIdx;
@@ -775,17 +794,17 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             viewer.animationState.currentIndex = currentIdx;
 
             // Check if we've reached the closest point to search location
-            if (searchContext && closestPointIndex !== null && closestPointIndex >= 0 && !viewer.animationState.hasStoppedAtClosest) {
+            if (searchContext && adjustedClosestIndex !== null && adjustedClosestIndex >= 0 && !viewer.animationState.hasStoppedAtClosest) {
               // Check if we've reached or passed the closest point
-              if (currentIdx >= closestPointIndex) {
-                console.log('Reached closest point to search location at index', closestPointIndex);
+              if (currentIdx >= adjustedClosestIndex) {
+                console.log('Reached closest point to search location at index', adjustedClosestIndex);
                 viewer.animationState.hasStoppedAtClosest = true;
 
                 // Pause the animation
                 setIsAnimating(false);
 
                 // Orient camera to look at the search location
-                const currentPosition = positions[closestPointIndex];
+                const currentPosition = displayPositions[adjustedClosestIndex];
                 const searchCartesian = window.Cesium.Cartesian3.fromDegrees(
                   searchContext.lng,
                   searchContext.lat,
@@ -913,7 +932,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               // Don't stop animation on camera errors - keep going
             }
             // Update slider position based on continuous position
-            const percentage = (viewer.animationState.continuousPosition / (positions.length - 1)) * 100;
+            const percentage = (viewer.animationState.continuousPosition / (displayPositions.length - 1)) * 100;
             setSliderPosition(percentage);
 
             // Schedule next frame with proper delay
