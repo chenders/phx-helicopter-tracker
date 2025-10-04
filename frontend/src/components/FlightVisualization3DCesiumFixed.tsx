@@ -281,26 +281,24 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             `https://tile.googleapis.com/v1/3dtiles/root.json?key=${cleanApiKey}`,
             {
               showCreditsOnScreen: true,
-              maximumScreenSpaceError: 0.5, // Even higher quality (0.5 is extremely high)
-              cacheBytes: 8 * 1024 * 1024 * 1024, // 8GB cache for tiles
-              maximumCacheOverflowBytes: 4 * 1024 * 1024 * 1024, // Allow 4GB overflow
-              skipLevelOfDetail: true, // Skip intermediate levels to load high quality faster
-              immediatelyLoadDesiredLevelOfDetail: true, // Load best quality immediately
+              maximumScreenSpaceError: 4, // Balanced quality setting (lower can cause artifacts)
+              cacheBytes: 2 * 1024 * 1024 * 1024, // 2GB cache for tiles
+              maximumCacheOverflowBytes: 1024 * 1024 * 1024, // Allow 1GB overflow
+              skipLevelOfDetail: false, // Don't skip levels to prevent artifacts
+              immediatelyLoadDesiredLevelOfDetail: false, // Progressive loading for stability
               loadSiblings: true,
-              cullWithChildrenBounds: false, // Better occlusion handling
-              dynamicScreenSpaceError: false, // Disable dynamic adjustment to maintain quality
+              cullWithChildrenBounds: true, // Standard occlusion handling
+              dynamicScreenSpaceError: true, // Enable dynamic adjustment for stability
               dynamicScreenSpaceErrorDensity: 0.00278,
-              dynamicScreenSpaceErrorFactor: 1.0, // Most aggressive quality
+              dynamicScreenSpaceErrorFactor: 4.0, // Standard factor
               dynamicScreenSpaceErrorHeightFalloff: 0.25,
-              progressiveResolutionHeightFraction: 0.0, // Don't use progressive loading - go straight to high quality
-              foveatedConeSize: 0.0, // Don't prioritize center - load everything high quality
+              progressiveResolutionHeightFraction: 0.3, // Progressive loading prevents artifacts
+              foveatedConeSize: 0.1, // Standard foveated rendering
               foveatedMinimumScreenSpaceErrorRelaxation: 0.0,
-              foveatedInterpolationCallback: undefined,
-              foveatedTimeDelay: 0.0,
-              cullRequestsWhileMoving: false, // Keep loading tiles during movement
-              cullRequestsWhileMovingMultiplier: 1.0,
-              preferLeaves: true, // Prefer highest detail tiles
-              maximumMemoryUsage: 8192 // 8GB memory usage limit
+              cullRequestsWhileMoving: true, // Standard culling while moving
+              cullRequestsWhileMovingMultiplier: 0.6, // Reduce quality slightly while moving
+              preferLeaves: false, // Don't force highest detail to prevent artifacts
+              maximumMemoryUsage: 2048 // 2GB memory usage limit
             }
           );
 
@@ -333,9 +331,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               geometricErrorScale: tileset.geometricErrorScale
             });
 
-            // Try to force higher quality
-            tileset.maximumScreenSpaceError = 0.5;
-            tileset.geometricErrorScale = 0.5; // Scale down geometric error for higher quality
+            // Set reasonable quality after loading
+            tileset.maximumScreenSpaceError = 4; // Balanced quality to prevent artifacts
+            // Don't modify geometricErrorScale as it can cause rendering issues
 
             // Monitor tile loading progress
             let lastTileCount = 0;
@@ -558,8 +556,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
         // Start with first-person pilot view
         const startPos = positions[0];
-        // Use lower altitude for better tile quality
-        const startAltitude = Math.max(startPos.altitude_feet || 500, 500); // Lower altitude for better quality
+        // Use reasonable altitude to prevent rendering artifacts
+        const startAltitude = Math.max(startPos.altitude_feet || 1000, 1000); // Minimum 1000ft to prevent artifacts
         const startCartesian = Cesium.Cartesian3.fromDegrees(
           startPos.longitude,
           startPos.latitude,
@@ -816,9 +814,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             // Smoothly interpolate position
             const interpolatedLat = lerp(currentPos.latitude, nextPos.latitude, t);
             const interpolatedLon = lerp(currentPos.longitude, nextPos.longitude, t);
-            // Ensure minimum altitude of 1500 feet to stay above ground
+            // Ensure minimum altitude of 1000 feet to prevent rendering artifacts
             const rawAlt = lerp(currentPos.altitude_feet, nextPos.altitude_feet, t);
-            const interpolatedAlt = Math.max(rawAlt, 1500);
+            const interpolatedAlt = Math.max(rawAlt, 1000);
 
             // Interpolate heading (handling wrap-around at 360 degrees)
             let currentHeading = currentPos.track_degrees || 0;
@@ -890,16 +888,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
                 }
               });
 
-              // Keep consistent high quality - don't adjust dynamically as it causes blurriness
+              // Maintain reasonable quality during animation
               if (viewer.googleTileset) {
                 viewer.animationState.lastPosition = viewer.animationState.continuousPosition;
 
-                // Always maintain highest quality
-                viewer.googleTileset.maximumScreenSpaceError = 0.5;
-
-                // Force high quality tiles to load
-                viewer.googleTileset.skipLevelOfDetail = true;
-                viewer.googleTileset.immediatelyLoadDesiredLevelOfDetail = true;
+                // Keep balanced quality to prevent artifacts
+                viewer.googleTileset.maximumScreenSpaceError = 4;
               }
 
               // Request render to ensure tiles are displayed
