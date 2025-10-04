@@ -243,9 +243,20 @@ export function FlightDetailPage() {
   const accumulatedTimeRef = useRef<number>(0)
 
   useEffect(() => {
+    let cancelled = false;
+
     if (flightId) {
-      loadFlightDetails()
+      const fetchData = async () => {
+        if (!cancelled) {
+          await loadFlightDetails();
+        }
+      };
+      fetchData();
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [flightId])
 
   // Calculate closest position if we have search context but no closest data

@@ -242,6 +242,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           // Remove quotes if present in the API key
           const cleanApiKey = apiKey.replace(/['"]/g, '');
 
+          // Check if tileset already exists on viewer
+          if (viewer.googleTileset) {
+            console.log('Google 3D Tileset already loaded on viewer, skipping...');
+            return;
+          }
+
           console.log('Loading Google 3D Tiles from:', `https://tile.googleapis.com/v1/3dtiles/root.json?key=${cleanApiKey.substring(0, 10)}...`);
           // Increase request limit for faster tile loading
           Cesium.RequestScheduler.requestsByServer["tile.googleapis.com:443"] = 100;
@@ -251,7 +257,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             {
               showCreditsOnScreen: true,
               maximumScreenSpaceError: 2, // Higher quality (lower value = better quality)
-              maximumMemoryUsage: 2048, // Double memory for better caching
+              maximumMemoryUsage: 4096, // 4GB memory limit to prevent blurry tiles
               skipLevelOfDetail: false, // Load all detail levels properly
               immediatelyLoadDesiredLevelOfDetail: false,
               loadSiblings: true,
@@ -263,7 +269,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               preloadWhenHidden: true, // Preload before showing
               progressiveResolutionHeightFraction: 0.3, // Quick low-res first, then high-res
               foveatedConeSize: 0.1, // Prioritize center of view
-              foveatedMinimumScreenSpaceErrorRelaxation: 0.0
+              foveatedMinimumScreenSpaceErrorRelaxation: 0.0,
+              cullRequestsWhileMoving: false, // Keep loading tiles during movement
+              cullRequestsWhileMovingMultiplier: 1.0
             }
           );
 
