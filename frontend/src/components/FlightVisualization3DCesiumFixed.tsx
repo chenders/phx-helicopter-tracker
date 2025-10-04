@@ -451,6 +451,42 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
         // Store helicopter reference on viewer for access in animation function
         viewer.helicopterEntity = helicopter;
 
+        // Add blue marker for search location if present
+        if (searchContext && closestPointIndex !== null) {
+          console.log('Creating search location marker at:', searchContext.lat, searchContext.lng);
+
+          const searchMarker = viewer.entities.add({
+            name: 'Search Location',
+            position: Cesium.Cartesian3.fromDegrees(searchContext.lng, searchContext.lat, 100),
+            point: {
+              pixelSize: 20,
+              color: Cesium.Color.BLUE,
+              outlineColor: Cesium.Color.WHITE,
+              outlineWidth: 3,
+              heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY
+            }
+          });
+
+          // Add a circle to show the search radius
+          viewer.entities.add({
+            name: 'Search Radius',
+            position: Cesium.Cartesian3.fromDegrees(searchContext.lng, searchContext.lat),
+            ellipse: {
+              semiMinorAxis: searchContext.radius,
+              semiMajorAxis: searchContext.radius,
+              height: 0,
+              material: Cesium.Color.BLUE.withAlpha(0.15),
+              outline: true,
+              outlineColor: Cesium.Color.BLUE.withAlpha(0.5),
+              outlineWidth: 2,
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+            }
+          });
+
+          viewer.searchMarker = searchMarker;
+        }
+
         // Start with first-person pilot view
         const startPos = positions[0];
         // Higher altitude to see more tiles
@@ -515,7 +551,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             interpolationProgress: 0,
             frameCount: 0,
             continuousPosition: 0,
-            lastPosition: 0 // Track last position for speed calculation
+            lastPosition: 0, // Track last position for speed calculation
+            hasStoppedAtClosest: false // Track if we've paused at the closest point
           };
         }
 
@@ -553,6 +590,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           viewer.animationState.continuousPosition = 0;
           viewer.animationState.frameCount = 0;
           viewer.animationState.lastPosition = 0;
+          viewer.animationState.hasStoppedAtClosest = false; // Reset the flag when starting new animation
 
           // Animation timing configuration
           const positionCount = positions.length;
@@ -658,6 +696,53 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
             // Update the visible index for UI
             viewer.animationState.currentIndex = currentIdx;
+
+            // Check if we've reached the closest point to search location
+            if (searchContext && closestPointIndex !== null && !viewer.animationState.hasStoppedAtClosest) {
+              // Check if we've reached or passed the closest point
+              if (currentIdx >= closestPointIndex) {
+                console.log('Reached closest point to search location at index', closestPointIndex);
+                viewer.animationState.hasStoppedAtClosest = true;
+
+                // Pause the animation
+                setIsAnimating(false);
+
+                // Orient camera to look at the search location
+                const currentPosition = positions[closestPointIndex];
+                const searchCartesian = window.Cesium.Cartesian3.fromDegrees(
+                  searchContext.lng,
+                  searchContext.lat,
+                  100
+                );
+
+                // Calculate heading from current position to search location
+                const deltaLon = searchContext.lng - currentPosition.longitude;
+                const deltaLat = searchContext.lat - currentPosition.latitude;
+                const headingToSearch = Math.atan2(deltaLon, deltaLat) * 180 / Math.PI;
+
+                // Set camera to look at search location
+                const viewCartesian = window.Cesium.Cartesian3.fromDegrees(
+                  currentPosition.longitude,
+                  currentPosition.latitude,
+                  currentPosition.altitude_feet * 0.3048
+                );
+
+                viewer.camera.setView({
+                  destination: viewCartesian,
+                  orientation: {
+                    heading: window.Cesium.Math.toRadians(headingToSearch),
+                    pitch: window.Cesium.Math.toRadians(-15), // Slight downward angle
+                    roll: 0
+                  }
+                });
+
+                console.log('Animation paused at closest point. Camera oriented toward search location.');
+                console.log('Click "Start Flight Animation" to continue the flight.');
+
+                // Don't continue the animation loop
+                return;
+              }
+            }
 
             // Smoothly interpolate position
             const interpolatedLat = lerp(currentPos.latitude, nextPos.latitude, t);
