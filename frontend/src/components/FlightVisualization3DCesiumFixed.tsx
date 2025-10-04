@@ -275,22 +275,26 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             `https://tile.googleapis.com/v1/3dtiles/root.json?key=${cleanApiKey}`,
             {
               showCreditsOnScreen: true,
-              maximumScreenSpaceError: 1, // Maximum quality (lower value = better quality)
+              maximumScreenSpaceError: 0.5, // Even higher quality (0.5 is extremely high)
               cacheBytes: 8 * 1024 * 1024 * 1024, // 8GB cache for tiles
               maximumCacheOverflowBytes: 4 * 1024 * 1024 * 1024, // Allow 4GB overflow
-              skipLevelOfDetail: false, // Load all detail levels properly
+              skipLevelOfDetail: true, // Skip intermediate levels to load high quality faster
               immediatelyLoadDesiredLevelOfDetail: true, // Load best quality immediately
               loadSiblings: true,
               cullWithChildrenBounds: false, // Better occlusion handling
               dynamicScreenSpaceError: false, // Disable dynamic adjustment to maintain quality
-              preloadFlightDestinations: true, // Preload tiles at camera destinations
-              preloadWhenHidden: true, // Preload before showing
-              progressiveResolutionHeightFraction: 0.5, // Load more high-res tiles
-              foveatedConeSize: 0.1, // Prioritize center of view
+              dynamicScreenSpaceErrorDensity: 0.00278,
+              dynamicScreenSpaceErrorFactor: 1.0, // Most aggressive quality
+              dynamicScreenSpaceErrorHeightFalloff: 0.25,
+              progressiveResolutionHeightFraction: 0.0, // Don't use progressive loading - go straight to high quality
+              foveatedConeSize: 0.0, // Don't prioritize center - load everything high quality
               foveatedMinimumScreenSpaceErrorRelaxation: 0.0,
+              foveatedInterpolationCallback: undefined,
+              foveatedTimeDelay: 0.0,
               cullRequestsWhileMoving: false, // Keep loading tiles during movement
               cullRequestsWhileMovingMultiplier: 1.0,
-              preferLeaves: true // Prefer highest detail tiles
+              preferLeaves: true, // Prefer highest detail tiles
+              maximumMemoryUsage: 8192 // 8GB memory usage limit
             }
           );
 
@@ -311,9 +315,21 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             await tileset.readyPromise;
             console.log('Google 3D Tiles ready');
 
-            // Keep high quality settings after loading
-            // tileset.maximumScreenSpaceError is already set in constructor
-            // Don't override the quality settings here
+            // Log tileset properties to debug quality issues
+            console.log('Tileset properties:', {
+              maximumScreenSpaceError: tileset.maximumScreenSpaceError,
+              skipLevelOfDetail: tileset.skipLevelOfDetail,
+              immediatelyLoadDesiredLevelOfDetail: tileset.immediatelyLoadDesiredLevelOfDetail,
+              geometricError: tileset.root?.geometricError,
+              hasExtension: tileset.root?.hasExtension,
+              tilesLoaded: tileset.statistics?.numberOfTilesLoaded,
+              tilesTotal: tileset.statistics?.numberOfTilesTotal,
+              geometricErrorScale: tileset.geometricErrorScale
+            });
+
+            // Try to force higher quality
+            tileset.maximumScreenSpaceError = 0.5;
+            tileset.geometricErrorScale = 0.5; // Scale down geometric error for higher quality
 
             // Keep the globe hidden - don't change this during animation
             viewer.scene.globe.show = false;
@@ -491,8 +507,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
         // Start with first-person pilot view
         const startPos = positions[0];
-        // Higher altitude to see more tiles
-        const startAltitude = 2000; // Higher altitude to load more tiles
+        // Use lower altitude for better tile quality
+        const startAltitude = Math.max(startPos.altitude_feet || 500, 500); // Lower altitude for better quality
         const startCartesian = Cesium.Cartesian3.fromDegrees(
           startPos.longitude,
           startPos.latitude,
@@ -827,8 +843,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               if (viewer.googleTileset) {
                 viewer.animationState.lastPosition = viewer.animationState.continuousPosition;
 
-                // Always maintain high quality
-                viewer.googleTileset.maximumScreenSpaceError = 1;
+                // Always maintain highest quality
+                viewer.googleTileset.maximumScreenSpaceError = 0.5;
+
+                // Force high quality tiles to load
+                viewer.googleTileset.skipLevelOfDetail = true;
+                viewer.googleTileset.immediatelyLoadDesiredLevelOfDetail = true;
               }
 
               // Request render to ensure tiles are displayed
