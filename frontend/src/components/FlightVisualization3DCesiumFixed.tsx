@@ -50,6 +50,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
   const [sliderPosition, setSliderPosition] = useState(0);
   const [closestPointIndex, setClosestPointIndex] = useState<number | null>(null);
   const [tileLoadingMode, setTileLoadingMode] = useState(false);
+  const [tilesReady, setTilesReady] = useState(false);
+  const [tileLoadProgress, setTileLoadProgress] = useState(0);
   const isInitializingRef = useRef(false);
   const hasInitializedRef = useRef(false);
 
@@ -80,6 +82,10 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
     // Reset initialization flags
     isInitializingRef.current = false;
     hasInitializedRef.current = false;
+
+    // Reset tile loading state
+    setTilesReady(false);
+    setTileLoadProgress(0);
   }, []);
 
   useEffect(() => {
@@ -331,6 +337,47 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             tileset.maximumScreenSpaceError = 0.5;
             tileset.geometricErrorScale = 0.5; // Scale down geometric error for higher quality
 
+            // Monitor tile loading progress
+            let lastTileCount = 0;
+            let stableFrames = 0;
+            const minimumTiles = 20; // Minimum tiles before allowing animation
+
+            const checkTileLoading = setInterval(() => {
+              if (!mountedRef.current || !tileset) {
+                clearInterval(checkTileLoading);
+                return;
+              }
+
+              const tilesLoaded = tileset.statistics.numberOfTilesLoaded;
+              const progress = Math.min(100, (tilesLoaded / Math.max(minimumTiles, tilesLoaded)) * 100);
+
+              setTileLoadProgress(progress);
+
+              // Check if tiles are stable (no new tiles loading)
+              if (tilesLoaded === lastTileCount) {
+                stableFrames++;
+              } else {
+                stableFrames = 0;
+                lastTileCount = tilesLoaded;
+              }
+
+              // Consider tiles ready when we have enough tiles and loading is stable
+              if (tilesLoaded >= minimumTiles && stableFrames >= 10) {
+                console.log(`Tiles ready! Loaded ${tilesLoaded} tiles`);
+                setTilesReady(true);
+                clearInterval(checkTileLoading);
+              }
+            }, 200); // Check every 200ms
+
+            // Fallback: Set ready after max 5 seconds even if not all tiles loaded
+            setTimeout(() => {
+              if (!tilesReady && mountedRef.current) {
+                console.log('Tile loading timeout - enabling animation');
+                setTilesReady(true);
+                clearInterval(checkTileLoading);
+              }
+            }, 5000);
+
             // Keep the globe hidden - don't change this during animation
             viewer.scene.globe.show = false;
 
@@ -344,6 +391,10 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           console.warn('Could not load Google 3D tiles, using default terrain:', tileError);
           // Keep the default ellipsoid terrain provider
           viewer.scene.globe.show = true;
+
+          // Still mark tiles as "ready" so animation can proceed
+          setTilesReady(true);
+          setTileLoadProgress(100);
         }
 
         if (!mountedRef.current) return;
@@ -1223,9 +1274,24 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
               {!isAnimating ? (
                 <button
                   onClick={handleStartAnimation}
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white px-3 py-2 rounded text-sm hover:from-blue-600 hover:to-blue-700 transition-all shadow-md"
+                  disabled={!tilesReady}
+                  className={`w-full text-white px-3 py-2 rounded text-sm transition-all shadow-md ${
+                    tilesReady
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 cursor-pointer'
+                      : 'bg-gray-400 cursor-not-allowed'
+                  }`}
                 >
-                  🚁 Start Flight Animation
+                  {tilesReady ? (
+                    '🚁 Start Flight Animation'
+                  ) : (
+                    <span className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Loading tiles... ({Math.round(tileLoadProgress)}%)
+                    </span>
+                  )}
                 </button>
               ) : (
                 <button
