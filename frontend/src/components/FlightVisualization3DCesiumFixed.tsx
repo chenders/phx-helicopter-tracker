@@ -50,6 +50,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
   const [sliderPosition, setSliderPosition] = useState(0);
   const [closestPointIndex, setClosestPointIndex] = useState<number | null>(null);
   const [tileLoadingMode, setTileLoadingMode] = useState(false);
+  const isInitializingRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
   // Clean up function
   const cleanup = useCallback(() => {
@@ -74,6 +76,10 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
       cesiumContainerRef.current.parentNode.removeChild(cesiumContainerRef.current);
       cesiumContainerRef.current = null;
     }
+
+    // Reset initialization flags
+    isInitializingRef.current = false;
+    hasInitializedRef.current = false;
   }, []);
 
   useEffect(() => {
@@ -115,8 +121,18 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
   useEffect(() => {
     if (!containerRef.current || positions.length === 0) return;
 
+    // Prevent multiple initializations
+    if (isInitializingRef.current || hasInitializedRef.current) {
+      console.log('Cesium initialization already in progress or completed, skipping...');
+      return;
+    }
+
     const loadCesium = async () => {
       try {
+        // Set the initializing flag immediately
+        isInitializingRef.current = true;
+        console.log('Starting Cesium initialization...');
+
         setIsLoading(true);
         setError(null);
 
@@ -257,7 +273,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
             {
               showCreditsOnScreen: true,
               maximumScreenSpaceError: 2, // Higher quality (lower value = better quality)
-              maximumMemoryUsage: 4096, // 4GB memory limit to prevent blurry tiles
+              cacheBytes: 4 * 1024 * 1024 * 1024, // 4GB cache for tiles
+              maximumCacheOverflowBytes: 2 * 1024 * 1024 * 1024, // Allow 2GB overflow
               skipLevelOfDetail: false, // Load all detail levels properly
               immediatelyLoadDesiredLevelOfDetail: false,
               loadSiblings: true,
@@ -276,6 +293,11 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
           );
 
           console.log('Google 3D Tileset loaded successfully');
+          console.log('Tileset cache settings:', {
+            cacheBytes: tileset.cacheBytes / (1024 * 1024) + ' MB',
+            maximumCacheOverflowBytes: tileset.maximumCacheOverflowBytes / (1024 * 1024) + ' MB',
+            totalMemoryUsageInBytes: tileset.totalMemoryUsageInBytes / (1024 * 1024) + ' MB'
+          });
 
           if (mountedRef.current) {
             viewer.scene.primitives.add(tileset);
@@ -798,12 +820,19 @@ export const FlightVisualization3DCesiumFixed: React.FC<FlightVisualization3DCes
 
         setIsLoading(false);
 
+        // Mark initialization as complete
+        isInitializingRef.current = false;
+        hasInitializedRef.current = true;
+        console.log('Cesium initialization complete');
+
       } catch (err) {
         console.error('Error loading Cesium:', err);
         if (mountedRef.current) {
           setError(`Failed to load 3D visualization: ${err.message}`);
           setIsLoading(false);
         }
+        // Reset initialization flag on error
+        isInitializingRef.current = false;
       }
     };
 
