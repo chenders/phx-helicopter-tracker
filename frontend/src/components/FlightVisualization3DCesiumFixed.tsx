@@ -1420,14 +1420,14 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                 isWithinSearchRadius = true;
                 cameraPitch = Cesium.Math.toRadians(-30); // Look down more steeply
 
-                // Slow down to half speed when in search radius
+                // Slow down to 1/10th speed when in search radius
                 if (viewer.clock.multiplier === playbackSpeed * 50) {
-                  viewer.clock.multiplier = (playbackSpeed * 50) / 2;
-                  console.log("Entering search radius - slowing down and looking down");
+                  viewer.clock.multiplier = (playbackSpeed * 50) / 10;
+                  console.log("Entering search radius - slowing down 10x and looking down");
                 }
               } else {
                 // Speed back up when outside search radius
-                if (viewer.clock.multiplier === (playbackSpeed * 50) / 2) {
+                if (viewer.clock.multiplier === (playbackSpeed * 50) / 10) {
                   viewer.clock.multiplier = playbackSpeed * 50;
                   console.log("Exiting search radius - resuming normal speed");
                 }
