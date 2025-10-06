@@ -1380,12 +1380,56 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             // Convert quaternion to heading/pitch/roll
             const hpr = Cesium.HeadingPitchRoll.fromQuaternion(orientation);
 
+            // Calculate current position index for distance check
+            const startTime = viewer.clock.startTime;
+            const elapsedSeconds = Cesium.JulianDate.secondsDifference(currentTime, startTime);
+            const positionIndex = Math.floor((elapsedSeconds / 5));
+
+            // Check if within search radius and adjust camera/speed
+            let cameraPitch = Cesium.Math.toRadians(-15); // Default: look down slightly
+            let isWithinSearchRadius = false;
+
+            if (searchContext && positionIndex >= 0 && positionIndex < positions.length) {
+              const currentPos = positions[positionIndex];
+
+              // Calculate distance from search location
+              const R = 3959; // Earth's radius in miles
+              const lat1 = searchContext.lat * Math.PI / 180;
+              const lat2 = currentPos.latitude * Math.PI / 180;
+              const dLat = (currentPos.latitude - searchContext.lat) * Math.PI / 180;
+              const dLng = (currentPos.longitude - searchContext.lng) * Math.PI / 180;
+
+              const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                       Math.cos(lat1) * Math.cos(lat2) *
+                       Math.sin(dLng / 2) * Math.sin(dLng / 2);
+              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+              const distanceInMiles = R * c;
+              const searchRadiusMiles = searchContext.radius / 1609.34; // Convert meters to miles
+
+              if (distanceInMiles <= searchRadiusMiles) {
+                isWithinSearchRadius = true;
+                cameraPitch = Cesium.Math.toRadians(-30); // Look down more steeply
+
+                // Slow down to half speed when in search radius
+                if (viewer.clock.multiplier === playbackSpeed * 50) {
+                  viewer.clock.multiplier = (playbackSpeed * 50) / 2;
+                  console.log("Entering search radius - slowing down and looking down");
+                }
+              } else {
+                // Speed back up when outside search radius
+                if (viewer.clock.multiplier === (playbackSpeed * 50) / 2) {
+                  viewer.clock.multiplier = playbackSpeed * 50;
+                  console.log("Exiting search radius - resuming normal speed");
+                }
+              }
+            }
+
             // Set camera to entity position with first-person orientation
             viewer.camera.setView({
               destination: position,
               orientation: {
                 heading: hpr.heading,
-                pitch: Cesium.Math.toRadians(-15), // Look down slightly
+                pitch: cameraPitch, // Dynamic pitch based on location
                 roll: 0
               }
             });
@@ -1680,14 +1724,30 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             </div>
 
             {/* Distance from Search Location */}
-            {searchContext && hudData.distanceFromSearch > 0 && (
-              <div className="bg-black/70 backdrop-blur text-orange-400 px-4 py-2 rounded-lg font-mono text-sm border border-orange-500/30">
-                <div className="text-xs text-orange-300/70 mb-1">DISTANCE FROM SEARCH</div>
+            {searchContext && hudData.distanceFromSearch >= 0 && (
+              <div className={`bg-black/70 backdrop-blur px-4 py-2 rounded-lg font-mono text-sm border ${
+                hudData.distanceFromSearch <= (searchContext.radius / 1609.34)
+                  ? 'text-red-400 border-red-500/50 animate-pulse'
+                  : 'text-orange-400 border-orange-500/30'
+              }`}>
+                <div className={`text-xs mb-1 flex items-center gap-2 ${
+                  hudData.distanceFromSearch <= (searchContext.radius / 1609.34)
+                    ? 'text-red-300/70'
+                    : 'text-orange-300/70'
+                }`}>
+                  {hudData.distanceFromSearch <= (searchContext.radius / 1609.34) && (
+                    <span className="text-red-500 text-lg">⚠</span>
+                  )}
+                  DISTANCE FROM SEARCH
+                </div>
                 <div className="text-2xl font-bold">
                   {hudData.distanceFromSearch < 0.1 ?
                     <>{Math.round(hudData.distanceFromSearch * 5280)} <span className="text-base">ft</span></> :
                     <>{hudData.distanceFromSearch.toFixed(2)} <span className="text-base">mi</span></>
                   }
+                  {hudData.distanceFromSearch <= (searchContext.radius / 1609.34) && (
+                    <div className="text-sm mt-1 text-red-300">WITHIN SEARCH RADIUS</div>
+                  )}
                 </div>
               </div>
             )}
