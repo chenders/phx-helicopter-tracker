@@ -228,8 +228,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         const viewer = new Cesium.Viewer("cesiumContainer", {
           terrain: Cesium.Terrain.fromWorldTerrain(),
           navigationHelpButton: false,
-          animation: true,
-          timeline: true,
+          animation: false,  // Disable animation widget - we have custom controls
+          timeline: false,   // Disable timeline widget - we have custom controls
           fullscreenButton: false,
           vrButton: false,
         });
@@ -260,7 +260,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         viewer.clock.startTime = start.clone();
         viewer.clock.stopTime = stop.clone();
         viewer.clock.currentTime = start.clone();
-        viewer.timeline.zoomTo(start, stop);
+        viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP; // Stop at end, don't loop
         // Speed up the playback speed 50x.
         viewer.clock.multiplier = 50;
         // Don't auto-start - let user start it
@@ -1325,6 +1325,18 @@ export const FlightVisualization3DCesiumFixed: React.FC<
       setIsAnimating(true);
 
       console.log("Clock animation started, multiplier:", viewer.clock.multiplier);
+
+      // Debug: Monitor clock updates
+      let frameCount = 0;
+      const monitorClock = () => {
+        if (frameCount < 10) {
+          console.log(`Frame ${frameCount}: Clock time:`, viewer.clock.currentTime.toString(),
+                      "shouldAnimate:", viewer.clock.shouldAnimate);
+          frameCount++;
+          requestAnimationFrame(monitorClock);
+        }
+      };
+      requestAnimationFrame(monitorClock);
 
       // Track the helicopter entity with first-person view
       if (viewer.helicopterEntity) {
