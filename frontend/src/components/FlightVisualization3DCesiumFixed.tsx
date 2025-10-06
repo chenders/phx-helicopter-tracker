@@ -1305,24 +1305,42 @@ export const FlightVisualization3DCesiumFixed: React.FC<
 
       // Track the helicopter entity with first-person view
       if (viewer.helicopterEntity) {
+        console.log("Setting up first-person tracking");
+
+        // Set tracked entity - this makes camera follow the entity
         viewer.trackedEntity = viewer.helicopterEntity;
 
-        // Set up first-person view with offset
-        // Offset is in the entity's local coordinate system (East-North-Up)
-        const offset = new Cesium.Cartesian3(
-          0,    // East (0 = centered)
-          0,    // North (0 = centered)
-          0     // Up (0 = at entity position, use positive to raise camera above entity)
-        );
+        // Configure camera to be in first-person position
+        // The trackedEntity setter will automatically start tracking
+        // We need to adjust the view after tracking starts
 
-        // Configure the view with first-person perspective
-        const hpr = new Cesium.HeadingPitchRange(
-          0,                                // Heading offset (0 = face entity direction)
-          Cesium.Math.toRadians(-15),       // Pitch down 15 degrees
-          1                                 // Range: very small number for first-person (not 0 to avoid clipping)
-        );
+        // Use requestAnimationFrame to ensure tracking is set up
+        requestAnimationFrame(() => {
+          try {
+            // Get current position and orientation
+            const position = viewer.helicopterEntity.position.getValue(viewer.clock.currentTime);
+            const orientation = viewer.helicopterEntity.orientation.getValue(viewer.clock.currentTime);
 
-        viewer.zoomTo(viewer.helicopterEntity, hpr);
+            if (position && orientation) {
+              // Convert quaternion to heading/pitch/roll
+              const hpr = Cesium.HeadingPitchRoll.fromQuaternion(orientation);
+
+              // Set camera to first-person view
+              viewer.camera.setView({
+                destination: position,
+                orientation: {
+                  heading: hpr.heading,
+                  pitch: Cesium.Math.toRadians(-15), // Look down slightly
+                  roll: 0
+                }
+              });
+
+              console.log("First-person view set successfully");
+            }
+          } catch (e) {
+            console.error("Error setting first-person view:", e);
+          }
+        });
       }
     } else {
       console.log("Cesium viewer not available");
