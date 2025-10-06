@@ -279,20 +279,22 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             i * timeStepInSeconds,
             new Cesium.JulianDate(),
           );
+          // Convert altitude from feet to meters (Cesium uses meters)
           const position = Cesium.Cartesian3.fromDegrees(
             dataPoint.longitude,
             dataPoint.latitude,
-            dataPoint.height,
+            dataPoint.height * 0.3048, // Convert feet to meters
           );
           // Store the position along with its timestamp.
           // Here we add the positions all upfront, but these can be added at run-time as samples are received from a server.
           positionProperty.addSample(time, position);
 
-          viewer.entities.add({
-            description: `Location: (${dataPoint.longitude}, ${dataPoint.latitude}, ${dataPoint.height})`,
-            position: position,
-            point: { pixelSize: 10, color: Cesium.Color.RED },
-          });
+          // Don't add individual point entities - we already have the polyline
+          // viewer.entities.add({
+          //   description: `Location: (${dataPoint.longitude}, ${dataPoint.latitude}, ${dataPoint.height})`,
+          //   position: position,
+          //   point: { pixelSize: 10, color: Cesium.Color.RED },
+          // });
         }
 
         // Add the helicopter entity that will be animated by the clock
@@ -1298,14 +1300,29 @@ export const FlightVisualization3DCesiumFixed: React.FC<
     const Cesium = window.Cesium;
 
     if (viewer && viewer.clock && Cesium) {
+      console.log("Clock state:", {
+        currentTime: viewer.clock.currentTime.toString(),
+        startTime: viewer.clock.startTime.toString(),
+        stopTime: viewer.clock.stopTime.toString(),
+        shouldAnimate: viewer.clock.shouldAnimate,
+        multiplier: viewer.clock.multiplier
+      });
+
       // Use Cesium's built-in clock animation
       viewer.clock.shouldAnimate = true;
       viewer.clock.multiplier = playbackSpeed * 50; // Adjust multiplier based on playback speed
       setIsAnimating(true);
 
+      console.log("Clock animation started, multiplier:", viewer.clock.multiplier);
+
       // Track the helicopter entity with first-person view
       if (viewer.helicopterEntity) {
-        console.log("Setting up first-person tracking");
+        console.log("Setting up first-person tracking for helicopter entity");
+        console.log("Helicopter entity:", {
+          id: viewer.helicopterEntity.id,
+          hasPosition: !!viewer.helicopterEntity.position,
+          hasOrientation: !!viewer.helicopterEntity.orientation
+        });
 
         // Set tracked entity - this makes camera follow the entity
         viewer.trackedEntity = viewer.helicopterEntity;
@@ -1321,9 +1338,18 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             const position = viewer.helicopterEntity.position.getValue(viewer.clock.currentTime);
             const orientation = viewer.helicopterEntity.orientation.getValue(viewer.clock.currentTime);
 
+            console.log("Entity position at current time:", position);
+            console.log("Entity orientation at current time:", orientation);
+
             if (position && orientation) {
               // Convert quaternion to heading/pitch/roll
               const hpr = Cesium.HeadingPitchRoll.fromQuaternion(orientation);
+
+              console.log("Heading/Pitch/Roll:", {
+                heading: Cesium.Math.toDegrees(hpr.heading),
+                pitch: Cesium.Math.toDegrees(hpr.pitch),
+                roll: Cesium.Math.toDegrees(hpr.roll)
+              });
 
               // Set camera to first-person view
               viewer.camera.setView({
@@ -1336,14 +1362,22 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               });
 
               console.log("First-person view set successfully");
+            } else {
+              console.warn("Position or orientation not available:", { position, orientation });
             }
           } catch (e) {
             console.error("Error setting first-person view:", e);
           }
         });
+      } else {
+        console.error("No helicopter entity found!");
       }
     } else {
-      console.log("Cesium viewer not available");
+      console.log("Cesium viewer not available:", {
+        hasViewer: !!viewer,
+        hasClock: !!viewer?.clock,
+        hasCesium: !!Cesium
+      });
     }
   };
 
