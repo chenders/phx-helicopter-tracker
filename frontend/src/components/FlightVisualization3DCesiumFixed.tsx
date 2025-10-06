@@ -1334,12 +1334,20 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         // Use requestAnimationFrame to ensure tracking is set up
         requestAnimationFrame(() => {
           try {
-            // Get current position and orientation
-            const position = viewer.helicopterEntity.position.getValue(viewer.clock.currentTime);
-            const orientation = viewer.helicopterEntity.orientation.getValue(viewer.clock.currentTime);
+            // Advance clock slightly to get a valid orientation (VelocityOrientation needs 2 samples)
+            const timeAdvance = 10; // seconds
+            const advancedTime = Cesium.JulianDate.addSeconds(
+              viewer.clock.currentTime,
+              timeAdvance,
+              new Cesium.JulianDate()
+            );
 
-            console.log("Entity position at current time:", position);
-            console.log("Entity orientation at current time:", orientation);
+            // Get position and orientation at slightly advanced time
+            const position = viewer.helicopterEntity.position.getValue(advancedTime);
+            const orientation = viewer.helicopterEntity.orientation.getValue(advancedTime);
+
+            console.log("Entity position at advanced time:", position);
+            console.log("Entity orientation at advanced time:", orientation);
 
             if (position && orientation) {
               // Convert quaternion to heading/pitch/roll
@@ -1364,6 +1372,18 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               console.log("First-person view set successfully");
             } else {
               console.warn("Position or orientation not available:", { position, orientation });
+              // Fallback: just use position with default heading
+              if (position) {
+                viewer.camera.setView({
+                  destination: position,
+                  orientation: {
+                    heading: 0,
+                    pitch: Cesium.Math.toRadians(-15),
+                    roll: 0
+                  }
+                });
+                console.log("Set view with position only (no orientation)");
+              }
             }
           } catch (e) {
             console.error("Error setting first-person view:", e);
