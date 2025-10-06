@@ -20,6 +20,7 @@ interface FlightResult {
   hover_locations: any[]
   surveillance_score: number
   distance_from_search: number
+  time_in_radius_seconds?: number
   closest_position: {
     latitude: number
     longitude: number
@@ -144,13 +145,19 @@ const getLocalDateTimeString = (date: Date) => {
   return `${year}-${month}-${day}T${hours}:${minutes}`
 }
 
+const formatTime = (seconds: number): string => {
+  const mins = Math.floor(Math.abs(seconds) / 60)
+  const secs = Math.floor(Math.abs(seconds) % 60)
+  return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
 export function FlightSearchPage() {
   const navigate = useNavigate()
   const [timezone] = useState(getLocalTimezone())
 
-  // Load saved filters from session storage
+  // Load saved filters from local storage (persists across sessions)
   const [filters, setFilters] = useState<SearchFilters>(() => {
-    const savedFilters = sessionStorage.getItem('flightSearchFilters')
+    const savedFilters = localStorage.getItem('flightSearchFilters')
     if (savedFilters) {
       try {
         const parsed = JSON.parse(savedFilters)
@@ -182,12 +189,12 @@ export function FlightSearchPage() {
   const [loading, setLoading] = useState(false)
   const [mapCenter, setMapCenter] = useState(filters.search_coordinates || defaultCenter)
   const [addressInput, setAddressInput] = useState(() => {
-    return sessionStorage.getItem('flightSearchAddress') || import.meta.env.VITE_MAIN_SEARCH_ADDRESS || ''
+    return localStorage.getItem('flightSearchAddress') || import.meta.env.VITE_MAIN_SEARCH_ADDRESS || ''
   })
   const [aircraftList, setAircraftList] = useState<string[]>([])
   const [radioFiles, setRadioFiles] = useState<any[]>([])
   const [playingAudio, setPlayingAudio] = useState<string | null>(null)
-  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'registration'>('date-desc')
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'registration' | 'time-in-radius'>('date-desc')
   const [groupByFlightId, setGroupByFlightId] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
@@ -205,8 +212,8 @@ export function FlightSearchPage() {
     }
     fetchAircraft()
 
-    // If there's a default address from env and no saved session address, geocode it
-    if (import.meta.env.VITE_MAIN_SEARCH_ADDRESS && !sessionStorage.getItem('flightSearchAddress') && window.google) {
+    // If there's a default address from env and no saved address, geocode it
+    if (import.meta.env.VITE_MAIN_SEARCH_ADDRESS && !localStorage.getItem('flightSearchAddress') && window.google) {
       const geocoder = new window.google.maps.Geocoder()
       geocoder.geocode(
         { address: import.meta.env.VITE_MAIN_SEARCH_ADDRESS },
@@ -435,14 +442,14 @@ export function FlightSearchPage() {
     }
   }, [selectedFlight])
 
-  // Save filters to session storage whenever they change
+  // Save filters to local storage whenever they change
   useEffect(() => {
-    sessionStorage.setItem('flightSearchFilters', JSON.stringify(filters))
+    localStorage.setItem('flightSearchFilters', JSON.stringify(filters))
   }, [filters])
 
-  // Save address input to session storage whenever it changes
+  // Save address input to local storage whenever it changes
   useEffect(() => {
-    sessionStorage.setItem('flightSearchAddress', addressInput)
+    localStorage.setItem('flightSearchAddress', addressInput)
   }, [addressInput])
 
   // Sort and group search results
@@ -459,6 +466,9 @@ export function FlightSearchPage() {
         break
       case 'registration':
         results.sort((a, b) => (a.registration || a.callsign || '').localeCompare(b.registration || b.callsign || ''))
+        break
+      case 'time-in-radius':
+        results.sort((a, b) => (b.time_in_radius_seconds || 0) - (a.time_in_radius_seconds || 0))
         break
     }
 
@@ -501,6 +511,9 @@ export function FlightSearchPage() {
           break
         case 'registration':
           results.sort((a, b) => (a.registration || a.callsign || '').localeCompare(b.registration || b.callsign || ''))
+          break
+        case 'time-in-radius':
+          results.sort((a, b) => (b.time_in_radius_seconds || 0) - (a.time_in_radius_seconds || 0))
           break
       }
     }
@@ -632,6 +645,7 @@ export function FlightSearchPage() {
                   <option value="date-desc">Newest First</option>
                   <option value="date-asc">Oldest First</option>
                   <option value="registration">Registration</option>
+                  <option value="time-in-radius">Time in Radius</option>
                 </select>
 
                 {/* Group checkbox */}
@@ -755,12 +769,21 @@ export function FlightSearchPage() {
 
                     {/* Distance and Additional Info */}
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-4 flex-wrap">
                         {flight.distance_from_search !== undefined && (
                           <div className="flex items-center gap-1.5">
                             <MapPin className="h-4 w-4 text-gray-500" />
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                               {(flight.distance_from_search * 0.000621371).toFixed(2)} mi from search
+                            </span>
+                          </div>
+                        )}
+
+                        {flight.time_in_radius_seconds !== undefined && flight.time_in_radius_seconds > 0 && (
+                          <div className="flex items-center gap-1.5">
+                            <Clock className="h-4 w-4 text-red-500" />
+                            <span className="text-sm font-bold text-red-600 dark:text-red-400">
+                              {formatTime(flight.time_in_radius_seconds)} in radius
                             </span>
                           </div>
                         )}

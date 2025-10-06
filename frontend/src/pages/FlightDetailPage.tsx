@@ -18,7 +18,9 @@ import {
   TrendingUp,
   TrendingDown,
   Mountain,
-  Globe
+  Globe,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import axios from '@/lib/axios'
 import { formatLocalTime, formatRelativeTime } from '../utils/dateUtils'
@@ -235,12 +237,16 @@ export function FlightDetailPage() {
   const [currentPositionIndex, setCurrentPositionIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [use3DView, setUse3DView] = useState(true) // Default to 3D view
-  const [playbackSpeed, setPlaybackSpeed] = useState(1) // Start at normal speed
+  const [playbackSpeed, setPlaybackSpeed] = useState(0.5) // Start at 0.5x speed
+  const [isDetailsExpanded, setIsDetailsExpanded] = useState(false) // Collapsed by default
+  const [is3DAnimating, setIs3DAnimating] = useState(false) // Track 3D animation state
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const animationRef = useRef<number | null>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const lastUpdateTimeRef = useRef<number>(0)
   const accumulatedTimeRef = useRef<number>(0)
+  const startAnimationRef = useRef<(() => void) | null>(null)
+  const stopAnimationRef = useRef<(() => void) | null>(null)
 
   useEffect(() => {
     let cancelled = false;
@@ -736,39 +742,105 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
             <ArrowLeft className="h-5 w-5" />
             Back
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
-              onClick={downloadFlightData}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+              onClick={() => {
+                if (is3DAnimating) {
+                  // Pause animation
+                  if (stopAnimationRef.current) {
+                    stopAnimationRef.current();
+                  }
+                } else {
+                  // Scroll to map section - align top of map with top of viewport
+                  const mapSection = document.querySelector('[data-map-section]');
+                  if (mapSection) {
+                    mapSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                  // Start animation after a brief delay to allow scroll
+                  setTimeout(() => {
+                    if (startAnimationRef.current) {
+                      console.log('Calling start animation via ref');
+                      startAnimationRef.current();
+                    } else {
+                      console.warn('Start animation function not available yet');
+                    }
+                  }, 800);
+                }
+              }}
+              className="relative flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl font-bold transition-all"
+              title={is3DAnimating ? "Pause animation" : "Start 3D flight animation"}
             >
-              <Download className="h-4 w-4" />
-              Download Data
+              {!is3DAnimating && (
+                <span className="absolute inset-0 rounded-lg animate-pulse border-2 border-emerald-400"></span>
+              )}
+              {is3DAnimating ? (
+                <Pause className="h-4 w-4 relative z-10" />
+              ) : (
+                <Play className="h-4 w-4 relative z-10" />
+              )}
+              <span className="relative z-10">{is3DAnimating ? 'Pause' : 'Start Animation'}</span>
             </button>
-            <button
-              onClick={exportToKML}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-              title="Download KML file for Google Earth"
-            >
-              <Globe className="h-4 w-4" />
-              Open in Google Earth
-            </button>
+
+            {/* Speed Selector */}
+            <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 shadow">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                Speed:
+              </label>
+              <select
+                value={playbackSpeed}
+                onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
+                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value={0.5}>0.5x</option>
+                <option value={1}>1x</option>
+                <option value={2}>2x</option>
+                <option value={3}>3x</option>
+                <option value={5}>5x</option>
+                <option value={10}>10x</option>
+              </select>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-4 mb-4">
-          <Plane className="h-8 w-8 text-purple-600" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Flight {flight.flight_id || `#${flight.id}`}
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              {flight.aircraft_id} • {flight.callsign || 'No Callsign'}
-            </p>
+        <button
+          onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+          className="flex items-center justify-between w-full mb-4 group"
+        >
+          <div className="flex items-center gap-4">
+            <Plane className="h-8 w-8 text-purple-600" />
+            <div className="text-left">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                Flight {flight.flight_id || `#${flight.id}`}
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                {flight.aircraft_id} • {flight.callsign || 'No Callsign'}
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {new Date(flight.departure_time).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })} • Start: {new Date(flight.departure_time).toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                })}
+              </p>
+            </div>
           </div>
-        </div>
+          {isDetailsExpanded ? (
+            <ChevronUp className="h-6 w-6 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
+          ) : (
+            <ChevronDown className="h-6 w-6 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
+          )}
+        </button>
 
-        {/* Key Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Collapsible Content */}
+        {isDetailsExpanded && (
+          <>
+            {/* Key Metrics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Duration</div>
             <div className="font-semibold text-gray-900 dark:text-white">
@@ -889,29 +961,84 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
                 )}
               </div>
             )}
+
+            {/* Total Time in Search Radius */}
+            {searchContext.radius && (
+              <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                    ⏱ Total Time in Search Radius:
+                  </span>
+                  <span className="text-base font-bold font-mono text-red-700 dark:text-red-400">
+                    {(() => {
+                      // Calculate total time in radius from positions using actual timestamps
+                      if (!positions || positions.length === 0) return '0:00';
+                      let timeInRadius = 0;
+                      const searchRadiusMiles = searchContext.radius / 1609.34;
+                      const R = 3959; // Earth's radius in miles
+
+                      let prevTimestamp: Date | null = null;
+
+                      positions.forEach((pos: any) => {
+                        const lat1 = searchContext.lat * Math.PI / 180;
+                        const lat2 = pos.latitude * Math.PI / 180;
+                        const dLat = (pos.latitude - searchContext.lat) * Math.PI / 180;
+                        const dLng = (pos.longitude - searchContext.lng) * Math.PI / 180;
+
+                        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                                 Math.cos(lat1) * Math.cos(lat2) *
+                                 Math.sin(dLng / 2) * Math.sin(dLng / 2);
+                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                        const distance = R * c;
+
+                        if (distance <= searchRadiusMiles) {
+                          if (prevTimestamp) {
+                            const currentTimestamp = new Date(pos.timestamp);
+                            const timeDiff = (currentTimestamp.getTime() - prevTimestamp.getTime()) / 1000; // Convert to seconds
+                            timeInRadius += timeDiff;
+                          }
+                          prevTimestamp = new Date(pos.timestamp);
+                        } else {
+                          prevTimestamp = null; // Reset when out of radius
+                        }
+                      });
+
+                      const mins = Math.floor(timeInRadius / 60);
+                      const secs = Math.floor(timeInRadius % 60);
+                      return `${mins}:${secs.toString().padStart(2, '0')}`;
+                    })()}
+                  </span>
+                </div>
+                <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                  Total surveillance time within {(searchContext.radius / 1609.34).toFixed(2)} mile radius
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Surveillance Alert */}
-        {flight.surveillance_likelihood > 0.5 && (
-          <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
-              <div>
-                <div className="font-medium text-red-900 dark:text-red-200">
-                  High Surveillance Likelihood ({(flight.surveillance_likelihood * 100).toFixed(0)}%)
-                </div>
-                <div className="text-sm text-red-700 dark:text-red-300 mt-1">
-                  {flight.pattern_notes}
+            {/* Surveillance Alert */}
+            {flight.surveillance_likelihood > 0.5 && (
+              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                  <div>
+                    <div className="font-medium text-red-900 dark:text-red-200">
+                      High Surveillance Likelihood ({(flight.surveillance_likelihood * 100).toFixed(0)}%)
+                    </div>
+                    <div className="text-sm text-red-700 dark:text-red-300 mt-1">
+                      {flight.pattern_notes}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
       </div>
 
       {/* Map */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4" data-map-section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Flight Path
@@ -976,6 +1103,10 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
             positions={positions}
             currentPositionIndex={currentPositionIndex}
             isPlaying={isPlaying}
+            playbackSpeed={playbackSpeed}
+            onStartAnimationRef={startAnimationRef}
+            onStopAnimationRef={stopAnimationRef}
+            onAnimationStateChange={setIs3DAnimating}
             searchContext={searchContext.lat && searchContext.lng ? {
               lat: searchContext.lat,
               lng: searchContext.lng,
@@ -1273,6 +1404,17 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Download Data Button */}
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              onClick={downloadFlightData}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              <Download className="h-4 w-4" />
+              Download Flight Data
+            </button>
           </div>
         </div>
 

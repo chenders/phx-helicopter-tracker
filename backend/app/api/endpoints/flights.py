@@ -432,6 +432,48 @@ def search_flights(
                 flight_dict["distance_from_search"] = None
                 flight_dict["closest_position"] = None
 
+            # Calculate time spent in radius using actual time differences between consecutive points
+            time_in_radius_query = text("""
+                WITH in_radius_positions AS (
+                    SELECT
+                        fp.timestamp,
+                        LAG(fp.timestamp) OVER (ORDER BY fp.timestamp) as prev_timestamp
+                    FROM flight_positions fp
+                    WHERE fp.flight_log_id = :flight_id
+                    AND fp.location IS NOT NULL
+                    AND ST_DWithin(
+                        fp.location,
+                        ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+                        :radius
+                    )
+                    ORDER BY fp.timestamp
+                )
+                SELECT
+                    COALESCE(
+                        SUM(
+                            CASE
+                                WHEN prev_timestamp IS NOT NULL
+                                THEN EXTRACT(EPOCH FROM (timestamp - prev_timestamp))
+                                ELSE 0
+                            END
+                        ),
+                        0
+                    ) as time_in_radius_seconds
+                FROM in_radius_positions
+            """)
+
+            time_result = db.execute(time_in_radius_query, {
+                'lon': longitude,
+                'lat': latitude,
+                'radius': radius,
+                'flight_id': flight.id
+            }).first()
+
+            if time_result and time_result.time_in_radius_seconds:
+                flight_dict["time_in_radius_seconds"] = int(time_result.time_in_radius_seconds)
+            else:
+                flight_dict["time_in_radius_seconds"] = 0
+
             results.append(flight_dict)
         else:
             # No location search, include all

@@ -24,6 +24,10 @@ interface FlightVisualization3DCesiumFixedProps {
   positions: FlightPosition[];
   currentPositionIndex?: number;
   isPlaying?: boolean;
+  playbackSpeed?: number;
+  onStartAnimationRef?: React.MutableRefObject<(() => void) | null>;
+  onStopAnimationRef?: React.MutableRefObject<(() => void) | null>;
+  onAnimationStateChange?: (isAnimating: boolean) => void;
   searchContext?: {
     lat: number;
     lng: number;
@@ -52,6 +56,10 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   positions,
   currentPositionIndex = 0,
   isPlaying = false,
+  playbackSpeed = 0.5,
+  onStartAnimationRef,
+  onStopAnimationRef,
+  onAnimationStateChange,
   searchContext,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -59,7 +67,6 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   const viewerRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [playbackSpeed, setPlaybackSpeed] = useState(0.5); // Default to 0.5x speed
   const [isAnimating, setIsAnimating] = useState(false);
   const animationRef = useRef<any>(null);
   const animationFunctionRef = useRef<any>(null);
@@ -84,6 +91,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
     timeToSearchRadius: 0,
     isWithinSearchRadius: false,
   });
+  const [totalTimeInRadius, setTotalTimeInRadius] = useState(0); // Total time spent in search radius in seconds
 
   // Clean up function
   const cleanup = useCallback(() => {
@@ -128,6 +136,47 @@ export const FlightVisualization3DCesiumFixed: React.FC<
       cleanup();
     };
   }, [cleanup]);
+
+  // Calculate total time spent in search radius
+  useEffect(() => {
+    if (!searchContext || positions.length === 0) {
+      setTotalTimeInRadius(0);
+      return;
+    }
+
+    const searchRadiusMiles = searchContext.radius / 1609.34; // Convert meters to miles
+    const R = 3959; // Earth's radius in miles
+    let timeInRadius = 0;
+    let prevTimestamp: Date | null = null;
+
+    for (let i = 0; i < positions.length; i++) {
+      const pos = positions[i];
+      const lat1 = searchContext.lat * Math.PI / 180;
+      const lat2 = pos.latitude * Math.PI / 180;
+      const dLat = (pos.latitude - searchContext.lat) * Math.PI / 180;
+      const dLng = (pos.longitude - searchContext.lng) * Math.PI / 180;
+
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+               Math.cos(lat1) * Math.cos(lat2) *
+               Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distance = R * c;
+
+      if (distance <= searchRadiusMiles) {
+        if (prevTimestamp) {
+          const currentTimestamp = new Date(pos.timestamp);
+          const timeDiff = (currentTimestamp.getTime() - prevTimestamp.getTime()) / 1000; // Convert to seconds
+          timeInRadius += timeDiff;
+        }
+        prevTimestamp = new Date(pos.timestamp);
+      } else {
+        prevTimestamp = null; // Reset when out of radius
+      }
+    }
+
+    setTotalTimeInRadius(timeInRadius);
+    console.log(`Total time in search radius: ${formatTime(timeInRadius)}`);
+  }, [searchContext, positions]);
 
   // Calculate closest point to search location
   useEffect(() => {
@@ -259,8 +308,169 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           fullscreenButton: false,
           vrButton: false,
         });
-        const osmBuildings = await Cesium.createOsmBuildingsAsync();
-        viewer.scene.primitives.add(osmBuildings);
+
+        // Add Google Photorealistic 3D Tiles
+        try {
+          const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(2275207);
+          viewer.scene.primitives.add(tileset);
+          console.log("Google Photorealistic 3D Tiles loaded successfully");
+        } catch (error) {
+          console.warn("Failed to load Google 3D Tiles, using OSM buildings:", error);
+          // Fallback to OSM buildings if Google tiles fail
+          const osmBuildings = await Cesium.createOsmBuildingsAsync();
+          viewer.scene.primitives.add(osmBuildings);
+        }
+
+        // Add 3D floating labels for major Phoenix roads and landmarks
+        // These labels will render on top of the Google 3D tiles
+        const phoenixLabels = [
+          // Major Freeways
+          { name: "I-10", lat: 33.4484, lng: -112.0740 },
+          { name: "I-17", lat: 33.5000, lng: -112.0980 },
+          { name: "Loop 101", lat: 33.5800, lng: -111.9800 },
+          { name: "Loop 202", lat: 33.4150, lng: -111.9500 },
+          { name: "US-60", lat: 33.4100, lng: -111.8400 },
+
+          // Major East-West Streets (North to South)
+          { name: "Bell Rd", lat: 33.6390, lng: -112.0740 },
+          { name: "Greenway Rd", lat: 33.6230, lng: -112.0740 },
+          { name: "Thunderbird Rd", lat: 33.6070, lng: -112.0740 },
+          { name: "Cactus Rd", lat: 33.5950, lng: -112.0740 },
+          { name: "Peoria Ave", lat: 33.5810, lng: -112.0740 },
+          { name: "Dunlap Ave", lat: 33.5650, lng: -112.0740 },
+          { name: "Northern Ave", lat: 33.5570, lng: -112.0740 },
+          { name: "Glendale Ave", lat: 33.5390, lng: -112.0740 },
+          { name: "Bethany Home Rd", lat: 33.5210, lng: -112.0740 },
+          { name: "Camelback Rd", lat: 33.5090, lng: -112.0740 },
+          { name: "Indian School Rd", lat: 33.4950, lng: -112.0740 },
+          { name: "Osborn Rd", lat: 33.4870, lng: -112.0740 },
+          { name: "Thomas Rd", lat: 33.4800, lng: -112.0740 },
+          { name: "McDowell Rd", lat: 33.4650, lng: -112.0740 },
+          { name: "Van Buren St", lat: 33.4500, lng: -112.0740 },
+          { name: "Buckeye Rd", lat: 33.4350, lng: -112.0740 },
+          { name: "Lower Buckeye Rd", lat: 33.4220, lng: -112.0740 },
+          { name: "Broadway Rd", lat: 33.4050, lng: -112.0740 },
+          { name: "Southern Ave", lat: 33.3930, lng: -112.0740 },
+          { name: "Baseline Rd", lat: 33.3780, lng: -112.0740 },
+          { name: "Dobbins Rd", lat: 33.3660, lng: -112.0740 },
+          { name: "Elliot Rd", lat: 33.3490, lng: -112.0740 },
+          { name: "Warner Rd", lat: 33.3350, lng: -112.0740 },
+          { name: "Ray Rd", lat: 33.3200, lng: -112.0740 },
+          { name: "Chandler Blvd", lat: 33.3060, lng: -112.0740 },
+
+          // Central Ave and major numbered streets/avenues (West to East)
+          { name: "Central Ave", lat: 33.4484, lng: -112.0740 },
+
+          // Streets (East of Central) - Every 3rd or 4th street
+          { name: "3rd St", lat: 33.4484, lng: -112.0685 },
+          { name: "7th St", lat: 33.4484, lng: -112.0550 },
+          { name: "12th St", lat: 33.4484, lng: -112.0475 },
+          { name: "16th St", lat: 33.4484, lng: -112.0400 },
+          { name: "20th St", lat: 33.4484, lng: -112.0325 },
+          { name: "24th St", lat: 33.4484, lng: -112.0250 },
+          { name: "28th St", lat: 33.4484, lng: -112.0175 },
+          { name: "32nd St", lat: 33.4484, lng: -112.0100 },
+          { name: "36th St", lat: 33.4484, lng: -112.0025 },
+          { name: "40th St", lat: 33.4484, lng: -111.9950 },
+          { name: "44th St", lat: 33.4484, lng: -111.9875 },
+          { name: "48th St", lat: 33.4484, lng: -111.9800 },
+          { name: "52nd St", lat: 33.4484, lng: -111.9725 },
+          { name: "56th St", lat: 33.4484, lng: -111.9650 },
+          { name: "60th St", lat: 33.4484, lng: -111.9575 },
+          { name: "64th St", lat: 33.4484, lng: -111.9500 },
+          { name: "68th St", lat: 33.4484, lng: -111.9425 },
+
+          // Avenues (West of Central) - Every 3rd or 4th avenue
+          { name: "3rd Ave", lat: 33.4484, lng: -112.0795 },
+          { name: "7th Ave", lat: 33.4484, lng: -112.0840 },
+          { name: "12th Ave", lat: 33.4484, lng: -112.0920 },
+          { name: "15th Ave", lat: 33.4484, lng: -112.0975 },
+          { name: "19th Ave", lat: 33.4484, lng: -112.1050 },
+          { name: "23rd Ave", lat: 33.4484, lng: -112.1115 },
+          { name: "27th Ave", lat: 33.4484, lng: -112.1180 },
+          { name: "31st Ave", lat: 33.4484, lng: -112.1245 },
+          { name: "35th Ave", lat: 33.4484, lng: -112.1320 },
+          { name: "39th Ave", lat: 33.4484, lng: -112.1390 },
+          { name: "43rd Ave", lat: 33.4484, lng: -112.1460 },
+          { name: "47th Ave", lat: 33.4484, lng: -112.1530 },
+          { name: "51st Ave", lat: 33.4484, lng: -112.1600 },
+          { name: "55th Ave", lat: 33.4484, lng: -112.1670 },
+          { name: "59th Ave", lat: 33.4484, lng: -112.1740 },
+          { name: "63rd Ave", lat: 33.4484, lng: -112.1810 },
+          { name: "67th Ave", lat: 33.4484, lng: -112.1880 },
+          { name: "75th Ave", lat: 33.4484, lng: -112.2020 },
+          { name: "83rd Ave", lat: 33.4484, lng: -112.2160 },
+          { name: "91st Ave", lat: 33.4484, lng: -112.2300 },
+          { name: "99th Ave", lat: 33.4484, lng: -112.2440 },
+          { name: "107th Ave", lat: 33.4484, lng: -112.2580 },
+
+          // Landmarks
+          { name: "Phoenix Sky Harbor Airport", lat: 33.4343, lng: -112.0080 },
+          { name: "Downtown Phoenix", lat: 33.4484, lng: -112.0740 },
+          { name: "Camelback Mountain", lat: 33.5145, lng: -111.9710 },
+          { name: "South Mountain", lat: 33.3390, lng: -112.0800 },
+          { name: "Papago Park", lat: 33.4550, lng: -111.9500 },
+        ];
+
+        // Test if labels  are being added
+        console.log("Adding", phoenixLabels.length, "3D floating labels for Phoenix roads and landmarks");
+
+        // Get the start position for distance calculations
+        const startPos = positions[0];
+        const startCartesian = Cesium.Cartesian3.fromDegrees(
+          startPos.longitude,
+          startPos.latitude,
+          startPos.altitude_feet * 0.3048,
+        );
+
+        phoenixLabels.forEach(label => {
+          // Calculate distance from start position to label
+          const labelCartesian = Cesium.Cartesian3.fromDegrees(label.lng, label.lat, 0);
+          const distance = Cesium.Cartesian3.distance(startCartesian, labelCartesian);
+
+          // Map distance to height:
+          // - Closer labels (0-2000m): height 100-300 feet
+          // - Medium distance (2000-5000m): height 300-500 feet
+          // - Far labels (5000-10000m): height 500-800 feet
+          // - Very far labels (>10000m): height 800-1000 feet
+          const minDistance = 0;
+          const maxDistance = 10000; // meters
+          const minHeight = 100; // feet
+          const maxHeight = 1000; // feet
+
+          const normalizedDistance = Math.min(distance / maxDistance, 1.0);
+          const height = minHeight + (normalizedDistance * (maxHeight - minHeight));
+
+          // Calculate opacity based on distance (closer = more opaque, farther = more transparent)
+          // Closer labels: 1.0 opacity (fully opaque)
+          // Far labels: 0.3 opacity (more transparent)
+          const minOpacity = 0.3;
+          const maxOpacity = 1.0;
+          // Invert: closer distance = higher opacity, farther distance = lower opacity
+          const opacity = maxOpacity - (normalizedDistance * (maxOpacity - minOpacity));
+
+          viewer.entities.add({
+            position: Cesium.Cartesian3.fromDegrees(label.lng, label.lat, height),
+            label: {
+              text: label.name,
+              font: 'bold 20px sans-serif',
+              fillColor: Cesium.Color.YELLOW.withAlpha(opacity),
+              outlineColor: Cesium.Color.BLACK.withAlpha(opacity * 0.8), // Slightly less opaque outline
+              outlineWidth: 4,
+              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+              verticalOrigin: Cesium.VerticalOrigin.CENTER,
+              horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+              pixelOffset: new Cesium.Cartesian2(0, 0),
+              disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always visible through terrain
+              eyeOffset: new Cesium.Cartesian3(0, 0, 0),
+              scaleByDistance: new Cesium.NearFarScalar(500, 2.0, 20000, 0.5),
+              translucencyByDistance: new Cesium.NearFarScalar(500, 1.0, 30000, 0.3),
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 10560), // Only show within 2 miles (10,560 feet)
+            }
+          });
+        });
+
+        console.log("Labels added. Total entities:", viewer.entities.values.length);
 
         // Mark tiles as ready since we're using OSM buildings
         setTilesReady(true);
@@ -710,31 +920,31 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         }
 
         // Start with first-person pilot view
-        const startPos = displayPositions[0];
+        const cameraStartPos = displayPositions[0];
         // Use reasonable altitude to prevent rendering artifacts
-        const startAltitude = Math.max(startPos.altitude_feet || 1000, 1000); // Minimum 1000ft to prevent artifacts
-        const startCartesian = Cesium.Cartesian3.fromDegrees(
-          startPos.longitude,
-          startPos.latitude,
+        const startAltitude = Math.max(cameraStartPos.altitude_feet || 1000, 1000); // Minimum 1000ft to prevent artifacts
+        const cameraStartCartesian = Cesium.Cartesian3.fromDegrees(
+          cameraStartPos.longitude,
+          cameraStartPos.latitude,
           startAltitude * 0.3048,
         );
 
         // Set initial first-person view with proper pitch
-        const heading = Cesium.Math.toRadians(startPos.track_degrees || 0);
+        const heading = Cesium.Math.toRadians(cameraStartPos.track_degrees || 0);
         const pitchAngle = -25; // Moderate downward angle
 
         // Initial camera setup
         console.log("Setting initial camera position:", {
-          lat: startPos.latitude,
-          lon: startPos.longitude,
+          lat: cameraStartPos.latitude,
+          lon: cameraStartPos.longitude,
           alt: startAltitude,
-          heading: startPos.track_degrees || 0,
+          heading: cameraStartPos.track_degrees || 0,
           pitch: pitchAngle,
         });
 
         // Set camera immediately with Phoenix coordinates
         viewer.camera.setView({
-          destination: startCartesian,
+          destination: cameraStartCartesian,
           orientation: {
             heading: heading,
             pitch: Cesium.Math.toRadians(pitchAngle),
@@ -1331,10 +1541,15 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   //   }
   // }, [isPlaying, isAnimating]);
 
-  const handleStartAnimation = () => {
+  const handleStartAnimation = React.useCallback(() => {
     console.log("handleStartAnimation called - using Cesium built-in animation");
     const viewer = (window as any).cesiumViewer;
     const Cesium = window.Cesium;
+
+    if (!tilesReady) {
+      console.log("Tiles not ready yet, cannot start animation");
+      return;
+    }
 
     if (viewer && viewer.clock && Cesium) {
       console.log("Clock state:", {
@@ -1349,6 +1564,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
       viewer.clock.shouldAnimate = true;
       viewer.clock.multiplier = playbackSpeed * 50; // Adjust multiplier based on playback speed
       setIsAnimating(true);
+      onAnimationStateChange?.(true);
 
       console.log("Clock animation started, multiplier:", viewer.clock.multiplier);
 
@@ -1435,6 +1651,11 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             }
 
             // Set camera to entity position with first-person orientation
+            // Airbus H125 has bubble canopy with excellent visibility:
+            // - Forward: 180° horizontal, -70° to +40° vertical
+            // - Sides: 120° per side with large windows
+            // - Downward: 70° through floor bubble (excellent for observation)
+
             viewer.camera.setView({
               destination: position,
               orientation: {
@@ -1443,6 +1664,10 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                 roll: 0
               }
             });
+
+            // Set realistic H125 field of view (90° horizontal is realistic for pilot view)
+            // Default Cesium FOV is 60°, H125 bubble canopy allows wider view
+            viewer.camera.frustum.fov = Cesium.Math.toRadians(90);
 
             // Update slider position based on clock time
             const stopTime = viewer.clock.stopTime;
@@ -1535,9 +1760,16 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         hasCesium: !!Cesium
       });
     }
-  };
+  }, [tilesReady, playbackSpeed, onAnimationStateChange]);
 
-  const handleStopAnimation = () => {
+  // Expose start animation function to parent
+  React.useEffect(() => {
+    if (onStartAnimationRef) {
+      onStartAnimationRef.current = handleStartAnimation;
+    }
+  }, [onStartAnimationRef, handleStartAnimation]);
+
+  const handleStopAnimation = React.useCallback(() => {
     const viewer = (window as any).cesiumViewer;
     if (viewer && viewer.clock) {
       viewer.clock.shouldAnimate = false;
@@ -1549,9 +1781,17 @@ export const FlightVisualization3DCesiumFixed: React.FC<
       }
 
       setIsAnimating(false);
+      onAnimationStateChange?.(false);
       console.log("Animation stopped and camera listener removed");
     }
-  };
+  }, [onAnimationStateChange]);
+
+  // Expose stop animation function to parent
+  React.useEffect(() => {
+    if (onStopAnimationRef) {
+      onStopAnimationRef.current = handleStopAnimation;
+    }
+  }, [onStopAnimationRef, handleStopAnimation]);
 
   const handleResetView = () => {
     const viewer = (window as any).cesiumViewer;
@@ -1617,110 +1857,18 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   }
 
   return (
-    <div className="relative w-full space-y-4">
-      {/* Controls - Outside the map */}
+    <div className="relative w-full space-y-2">
+      {/* Compact Controls - Outside the map */}
       {!isLoading && (
-        <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur p-4 rounded-lg shadow-xl">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-            <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
-              3D Pilot View Controls
-            </h3>
-          </div>
-
-          {isAnimating && (
-            <div className="mb-2 p-2 bg-blue-100 dark:bg-blue-900 rounded text-xs">
-              <div className="text-blue-800 dark:text-blue-200 flex items-center gap-2">
-                <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                Animation Playing
+        <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur p-3 rounded-lg shadow-lg">
+          <div className="flex items-center justify-center gap-3">
+            {/* Animation status */}
+            {isAnimating && (
+              <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                Playing
               </div>
-              <div className="text-blue-700 dark:text-blue-300 mt-1">
-                Speed: {playbackSpeed}x
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2 mb-3">
-            <label className="text-xs text-gray-600 dark:text-gray-400">
-              Playback Speed
-            </label>
-            <select
-              value={playbackSpeed}
-              onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
-              className="w-full px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600"
-              disabled={isAnimating}
-            >
-              <option value={0.5}>0.5x (Slow)</option>
-              <option value={1}>1x (Normal)</option>
-              <option value={2}>2x (Fast)</option>
-              <option value={3}>3x (Faster)</option>
-              <option value={5}>5x (Very Fast)</option>
-              <option value={10}>10x (Maximum)</option>
-            </select>
-
-            {!isAnimating ? (
-              <button
-                onClick={handleStartAnimation}
-                disabled={!tilesReady}
-                className={`w-full text-white px-3 py-2 rounded text-sm transition-all shadow-md ${
-                  tilesReady
-                    ? "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 cursor-pointer"
-                    : "bg-gray-400 cursor-not-allowed"
-                }`}
-              >
-                {tilesReady ? (
-                  "🚁 Start Flight Animation"
-                ) : (
-                  <span className="flex items-center justify-center">
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Loading tiles... ({Math.round(tileLoadProgress)}%)
-                  </span>
-                )}
-              </button>
-            ) : (
-              <button
-                onClick={handleStopAnimation}
-                className="w-full bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 transition-colors"
-              >
-                ⏹ Stop Animation
-              </button>
             )}
-
-            <button
-              onClick={handleResetView}
-              className="w-full bg-gray-500 text-white px-3 py-2 rounded text-sm hover:bg-gray-600 transition-colors"
-            >
-              🔄 Reset Overview
-            </button>
-          </div>
-
-          {/* Navigation */}
-          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
-            <p className="font-medium mb-1">Navigation:</p>
-            <ul className="space-y-0.5">
-              <li>• Left drag: Rotate</li>
-              <li>• Right drag: Zoom</li>
-              <li>• Scroll: Zoom</li>
-            </ul>
           </div>
         </div>
       )}
@@ -1739,161 +1887,73 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           </div>
         )}
 
-        {/* HUD Overlay */}
-        {!isLoading && isAnimating && (
-          <div className="absolute top-4 left-4 z-40 space-y-2">
-            {/* Speed */}
-            <div className="bg-black/70 backdrop-blur text-green-400 px-4 py-2 rounded-lg font-mono text-sm border border-green-500/30">
-              <div className="text-xs text-green-300/70 mb-1">GROUND SPEED</div>
-              <div className="text-2xl font-bold">
-                {Math.round(hudData.speed * 1.15078)} <span className="text-base">mph</span>
-                <span className="text-sm text-green-300/70"> ({Math.round(hudData.speed)}kts)</span>
+        {/* HUD Overlay - Only show time in radius countdown when within search radius */}
+        {!isLoading && isAnimating && searchContext && hudData.isWithinSearchRadius && (
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
+            <div className="bg-red-600/90 backdrop-blur text-white px-8 py-6 rounded-xl font-mono text-center border-4 border-red-400/50 shadow-2xl animate-pulse">
+              <div className="text-sm font-bold mb-2 tracking-wider">⚠ SURVEILLANCE RADIUS ⚠</div>
+              <div className="text-5xl font-bold tabular-nums">
+                {formatTime(hudData.timeRemaining)}
               </div>
+              <div className="text-xs mt-2 opacity-80">Time in radius this pass</div>
             </div>
-
-            {/* Altitude AGL */}
-            <div className="bg-black/70 backdrop-blur text-yellow-400 px-4 py-2 rounded-lg font-mono text-sm border border-yellow-500/30">
-              <div className="text-xs text-yellow-300/70 mb-1">ALTITUDE AGL</div>
-              <div className="text-2xl font-bold">
-                {hudData.altitudeAGL > 0 ? Math.round(hudData.altitudeAGL) : Math.round(hudData.altitude)} <span className="text-base">ft</span>
-              </div>
-            </div>
-
-            {/* Heading */}
-            <div className="bg-black/70 backdrop-blur text-purple-400 px-4 py-2 rounded-lg font-mono text-sm border border-purple-500/30">
-              <div className="text-xs text-purple-300/70 mb-1">HEADING</div>
-              <div className="text-2xl font-bold">{Math.round((hudData.heading + 360) % 360)}° <span className="text-base">{getCardinalDirection(hudData.heading)}</span></div>
-            </div>
-
-            {/* Distance from Search Location */}
-            {searchContext && hudData.distanceFromSearch >= 0 && (
-              <div className={`bg-black/70 backdrop-blur px-4 py-2 rounded-lg font-mono text-sm border ${
-                hudData.isWithinSearchRadius
-                  ? 'text-red-400 border-red-500/50 animate-pulse'
-                  : 'text-orange-400 border-orange-500/30'
-              }`}>
-                <div className={`text-xs mb-1 flex items-center gap-2 ${
-                  hudData.isWithinSearchRadius
-                    ? 'text-red-300/70'
-                    : 'text-orange-300/70'
-                }`}>
-                  {hudData.isWithinSearchRadius && (
-                    <span className="text-red-500 text-lg">⚠</span>
-                  )}
-                  DISTANCE FROM SEARCH
-                </div>
-                <div className="text-2xl font-bold">
-                  {hudData.distanceFromSearch < 0.1 ?
-                    <>{Math.round(hudData.distanceFromSearch * 5280)} <span className="text-base">ft</span></> :
-                    <>{hudData.distanceFromSearch.toFixed(2)} <span className="text-base">mi</span></>
-                  }
-                  {hudData.isWithinSearchRadius && (
-                    <div className="text-sm mt-1 text-red-300">WITHIN SEARCH RADIUS</div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Time Remaining */}
-            <div className="bg-black/70 backdrop-blur text-blue-400 px-4 py-2 rounded-lg font-mono text-sm border border-blue-500/30">
-              <div className="text-xs text-blue-300/70 mb-1">TIME REMAINING</div>
-              <div className="text-2xl font-bold">{formatTime(hudData.timeRemaining)}</div>
-            </div>
-
-            {/* Time to Search Radius */}
-            {searchContext && !hudData.isWithinSearchRadius && hudData.timeToSearchRadius > 0 && (
-              <div className="bg-black/70 backdrop-blur text-cyan-400 px-4 py-2 rounded-lg font-mono text-sm border border-cyan-500/30">
-                <div className="text-xs text-cyan-300/70 mb-1">TIME TO SEARCH RADIUS</div>
-                <div className="text-2xl font-bold">{formatTime(hudData.timeToSearchRadius)}</div>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Status Badge */}
-        {!isLoading && (
-          <div className="absolute top-4 right-4 bg-black/80 backdrop-blur text-white px-3 py-2 rounded-lg text-xs z-40">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span>3D View Active</span>
-            </div>
-          </div>
-        )}
       </div>
 
       {!isLoading && (
         <>
-          {/* Flight Timeline Slider - Below the map */}
+          {/* Compact Flight Timeline Slider - Below the map */}
           {positions.length > 0 && (
-            <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur p-4 rounded-lg shadow-xl">
-              <div className="flex items-center gap-3">
-                <div className="flex-grow">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                      Flight Timeline
-                    </span>
-                    {searchContext && closestPointIndex !== null && (
-                      <button
-                        onClick={handleJumpToClosest}
-                        className="text-xs bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600 transition-colors"
-                      >
-                        📍 Jump to Closest
-                      </button>
-                    )}
-                  </div>
+            <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur p-2 rounded-lg shadow-md">
+              <div className="flex items-center gap-2">
+                {/* Jump to closest button (if available) */}
+                {searchContext && closestPointIndex !== null && (
+                  <button
+                    onClick={handleJumpToClosest}
+                    className="text-xs bg-orange-500 text-white px-2 py-1 rounded hover:bg-orange-600 transition-colors whitespace-nowrap flex-shrink-0"
+                    title="Jump to closest point to search location"
+                  >
+                    📍
+                  </button>
+                )}
 
-                  <div className="relative">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      value={sliderPosition}
-                      onChange={(e) => handleSliderChange(Number(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 slider-thumb"
+                {/* Slider */}
+                <div className="flex-grow relative">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={sliderPosition}
+                    onChange={(e) => handleSliderChange(Number(e.target.value))}
+                    className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 slider-thumb"
+                    style={{
+                      background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${sliderPosition}%, #E5E7EB ${sliderPosition}%, #E5E7EB 100%)`,
+                    }}
+                  />
+
+                  {/* Closest point marker */}
+                  {searchContext && closestPointIndex !== null && (
+                    <div
+                      className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-orange-500 rounded-full shadow-sm pointer-events-none"
                       style={{
-                        background: `linear-gradient(to right, #3B82F6 0%, #3B82F6 ${sliderPosition}%, #E5E7EB ${sliderPosition}%, #E5E7EB 100%)`,
+                        left: `${(closestPointIndex / (positions.length - 1)) * 100}%`,
+                        transform: "translateX(-50%) translateY(-50%)",
+                        zIndex: 10,
                       }}
-                    />
-
-                    {/* Closest point marker */}
-                    {searchContext && closestPointIndex !== null && (
-                      <div
-                        className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-orange-500 rounded-full shadow-md pointer-events-none"
-                        style={{
-                          left: `${(closestPointIndex / (positions.length - 1)) * 100}%`,
-                          transform: "translateX(-50%) translateY(-50%)",
-                          zIndex: 10,
-                        }}
-                        title="Closest to search location"
-                      >
-                        <div className="absolute inset-0 bg-orange-500 rounded-full animate-ping opacity-75"></div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex justify-between mt-1">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {positions[0]
-                        ? new Date(positions[0].timestamp).toLocaleTimeString()
-                        : "Start"}
-                    </span>
-                    <span className="text-xs text-gray-600 dark:text-gray-300 font-medium">
-                      Position{" "}
-                      {Math.floor(
-                        (sliderPosition / 100) * (positions.length - 1),
-                      ) + 1}{" "}
-                      of {positions.length}
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {positions[positions.length - 1]
-                        ? new Date(
-                            positions[positions.length - 1].timestamp,
-                          ).toLocaleTimeString()
-                        : "End"}
-                    </span>
-                  </div>
+                      title="Closest to search location"
+                    >
+                      <div className="absolute inset-0 bg-orange-500 rounded-full animate-ping opacity-75"></div>
+                    </div>
+                  )}
                 </div>
+
+                {/* Position counter */}
+                <span className="text-xs text-gray-600 dark:text-gray-300 font-mono whitespace-nowrap flex-shrink-0">
+                  {Math.floor((sliderPosition / 100) * (positions.length - 1)) + 1}/{positions.length}
+                </span>
               </div>
             </div>
           )}
