@@ -31,6 +31,14 @@ interface FlightVisualization3DCesiumFixedProps {
   };
 }
 
+// Helper function to convert heading degrees to cardinal direction
+const getCardinalDirection = (degrees: number): string => {
+  const normalized = ((degrees % 360) + 360) % 360; // Normalize to 0-360
+  const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const index = Math.round(normalized / 22.5) % 16;
+  return directions[index];
+};
+
 export const FlightVisualization3DCesiumFixed: React.FC<
   FlightVisualization3DCesiumFixedProps
 > = ({
@@ -58,6 +66,13 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   const [tileLoadProgress, setTileLoadProgress] = useState(0);
   const isInitializingRef = useRef(false);
   const hasInitializedRef = useRef(false);
+  const [hudData, setHudData] = useState({
+    speed: 0,
+    altitude: 0,
+    heading: 0,
+    groundElevation: 0,
+    altitudeAGL: 0,
+  });
 
   // Clean up function
   const cleanup = useCallback(() => {
@@ -1381,6 +1396,20 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             const elapsedSeconds = Cesium.JulianDate.secondsDifference(currentTime, startTime);
             const percentage = (elapsedSeconds / totalSeconds) * 100;
             setSliderPosition(Math.min(100, Math.max(0, percentage)));
+
+            // Update HUD data
+            // Find the closest position index for current time
+            const positionIndex = Math.floor((elapsedSeconds / 5)); // 5 second intervals
+            if (positionIndex >= 0 && positionIndex < positions.length) {
+              const currentPos = positions[positionIndex];
+              setHudData({
+                speed: currentPos.ground_speed_knots || 0,
+                altitude: currentPos.altitude_feet || 0,
+                heading: Cesium.Math.toDegrees(hpr.heading),
+                groundElevation: currentPos.ground_elevation_feet || 0,
+                altitudeAGL: currentPos.altitude_agl_feet || 0,
+              });
+            }
           }
         };
 
@@ -1483,7 +1512,115 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   }
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full space-y-4">
+      {/* Controls - Outside the map */}
+      {!isLoading && (
+        <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur p-4 rounded-lg shadow-xl">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
+              3D Pilot View Controls
+            </h3>
+          </div>
+
+          {isAnimating && (
+            <div className="mb-2 p-2 bg-blue-100 dark:bg-blue-900 rounded text-xs">
+              <div className="text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full"></div>
+                Animation Playing
+              </div>
+              <div className="text-blue-700 dark:text-blue-300 mt-1">
+                Speed: {playbackSpeed}x
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2 mb-3">
+            <label className="text-xs text-gray-600 dark:text-gray-400">
+              Playback Speed
+            </label>
+            <select
+              value={playbackSpeed}
+              onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
+              className="w-full px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600"
+              disabled={isAnimating}
+            >
+              <option value={0.5}>0.5x (Slow)</option>
+              <option value={1}>1x (Normal)</option>
+              <option value={2}>2x (Fast)</option>
+              <option value={3}>3x (Faster)</option>
+              <option value={5}>5x (Very Fast)</option>
+              <option value={10}>10x (Maximum)</option>
+            </select>
+
+            {!isAnimating ? (
+              <button
+                onClick={handleStartAnimation}
+                disabled={!tilesReady}
+                className={`w-full text-white px-3 py-2 rounded text-sm transition-all shadow-md ${
+                  tilesReady
+                    ? "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 cursor-pointer"
+                    : "bg-gray-400 cursor-not-allowed"
+                }`}
+              >
+                {tilesReady ? (
+                  "🚁 Start Flight Animation"
+                ) : (
+                  <span className="flex items-center justify-center">
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Loading tiles... ({Math.round(tileLoadProgress)}%)
+                  </span>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={handleStopAnimation}
+                className="w-full bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 transition-colors"
+              >
+                ⏹ Stop Animation
+              </button>
+            )}
+
+            <button
+              onClick={handleResetView}
+              className="w-full bg-gray-500 text-white px-3 py-2 rounded text-sm hover:bg-gray-600 transition-colors"
+            >
+              🔄 Reset Overview
+            </button>
+          </div>
+
+          {/* Navigation */}
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
+            <p className="font-medium mb-1">Navigation:</p>
+            <ul className="space-y-0.5">
+              <li>• Left drag: Rotate</li>
+              <li>• Right drag: Zoom</li>
+              <li>• Scroll: Zoom</li>
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Map Container */}
       <div
         ref={containerRef}
         className="w-full h-[800px] bg-gray-900 rounded-lg relative"
@@ -1496,139 +1633,54 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             </div>
           </div>
         )}
+
+        {/* HUD Overlay */}
+        {!isLoading && isAnimating && (
+          <div className="absolute top-4 left-4 z-40 space-y-2">
+            {/* Speed */}
+            <div className="bg-black/70 backdrop-blur text-green-400 px-4 py-2 rounded-lg font-mono text-sm border border-green-500/30">
+              <div className="text-xs text-green-300/70 mb-1">GROUND SPEED</div>
+              <div className="text-2xl font-bold">{Math.round(hudData.speed)} <span className="text-base">kts</span></div>
+            </div>
+
+            {/* Altitude */}
+            <div className="bg-black/70 backdrop-blur text-cyan-400 px-4 py-2 rounded-lg font-mono text-sm border border-cyan-500/30">
+              <div className="text-xs text-cyan-300/70 mb-1">ALTITUDE MSL</div>
+              <div className="text-2xl font-bold">{Math.round(hudData.altitude)} <span className="text-base">ft</span></div>
+            </div>
+
+            {/* Altitude AGL */}
+            {hudData.altitudeAGL > 0 && (
+              <div className="bg-black/70 backdrop-blur text-yellow-400 px-4 py-2 rounded-lg font-mono text-sm border border-yellow-500/30">
+                <div className="text-xs text-yellow-300/70 mb-1">ALTITUDE AGL</div>
+                <div className="text-2xl font-bold">{Math.round(hudData.altitudeAGL)} <span className="text-base">ft</span></div>
+              </div>
+            )}
+
+            {/* Heading */}
+            <div className="bg-black/70 backdrop-blur text-purple-400 px-4 py-2 rounded-lg font-mono text-sm border border-purple-500/30">
+              <div className="text-xs text-purple-300/70 mb-1">HEADING</div>
+              <div className="text-2xl font-bold">{Math.round((hudData.heading + 360) % 360)}° <span className="text-base">{getCardinalDirection(hudData.heading)}</span></div>
+            </div>
+          </div>
+        )}
+
+        {/* Status Badge */}
+        {!isLoading && (
+          <div className="absolute top-4 right-4 bg-black/80 backdrop-blur text-white px-3 py-2 rounded-lg text-xs z-40">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span>3D View Active</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {!isLoading && (
         <>
-          {/* Controls */}
-          <div className="absolute top-4 right-4 bg-white/95 dark:bg-gray-800/95 backdrop-blur p-4 rounded-lg shadow-xl max-w-xs z-40">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <h3 className="font-semibold text-sm text-gray-900 dark:text-white">
-                3D Pilot View
-              </h3>
-            </div>
-
-            {isAnimating && (
-              <div className="mb-2 p-2 bg-blue-100 dark:bg-blue-900 rounded text-xs">
-                <div className="text-blue-800 dark:text-blue-200 flex items-center gap-2">
-                  <div className="animate-spin h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                  Animation Playing
-                </div>
-                <div className="text-blue-700 dark:text-blue-300 mt-1">
-                  Speed: {playbackSpeed}x
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2 mb-3">
-              {/* Tile Loading Mode Toggle */}
-              <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-700 rounded">
-                <input
-                  type="checkbox"
-                  id="tileLoadingMode"
-                  checked={tileLoadingMode}
-                  onChange={(e) => setTileLoadingMode(e.target.checked)}
-                  disabled={isAnimating}
-                  className="w-4 h-4"
-                />
-                <label
-                  htmlFor="tileLoadingMode"
-                  className="text-xs text-gray-600 dark:text-gray-400 cursor-pointer"
-                >
-                  <div className="font-medium">High Quality Mode</div>
-                  <div className="text-xs opacity-75">
-                    Slower animation for better 3D tiles
-                  </div>
-                </label>
-              </div>
-
-              <label className="text-xs text-gray-600 dark:text-gray-400">
-                Playback Speed
-              </label>
-              <select
-                value={playbackSpeed}
-                onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
-                className="w-full px-2 py-1 border rounded text-sm dark:bg-gray-700 dark:border-gray-600"
-                disabled={isAnimating}
-              >
-                <option value={0.5}>0.5x (Slow)</option>
-                <option value={1}>1x (Normal)</option>
-                <option value={2}>2x (Fast)</option>
-                <option value={3}>3x (Faster)</option>
-                <option value={5}>5x (Very Fast)</option>
-                <option value={10}>10x (Maximum)</option>
-              </select>
-
-              {!isAnimating ? (
-                <button
-                  onClick={handleStartAnimation}
-                  disabled={!tilesReady}
-                  className={`w-full text-white px-3 py-2 rounded text-sm transition-all shadow-md ${
-                    tilesReady
-                      ? "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 cursor-pointer"
-                      : "bg-gray-400 cursor-not-allowed"
-                  }`}
-                >
-                  {tilesReady ? (
-                    "🚁 Start Flight Animation"
-                  ) : (
-                    <span className="flex items-center justify-center">
-                      <svg
-                        className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      Loading tiles... ({Math.round(tileLoadProgress)}%)
-                    </span>
-                  )}
-                </button>
-              ) : (
-                <button
-                  onClick={handleStopAnimation}
-                  className="w-full bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 transition-colors"
-                >
-                  ⏹ Stop Animation
-                </button>
-              )}
-
-              <button
-                onClick={handleResetView}
-                className="w-full bg-gray-500 text-white px-3 py-2 rounded text-sm hover:bg-gray-600 transition-colors"
-              >
-                🔄 Reset Overview
-              </button>
-            </div>
-
-            {/* Navigation */}
-            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400">
-              <p className="font-medium mb-1">Navigation:</p>
-              <ul className="space-y-0.5">
-                <li>• Left drag: Rotate</li>
-                <li>• Right drag: Zoom</li>
-                <li>• Scroll: Zoom</li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Flight Timeline Slider */}
+          {/* Flight Timeline Slider - Below the map */}
           {positions.length > 0 && (
-            <div className="absolute bottom-4 left-4 right-4 bg-white/95 dark:bg-gray-800/95 backdrop-blur p-4 rounded-lg shadow-xl z-40">
+            <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur p-4 rounded-lg shadow-xl">
               <div className="flex items-center gap-3">
                 <div className="flex-grow">
                   <div className="flex justify-between items-center mb-2">
@@ -1700,14 +1752,6 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               </div>
             </div>
           )}
-
-          {/* Status */}
-          <div className="absolute top-4 left-4 bg-black/80 backdrop-blur text-white px-3 py-2 rounded-lg text-xs z-40">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span>Google 3D Tiles</span>
-            </div>
-          </div>
         </>
       )}
     </div>
