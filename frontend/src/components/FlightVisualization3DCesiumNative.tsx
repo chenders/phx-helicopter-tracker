@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as Cesium from 'cesium';
 
 // Set the default Cesium Ion token
-Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1kMTNjYmFkZjU3NjQiLCJpZCI6NTU3NjYsImlhdCI6MTYyMzI1NTU5OH0.WafrBABTcvHp9HzHpBKDZfZuHg5cRjeVZwIhIOM5iyY';
+Cesium.Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_API_KEY;
 
 interface FlightPosition {
   latitude: number;

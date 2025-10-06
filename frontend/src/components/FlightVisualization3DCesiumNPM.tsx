@@ -51,7 +51,7 @@ export const FlightVisualization3DCesiumNPM: React.FC<FlightVisualization3DCesiu
 
         // Set Cesium Ion default access token (you can get a free one from cesium.com)
         // This is a demo token - replace with your own for production
-        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1kMTNjYmFkZjU3NjQiLCJpZCI6NTU3NjYsImlhdCI6MTYyMzI1NTU5OH0.WafrBABTcvHp9HzHpBKDZfZuHg5cRjeVZwIhIOM5iyY';
+        Cesium.Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_API_KEY;
 
         // Create the Cesium Viewer
         const viewer = new Cesium.Viewer(cesiumContainerRef.current, {

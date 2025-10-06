@@ -1,0 +1,70 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - complementary [ref=e5]:
+    - generic [ref=e7]:
+      - link "🚁 Phoenix PD Helicopter Tracker" [ref=e8] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e9] [cursor=pointer]: 🚁
+        - generic [ref=e10] [cursor=pointer]:
+          - heading "Phoenix PD" [level=1] [ref=e11] [cursor=pointer]
+          - paragraph [ref=e12] [cursor=pointer]: Helicopter Tracker
+      - button "Collapse sidebar" [ref=e13] [cursor=pointer]:
+        - img [ref=e14] [cursor=pointer]
+    - navigation [ref=e16]:
+      - link "🏠 Dashboard" [ref=e17] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e18] [cursor=pointer]: 🏠
+        - generic [ref=e19] [cursor=pointer]: Dashboard
+      - link "🔎 Flight Search" [ref=e20] [cursor=pointer]:
+        - /url: /search
+        - generic [ref=e21] [cursor=pointer]: 🔎
+        - generic [ref=e22] [cursor=pointer]: Flight Search
+      - link "📡 Live Tracking" [ref=e23] [cursor=pointer]:
+        - /url: /live
+        - generic [ref=e24] [cursor=pointer]: 📡
+        - generic [ref=e25] [cursor=pointer]: Live Tracking
+      - link "📊 Historical" [ref=e26] [cursor=pointer]:
+        - /url: /historical
+        - generic [ref=e27] [cursor=pointer]: 📊
+        - generic [ref=e28] [cursor=pointer]: Historical
+      - link "🔍 Patterns" [ref=e29] [cursor=pointer]:
+        - /url: /patterns
+        - generic [ref=e30] [cursor=pointer]: 🔍
+        - generic [ref=e31] [cursor=pointer]: Patterns
+      - link "⚠️ Abnormal Patterns" [ref=e32] [cursor=pointer]:
+        - /url: /abnormal
+        - generic [ref=e33] [cursor=pointer]: ⚠️
+        - generic [ref=e34] [cursor=pointer]: Abnormal Patterns
+      - link "💰 Cost Analysis" [ref=e35] [cursor=pointer]:
+        - /url: /costs
+        - generic [ref=e36] [cursor=pointer]: 💰
+        - generic [ref=e37] [cursor=pointer]: Cost Analysis
+      - link "⚖️ Legal Docs" [ref=e38] [cursor=pointer]:
+        - /url: /legal
+        - generic [ref=e39] [cursor=pointer]: ⚖️
+        - generic [ref=e40] [cursor=pointer]: Legal Docs
+      - link "📻 Radio Archives" [ref=e41] [cursor=pointer]:
+        - /url: /radio
+        - generic [ref=e42] [cursor=pointer]: 📻
+        - generic [ref=e43] [cursor=pointer]: Radio Archives
+      - button "⚡ System ▶" [ref=e45] [cursor=pointer]:
+        - generic [ref=e46] [cursor=pointer]:
+          - generic [ref=e47] [cursor=pointer]: ⚡
+          - generic [ref=e48] [cursor=pointer]: System
+        - generic [ref=e49] [cursor=pointer]: ▶
+  - banner [ref=e50]:
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - generic [ref=e53]: "Status:"
+        - generic [ref=e54]: Online
+      - generic [ref=e57]:
+        - generic [ref=e58]: "Data:"
+        - generic [ref=e59]: Live
+    - button "Theme selector" [ref=e61] [cursor=pointer]:
+      - generic [ref=e62] [cursor=pointer]: 🌑️
+      - generic [ref=e63] [cursor=pointer]: Darker
+      - img [ref=e64] [cursor=pointer]
+  - main [ref=e66]
+```

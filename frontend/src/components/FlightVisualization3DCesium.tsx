@@ -83,7 +83,7 @@ export const FlightVisualization3DCesium: React.FC<FlightVisualization3DCesiumPr
         const Cesium = window.Cesium;
 
         // Set Cesium Ion default access token (free tier)
-        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJlYWE1OWUxNy1mMWZiLTQzYjYtYTQ0OS1kMTNjYmFkZjU3NjQiLCJpZCI6NTU3NjYsImlhdCI6MTYyMzI1NTU5OH0.WafrBABTcvHp9HzHpBKDZfZuHg5cRjeVZwIhIOM5iyY';
+        Cesium.Ion.defaultAccessToken = import.meta.env.VITE_CESIUM_API_KEY;
 
         // Create the Cesium Viewer with Google Photorealistic 3D Tiles
         const viewer = new Cesium.Viewer(cesiumContainerRef.current, {
