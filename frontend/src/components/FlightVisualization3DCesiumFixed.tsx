@@ -1435,10 +1435,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             });
 
             // Update slider position based on clock time
-            const startTime = viewer.clock.startTime;
             const stopTime = viewer.clock.stopTime;
             const totalSeconds = Cesium.JulianDate.secondsDifference(stopTime, startTime);
-            const elapsedSeconds = Cesium.JulianDate.secondsDifference(currentTime, startTime);
             const percentage = (elapsedSeconds / totalSeconds) * 100;
             setSliderPosition(Math.min(100, Math.max(0, percentage)));
 
