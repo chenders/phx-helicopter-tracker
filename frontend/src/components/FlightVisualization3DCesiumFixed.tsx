@@ -1441,8 +1441,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             setSliderPosition(Math.min(100, Math.max(0, percentage)));
 
             // Update HUD data
-            // Find the closest position index for current time
-            const positionIndex = Math.floor((elapsedSeconds / 5)); // 5 second intervals
+            // Reuse positionIndex already calculated above
             if (positionIndex >= 0 && positionIndex < positions.length) {
               const currentPos = positions[positionIndex];
 
