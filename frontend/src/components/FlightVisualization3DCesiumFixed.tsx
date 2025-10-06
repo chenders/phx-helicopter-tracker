@@ -39,6 +39,13 @@ const getCardinalDirection = (degrees: number): string => {
   return directions[index];
 };
 
+// Helper function to format time in MM:SS format
+const formatTime = (seconds: number): string => {
+  const mins = Math.floor(Math.abs(seconds) / 60);
+  const secs = Math.floor(Math.abs(seconds) % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
 export const FlightVisualization3DCesiumFixed: React.FC<
   FlightVisualization3DCesiumFixedProps
 > = ({
@@ -73,6 +80,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<
     groundElevation: 0,
     altitudeAGL: 0,
     distanceFromSearch: 0,
+    timeRemaining: 0,
+    timeToSearchRadius: 0,
+    isWithinSearchRadius: false,
   });
 
   // Clean up function
@@ -1445,8 +1455,14 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             if (positionIndex >= 0 && positionIndex < positions.length) {
               const currentPos = positions[positionIndex];
 
+              // Calculate time remaining in flight
+              const timeRemainingSeconds = Cesium.JulianDate.secondsDifference(stopTime, currentTime);
+
               // Calculate distance from search location if available
               let distanceFromSearch = 0;
+              let timeToSearchRadius = 0;
+              let withinRadius = false;
+
               if (searchContext) {
                 const R = 3959; // Earth's radius in miles
                 const lat1 = searchContext.lat * Math.PI / 180;
@@ -1459,6 +1475,32 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                          Math.sin(dLng / 2) * Math.sin(dLng / 2);
                 const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
                 distanceFromSearch = R * c;
+
+                const searchRadiusMiles = searchContext.radius / 1609.34;
+                withinRadius = distanceFromSearch <= searchRadiusMiles;
+
+                // Calculate time to search radius if not already there
+                if (!withinRadius) {
+                  // Look ahead to find when we enter the search radius
+                  for (let i = positionIndex + 1; i < positions.length; i++) {
+                    const futurePos = positions[i];
+                    const futureLat = futurePos.latitude * Math.PI / 180;
+                    const futureDLat = (futurePos.latitude - searchContext.lat) * Math.PI / 180;
+                    const futureDLng = (futurePos.longitude - searchContext.lng) * Math.PI / 180;
+
+                    const futureA = Math.sin(futureDLat / 2) * Math.sin(futureDLat / 2) +
+                                   Math.cos(lat1) * Math.cos(futureLat) *
+                                   Math.sin(futureDLng / 2) * Math.sin(futureDLng / 2);
+                    const futureC = 2 * Math.atan2(Math.sqrt(futureA), Math.sqrt(1 - futureA));
+                    const futureDistance = R * futureC;
+
+                    if (futureDistance <= searchRadiusMiles) {
+                      // Found when we enter radius
+                      timeToSearchRadius = (i - positionIndex) * 5; // 5 seconds per position
+                      break;
+                    }
+                  }
+                }
               }
 
               setHudData({
@@ -1468,6 +1510,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                 groundElevation: currentPos.ground_elevation_feet || 0,
                 altitudeAGL: currentPos.altitude_agl_feet || 0,
                 distanceFromSearch: distanceFromSearch,
+                timeRemaining: timeRemainingSeconds,
+                timeToSearchRadius: timeToSearchRadius,
+                isWithinSearchRadius: withinRadius,
               });
             }
           }
@@ -1723,16 +1768,16 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             {/* Distance from Search Location */}
             {searchContext && hudData.distanceFromSearch >= 0 && (
               <div className={`bg-black/70 backdrop-blur px-4 py-2 rounded-lg font-mono text-sm border ${
-                hudData.distanceFromSearch <= (searchContext.radius / 1609.34)
+                hudData.isWithinSearchRadius
                   ? 'text-red-400 border-red-500/50 animate-pulse'
                   : 'text-orange-400 border-orange-500/30'
               }`}>
                 <div className={`text-xs mb-1 flex items-center gap-2 ${
-                  hudData.distanceFromSearch <= (searchContext.radius / 1609.34)
+                  hudData.isWithinSearchRadius
                     ? 'text-red-300/70'
                     : 'text-orange-300/70'
                 }`}>
-                  {hudData.distanceFromSearch <= (searchContext.radius / 1609.34) && (
+                  {hudData.isWithinSearchRadius && (
                     <span className="text-red-500 text-lg">⚠</span>
                   )}
                   DISTANCE FROM SEARCH
@@ -1742,10 +1787,24 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                     <>{Math.round(hudData.distanceFromSearch * 5280)} <span className="text-base">ft</span></> :
                     <>{hudData.distanceFromSearch.toFixed(2)} <span className="text-base">mi</span></>
                   }
-                  {hudData.distanceFromSearch <= (searchContext.radius / 1609.34) && (
+                  {hudData.isWithinSearchRadius && (
                     <div className="text-sm mt-1 text-red-300">WITHIN SEARCH RADIUS</div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Time Remaining */}
+            <div className="bg-black/70 backdrop-blur text-blue-400 px-4 py-2 rounded-lg font-mono text-sm border border-blue-500/30">
+              <div className="text-xs text-blue-300/70 mb-1">TIME REMAINING</div>
+              <div className="text-2xl font-bold">{formatTime(hudData.timeRemaining)}</div>
+            </div>
+
+            {/* Time to Search Radius */}
+            {searchContext && !hudData.isWithinSearchRadius && hudData.timeToSearchRadius > 0 && (
+              <div className="bg-black/70 backdrop-blur text-cyan-400 px-4 py-2 rounded-lg font-mono text-sm border border-cyan-500/30">
+                <div className="text-xs text-cyan-300/70 mb-1">TIME TO SEARCH RADIUS</div>
+                <div className="text-2xl font-bold">{formatTime(hudData.timeToSearchRadius)}</div>
               </div>
             )}
           </div>
