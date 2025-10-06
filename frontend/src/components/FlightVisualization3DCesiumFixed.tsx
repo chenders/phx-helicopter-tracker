@@ -1338,46 +1338,51 @@ export const FlightVisualization3DCesiumFixed: React.FC<
       };
       requestAnimationFrame(monitorClock);
 
-      // Track the helicopter entity with first-person view
+      // Manually update camera on each frame instead of using trackedEntity
       if (viewer.helicopterEntity) {
-        console.log("Setting up first-person tracking for helicopter entity");
+        console.log("Setting up manual first-person camera tracking");
         console.log("Helicopter entity:", {
           id: viewer.helicopterEntity.id,
           hasPosition: !!viewer.helicopterEntity.position,
           hasOrientation: !!viewer.helicopterEntity.orientation
         });
 
-        // Set tracked entity - this makes camera follow the entity automatically
-        // DO NOT call camera.setView after setting trackedEntity as it will disable tracking
-        viewer.trackedEntity = viewer.helicopterEntity;
+        // Remove any existing render listeners
+        if (viewer._cameraUpdateListener) {
+          viewer.scene.preRender.removeEventListener(viewer._cameraUpdateListener);
+        }
 
-        console.log("Tracked entity set - Cesium will now automatically follow the helicopter");
+        // Create a render listener to update camera position every frame
+        const updateCamera = () => {
+          if (!viewer.clock.shouldAnimate) return;
 
-        // Wait for tracking to initialize, then adjust the view offset
-        setTimeout(() => {
-          if (viewer.trackedEntity) {
-            // Set the camera offset for first-person view
-            // This is in the entity's local coordinate frame (East-North-Up)
-            const offset = new Cesium.Cartesian3(
-              0,    // East - 0 = centered on entity
-              0,    // North - 0 = centered on entity
-              0     // Up - 0 = at entity altitude (first-person)
-            );
+          const currentTime = viewer.clock.currentTime;
+          const position = viewer.helicopterEntity.position.getValue(currentTime);
+          const orientation = viewer.helicopterEntity.orientation.getValue(currentTime);
 
-            // Set the viewing angle relative to the entity
-            const hpr = new Cesium.HeadingPitchRange(
-              0,                              // Heading offset (0 = look in entity direction)
-              Cesium.Math.toRadians(-15),     // Pitch (negative = look down)
-              1                               // Range (1m = very close for first-person)
-            );
+          if (position && orientation) {
+            // Convert quaternion to heading/pitch/roll
+            const hpr = Cesium.HeadingPitchRoll.fromQuaternion(orientation);
 
-            // Apply the offset without breaking tracking
-            viewer.scene.screenSpaceCameraController.enableTilt = true;
-            viewer.scene.screenSpaceCameraController.enableRotate = true;
-
-            console.log("First-person tracking configured with offset:", { offset, hpr });
+            // Set camera to entity position with first-person orientation
+            viewer.camera.setView({
+              destination: position,
+              orientation: {
+                heading: hpr.heading,
+                pitch: Cesium.Math.toRadians(-15), // Look down slightly
+                roll: 0
+              }
+            });
           }
-        }, 100);
+        };
+
+        // Store listener reference for cleanup
+        viewer._cameraUpdateListener = updateCamera;
+
+        // Add the listener to update camera on every frame
+        viewer.scene.preRender.addEventListener(updateCamera);
+
+        console.log("Manual camera tracking enabled - camera will update on every frame");
       } else {
         console.error("No helicopter entity found!");
       }
@@ -1394,8 +1399,15 @@ export const FlightVisualization3DCesiumFixed: React.FC<
     const viewer = (window as any).cesiumViewer;
     if (viewer && viewer.clock) {
       viewer.clock.shouldAnimate = false;
-      viewer.trackedEntity = undefined; // Stop tracking the helicopter
+
+      // Clean up camera update listener
+      if (viewer._cameraUpdateListener) {
+        viewer.scene.preRender.removeEventListener(viewer._cameraUpdateListener);
+        viewer._cameraUpdateListener = null;
+      }
+
       setIsAnimating(false);
+      console.log("Animation stopped and camera listener removed");
     }
   };
 
