@@ -1335,51 +1335,37 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           hasOrientation: !!viewer.helicopterEntity.orientation
         });
 
-        // Set tracked entity - this makes camera follow the entity
+        // Set tracked entity - this makes camera follow the entity automatically
+        // DO NOT call camera.setView after setting trackedEntity as it will disable tracking
         viewer.trackedEntity = viewer.helicopterEntity;
 
-        // Configure camera to be in first-person position
-        // The trackedEntity setter will automatically start tracking
-        // We need to adjust the view after tracking starts
+        console.log("Tracked entity set - Cesium will now automatically follow the helicopter");
 
-        // Use requestAnimationFrame to ensure tracking is set up
-        requestAnimationFrame(() => {
-          try {
-            // Get position and orientation at current time
-            const position = viewer.helicopterEntity.position.getValue(viewer.clock.currentTime);
-            const orientation = viewer.helicopterEntity.orientation.getValue(viewer.clock.currentTime);
+        // Wait for tracking to initialize, then adjust the view offset
+        setTimeout(() => {
+          if (viewer.trackedEntity) {
+            // Set the camera offset for first-person view
+            // This is in the entity's local coordinate frame (East-North-Up)
+            const offset = new Cesium.Cartesian3(
+              0,    // East - 0 = centered on entity
+              0,    // North - 0 = centered on entity
+              0     // Up - 0 = at entity altitude (first-person)
+            );
 
-            console.log("Entity position at current time:", position);
-            console.log("Entity orientation at current time:", orientation);
+            // Set the viewing angle relative to the entity
+            const hpr = new Cesium.HeadingPitchRange(
+              0,                              // Heading offset (0 = look in entity direction)
+              Cesium.Math.toRadians(-15),     // Pitch (negative = look down)
+              1                               // Range (1m = very close for first-person)
+            );
 
-            if (position && orientation) {
-              // Convert quaternion to heading/pitch/roll
-              const hpr = Cesium.HeadingPitchRoll.fromQuaternion(orientation);
+            // Apply the offset without breaking tracking
+            viewer.scene.screenSpaceCameraController.enableTilt = true;
+            viewer.scene.screenSpaceCameraController.enableRotate = true;
 
-              console.log("Heading/Pitch/Roll:", {
-                heading: Cesium.Math.toDegrees(hpr.heading),
-                pitch: Cesium.Math.toDegrees(hpr.pitch),
-                roll: Cesium.Math.toDegrees(hpr.roll)
-              });
-
-              // Set camera to first-person view
-              viewer.camera.setView({
-                destination: position,
-                orientation: {
-                  heading: hpr.heading,
-                  pitch: Cesium.Math.toRadians(-15), // Look down slightly
-                  roll: 0
-                }
-              });
-
-              console.log("First-person view set successfully - animation should now follow entity");
-            } else {
-              console.warn("Position or orientation not available:", { position, orientation });
-            }
-          } catch (e) {
-            console.error("Error setting first-person view:", e);
+            console.log("First-person tracking configured with offset:", { offset, hpr });
           }
-        });
+        }, 100);
       } else {
         console.error("No helicopter entity found!");
       }
