@@ -59,7 +59,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   const viewerRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [playbackSpeed, setPlaybackSpeed] = useState(0.5); // Default to 0.5x speed
   const [isAnimating, setIsAnimating] = useState(false);
   const animationRef = useRef<any>(null);
   const animationFunctionRef = useRef<any>(null);
@@ -1418,7 +1418,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
 
               if (distanceInMiles <= searchRadiusMiles) {
                 isWithinSearchRadius = true;
-                cameraPitch = Cesium.Math.toRadians(-30); // Look down more steeply
+                cameraPitch = Cesium.Math.toRadians(-40); // Look down steeply (40 degrees)
 
                 // Slow down to 1/10th speed when in search radius
                 if (viewer.clock.multiplier === playbackSpeed * 50) {
