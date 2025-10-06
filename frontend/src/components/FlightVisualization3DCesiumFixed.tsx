@@ -268,7 +268,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
 
         // The SampledPositionedProperty stores the position and timestamp for each sample along the radar sample series.
         const positionProperty = new Cesium.SampledPositionProperty();
-        const orientationProperty = new Cesium.VelocityOrientationProperty(positionProperty);
+        const orientationProperty = new Cesium.SampledProperty(Cesium.Quaternion);
 
         for (let i = 0; i < flightData.length; i++) {
           const dataPoint = flightData[i];
@@ -288,6 +288,17 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           // Store the position along with its timestamp.
           // Here we add the positions all upfront, but these can be added at run-time as samples are received from a server.
           positionProperty.addSample(time, position);
+
+          // Calculate orientation from heading
+          const heading = Cesium.Math.toRadians(dataPoint.heading);
+          const pitch = 0;
+          const roll = 0;
+          const hpr = new Cesium.HeadingPitchRoll(heading, pitch, roll);
+          const orientation = Cesium.Transforms.headingPitchRollQuaternion(
+            position,
+            hpr
+          );
+          orientationProperty.addSample(time, orientation);
 
           // Don't add individual point entities - we already have the polyline
           // viewer.entities.add({
@@ -1334,20 +1345,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         // Use requestAnimationFrame to ensure tracking is set up
         requestAnimationFrame(() => {
           try {
-            // Advance clock slightly to get a valid orientation (VelocityOrientation needs 2 samples)
-            const timeAdvance = 10; // seconds
-            const advancedTime = Cesium.JulianDate.addSeconds(
-              viewer.clock.currentTime,
-              timeAdvance,
-              new Cesium.JulianDate()
-            );
+            // Get position and orientation at current time
+            const position = viewer.helicopterEntity.position.getValue(viewer.clock.currentTime);
+            const orientation = viewer.helicopterEntity.orientation.getValue(viewer.clock.currentTime);
 
-            // Get position and orientation at slightly advanced time
-            const position = viewer.helicopterEntity.position.getValue(advancedTime);
-            const orientation = viewer.helicopterEntity.orientation.getValue(advancedTime);
-
-            console.log("Entity position at advanced time:", position);
-            console.log("Entity orientation at advanced time:", orientation);
+            console.log("Entity position at current time:", position);
+            console.log("Entity orientation at current time:", orientation);
 
             if (position && orientation) {
               // Convert quaternion to heading/pitch/roll
@@ -1369,21 +1372,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                 }
               });
 
-              console.log("First-person view set successfully");
+              console.log("First-person view set successfully - animation should now follow entity");
             } else {
               console.warn("Position or orientation not available:", { position, orientation });
-              // Fallback: just use position with default heading
-              if (position) {
-                viewer.camera.setView({
-                  destination: position,
-                  orientation: {
-                    heading: 0,
-                    pitch: Cesium.Math.toRadians(-15),
-                    roll: 0
-                  }
-                });
-                console.log("Set view with position only (no orientation)");
-              }
             }
           } catch (e) {
             console.error("Error setting first-person view:", e);
