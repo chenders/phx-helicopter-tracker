@@ -72,6 +72,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
     heading: 0,
     groundElevation: 0,
     altitudeAGL: 0,
+    distanceFromSearch: 0,
   });
 
   // Clean up function
@@ -1402,12 +1403,30 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             const positionIndex = Math.floor((elapsedSeconds / 5)); // 5 second intervals
             if (positionIndex >= 0 && positionIndex < positions.length) {
               const currentPos = positions[positionIndex];
+
+              // Calculate distance from search location if available
+              let distanceFromSearch = 0;
+              if (searchContext) {
+                const R = 3959; // Earth's radius in miles
+                const lat1 = searchContext.lat * Math.PI / 180;
+                const lat2 = currentPos.latitude * Math.PI / 180;
+                const dLat = (currentPos.latitude - searchContext.lat) * Math.PI / 180;
+                const dLng = (currentPos.longitude - searchContext.lng) * Math.PI / 180;
+
+                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                         Math.cos(lat1) * Math.cos(lat2) *
+                         Math.sin(dLng / 2) * Math.sin(dLng / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                distanceFromSearch = R * c;
+              }
+
               setHudData({
                 speed: currentPos.ground_speed_knots || 0,
                 altitude: currentPos.altitude_feet || 0,
                 heading: Cesium.Math.toDegrees(hpr.heading),
                 groundElevation: currentPos.ground_elevation_feet || 0,
                 altitudeAGL: currentPos.altitude_agl_feet || 0,
+                distanceFromSearch: distanceFromSearch,
               });
             }
           }
@@ -1659,6 +1678,19 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               <div className="text-xs text-purple-300/70 mb-1">HEADING</div>
               <div className="text-2xl font-bold">{Math.round((hudData.heading + 360) % 360)}° <span className="text-base">{getCardinalDirection(hudData.heading)}</span></div>
             </div>
+
+            {/* Distance from Search Location */}
+            {searchContext && hudData.distanceFromSearch > 0 && (
+              <div className="bg-black/70 backdrop-blur text-orange-400 px-4 py-2 rounded-lg font-mono text-sm border border-orange-500/30">
+                <div className="text-xs text-orange-300/70 mb-1">DISTANCE FROM SEARCH</div>
+                <div className="text-2xl font-bold">
+                  {hudData.distanceFromSearch < 0.1 ?
+                    <>{Math.round(hudData.distanceFromSearch * 5280)} <span className="text-base">ft</span></> :
+                    <>{hudData.distanceFromSearch.toFixed(2)} <span className="text-base">mi</span></>
+                  }
+                </div>
+              </div>
+            )}
           </div>
         )}
 
