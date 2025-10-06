@@ -245,6 +245,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             latitude: pos.latitude,
             height: pos.altitude_feet,
             timestamp: pos.timestamp,
+            heading: pos.track_degrees || 0,
           };
         });
 
@@ -262,11 +263,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         viewer.timeline.zoomTo(start, stop);
         // Speed up the playback speed 50x.
         viewer.clock.multiplier = 50;
-        // Start playing the scene.
-        viewer.clock.shouldAnimate = true;
+        // Don't auto-start - let user start it
+        viewer.clock.shouldAnimate = false;
 
         // The SampledPositionedProperty stores the position and timestamp for each sample along the radar sample series.
         const positionProperty = new Cesium.SampledPositionProperty();
+        const orientationProperty = new Cesium.VelocityOrientationProperty(positionProperty);
 
         for (let i = 0; i < flightData.length; i++) {
           const dataPoint = flightData[i];
@@ -302,11 +304,13 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             }),
           ]),
           position: positionProperty,
-          // Use a billboard to represent the helicopter
+          orientation: orientationProperty, // Use velocity-based orientation for heading
+          // Use a billboard to represent the helicopter (only visible in third-person)
           billboard: {
             image: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHRleHQgeD0iNSIgeT0iNDAiIGZvbnQtc2l6ZT0iNDgiPvCfmoE8L3RleHQ+PC9zdmc+",
             scale: 0.8,
             verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            show: false, // Hide in first-person view
           },
           // Optionally add a label
           label: {
@@ -317,6 +321,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             outlineWidth: 2,
             style: Cesium.LabelStyle.FILL_AND_OUTLINE,
             pixelOffset: new Cesium.Cartesian2(0, -50),
+            show: false, // Hide in first-person view
           },
         });
 
@@ -1290,15 +1295,34 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   const handleStartAnimation = () => {
     console.log("handleStartAnimation called - using Cesium built-in animation");
     const viewer = (window as any).cesiumViewer;
-    if (viewer && viewer.clock) {
+    const Cesium = window.Cesium;
+
+    if (viewer && viewer.clock && Cesium) {
       // Use Cesium's built-in clock animation
       viewer.clock.shouldAnimate = true;
       viewer.clock.multiplier = playbackSpeed * 50; // Adjust multiplier based on playback speed
       setIsAnimating(true);
 
-      // Track the helicopter entity with the camera
+      // Track the helicopter entity with first-person view
       if (viewer.helicopterEntity) {
         viewer.trackedEntity = viewer.helicopterEntity;
+
+        // Set up first-person view with offset
+        // Offset is in the entity's local coordinate system (East-North-Up)
+        const offset = new Cesium.Cartesian3(
+          0,    // East (0 = centered)
+          0,    // North (0 = centered)
+          0     // Up (0 = at entity position, use positive to raise camera above entity)
+        );
+
+        // Configure the view with first-person perspective
+        const hpr = new Cesium.HeadingPitchRange(
+          0,                                // Heading offset (0 = face entity direction)
+          Cesium.Math.toRadians(-15),       // Pitch down 15 degrees
+          1                                 // Range: very small number for first-person (not 0 to avoid clipping)
+        );
+
+        viewer.zoomTo(viewer.helicopterEntity, hpr);
       }
     } else {
       console.log("Cesium viewer not available");
