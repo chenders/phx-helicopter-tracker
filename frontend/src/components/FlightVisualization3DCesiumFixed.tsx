@@ -428,19 +428,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         // Test if labels  are being added
         console.log("Adding", phoenixLabels.length, "3D floating labels for Phoenix roads and landmarks");
 
-        // Get the start position for distance calculations
-        const startPos = positions[0];
-        const startCartesian = Cesium.Cartesian3.fromDegrees(
-          startPos.longitude,
-          startPos.latitude,
-          startPos.altitude_feet * 0.3048,
-        );
-
         phoenixLabels.forEach(label => {
-          // Calculate distance from start position to label
-          const labelCartesian = Cesium.Cartesian3.fromDegrees(label.lng, label.lat, 0);
-          const distance = Cesium.Cartesian3.distance(startCartesian, labelCartesian);
-
           // Tier-based styling for visual hierarchy
           // Tier 1 (Freeways): White, largest, always visible
           // Tier 2 (Major landmarks): Cyan, large
@@ -476,14 +464,14 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               fillColor = Cesium.Color.LIGHTGRAY;
               fontSize = 16;
               maxDistance = 5280; // 1 mile
-              minDistance = 1000; // Only show when closer than 1000 feet
+              minDistance = 0;
               baseHeight = 80;
               break;
             case 5: // Minor streets
               fillColor = Cesium.Color.DARKGRAY;
               fontSize = 14;
-              maxDistance = 2640; // 0.5 miles
-              minDistance = 1000; // Only show when closer than 1000 feet
+              maxDistance = 3960; // 0.75 miles (increased from 0.5)
+              minDistance = 0;
               baseHeight = 60;
               break;
             default:
@@ -494,9 +482,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               baseHeight = 100;
           }
 
-          // Calculate height based on distance (closer = lower, farther = higher for better distribution)
-          const normalizedDistance = Math.min(distance / 10000, 1.0);
-          const height = baseHeight + (normalizedDistance * 100); // Vary by 100 feet
+          // Use a fixed height for all labels instead of distance-based
+          // This prevents labels from bunching up
+          const height = baseHeight;
 
           viewer.entities.add({
             position: Cesium.Cartesian3.fromDegrees(label.lng, label.lat, height),
@@ -512,11 +500,11 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               pixelOffset: new Cesium.Cartesian2(0, 0),
               disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always visible through terrain
               eyeOffset: new Cesium.Cartesian3(0, 0, 0),
-              // Scale: larger when close, smaller when far
-              scaleByDistance: new Cesium.NearFarScalar(1000, 1.5, maxDistance * 0.8, 0.6),
-              // Fade out gradually at max distance
-              translucencyByDistance: new Cesium.NearFarScalar(maxDistance * 0.5, 1.0, maxDistance, 0.0),
-              // Only show within tier-specific distance
+              // Scale: larger when close, smaller when far (from camera, not start position)
+              scaleByDistance: new Cesium.NearFarScalar(500, 2.0, maxDistance, 0.5),
+              // Fade out gradually at max distance (from camera)
+              translucencyByDistance: new Cesium.NearFarScalar(maxDistance * 0.6, 1.0, maxDistance, 0.0),
+              // Show within tier-specific distance FROM CAMERA (this updates as camera moves)
               distanceDisplayCondition: new Cesium.DistanceDisplayCondition(minDistance, maxDistance),
             }
           });
