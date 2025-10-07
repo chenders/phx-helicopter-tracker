@@ -337,94 +337,92 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         }
 
         // Add 3D floating labels for major Phoenix roads and landmarks
-        // These labels will render on top of the Google 3D tiles
+        // Categorized by importance for visual hierarchy
         const phoenixLabels = [
-          // Major Freeways
-          { name: "I-10", lat: 33.4484, lng: -112.0740 },
-          { name: "I-17", lat: 33.5000, lng: -112.0980 },
-          { name: "Loop 101", lat: 33.5800, lng: -111.9800 },
-          { name: "Loop 202", lat: 33.4150, lng: -111.9500 },
-          { name: "US-60", lat: 33.4100, lng: -111.8400 },
+          // Tier 1: Major Freeways (highest priority)
+          { name: "I-10", lat: 33.4484, lng: -112.0740, tier: 1 },
+          { name: "I-17", lat: 33.5000, lng: -112.0980, tier: 1 },
+          { name: "Loop 101", lat: 33.5800, lng: -111.9800, tier: 1 },
+          { name: "Loop 202", lat: 33.4150, lng: -111.9500, tier: 1 },
+          { name: "US-60", lat: 33.4100, lng: -111.8400, tier: 1 },
 
-          // Major East-West Streets (North to South)
-          { name: "Bell Rd", lat: 33.6390, lng: -112.0740 },
-          { name: "Greenway Rd", lat: 33.6230, lng: -112.0740 },
-          { name: "Thunderbird Rd", lat: 33.6070, lng: -112.0740 },
-          { name: "Cactus Rd", lat: 33.5950, lng: -112.0740 },
-          { name: "Peoria Ave", lat: 33.5810, lng: -112.0740 },
-          { name: "Dunlap Ave", lat: 33.5650, lng: -112.0740 },
-          { name: "Northern Ave", lat: 33.5570, lng: -112.0740 },
-          { name: "Glendale Ave", lat: 33.5390, lng: -112.0740 },
-          { name: "Bethany Home Rd", lat: 33.5210, lng: -112.0740 },
-          { name: "Camelback Rd", lat: 33.5090, lng: -112.0740 },
-          { name: "Indian School Rd", lat: 33.4950, lng: -112.0740 },
-          { name: "Osborn Rd", lat: 33.4870, lng: -112.0740 },
-          { name: "Thomas Rd", lat: 33.4800, lng: -112.0740 },
-          { name: "McDowell Rd", lat: 33.4650, lng: -112.0740 },
-          { name: "Van Buren St", lat: 33.4500, lng: -112.0740 },
-          { name: "Buckeye Rd", lat: 33.4350, lng: -112.0740 },
-          { name: "Lower Buckeye Rd", lat: 33.4220, lng: -112.0740 },
-          { name: "Broadway Rd", lat: 33.4050, lng: -112.0740 },
-          { name: "Southern Ave", lat: 33.3930, lng: -112.0740 },
-          { name: "Baseline Rd", lat: 33.3780, lng: -112.0740 },
-          { name: "Dobbins Rd", lat: 33.3660, lng: -112.0740 },
-          { name: "Elliot Rd", lat: 33.3490, lng: -112.0740 },
-          { name: "Warner Rd", lat: 33.3350, lng: -112.0740 },
-          { name: "Ray Rd", lat: 33.3200, lng: -112.0740 },
-          { name: "Chandler Blvd", lat: 33.3060, lng: -112.0740 },
+          // Tier 2: Major landmarks and key arterials
+          { name: "Phoenix Sky Harbor Airport", lat: 33.4343, lng: -112.0080, tier: 2 },
+          { name: "Downtown Phoenix", lat: 33.4484, lng: -112.0740, tier: 2 },
+          { name: "Camelback Mountain", lat: 33.5145, lng: -111.9710, tier: 2 },
+          { name: "South Mountain", lat: 33.3390, lng: -112.0800, tier: 2 },
+          { name: "Camelback Rd", lat: 33.5090, lng: -112.0740, tier: 2 },
+          { name: "Central Ave", lat: 33.4484, lng: -112.0740, tier: 2 },
+          { name: "Bell Rd", lat: 33.6390, lng: -112.0740, tier: 2 },
 
-          // Central Ave and major numbered streets/avenues (West to East)
-          { name: "Central Ave", lat: 33.4484, lng: -112.0740 },
+          // Tier 3: Major East-West Streets
+          { name: "Greenway Rd", lat: 33.6230, lng: -112.0740, tier: 3 },
+          { name: "Thunderbird Rd", lat: 33.6070, lng: -112.0740, tier: 3 },
+          { name: "Cactus Rd", lat: 33.5950, lng: -112.0740, tier: 3 },
+          { name: "Peoria Ave", lat: 33.5810, lng: -112.0740, tier: 3 },
+          { name: "Dunlap Ave", lat: 33.5650, lng: -112.0740, tier: 3 },
+          { name: "Northern Ave", lat: 33.5570, lng: -112.0740, tier: 3 },
+          { name: "Glendale Ave", lat: 33.5390, lng: -112.0740, tier: 3 },
+          { name: "Bethany Home Rd", lat: 33.5210, lng: -112.0740, tier: 3 },
+          { name: "Indian School Rd", lat: 33.4950, lng: -112.0740, tier: 3 },
+          { name: "Thomas Rd", lat: 33.4800, lng: -112.0740, tier: 3 },
+          { name: "McDowell Rd", lat: 33.4650, lng: -112.0740, tier: 3 },
+          { name: "Van Buren St", lat: 33.4500, lng: -112.0740, tier: 3 },
+          { name: "Buckeye Rd", lat: 33.4350, lng: -112.0740, tier: 3 },
+          { name: "Broadway Rd", lat: 33.4050, lng: -112.0740, tier: 3 },
+          { name: "Southern Ave", lat: 33.3930, lng: -112.0740, tier: 3 },
+          { name: "Baseline Rd", lat: 33.3780, lng: -112.0740, tier: 3 },
 
-          // Streets (East of Central) - Every 3rd or 4th street
-          { name: "3rd St", lat: 33.4484, lng: -112.0685 },
-          { name: "7th St", lat: 33.4484, lng: -112.0550 },
-          { name: "12th St", lat: 33.4484, lng: -112.0475 },
-          { name: "16th St", lat: 33.4484, lng: -112.0400 },
-          { name: "20th St", lat: 33.4484, lng: -112.0325 },
-          { name: "24th St", lat: 33.4484, lng: -112.0250 },
-          { name: "28th St", lat: 33.4484, lng: -112.0175 },
-          { name: "32nd St", lat: 33.4484, lng: -112.0100 },
-          { name: "36th St", lat: 33.4484, lng: -112.0025 },
-          { name: "40th St", lat: 33.4484, lng: -111.9950 },
-          { name: "44th St", lat: 33.4484, lng: -111.9875 },
-          { name: "48th St", lat: 33.4484, lng: -111.9800 },
-          { name: "52nd St", lat: 33.4484, lng: -111.9725 },
-          { name: "56th St", lat: 33.4484, lng: -111.9650 },
-          { name: "60th St", lat: 33.4484, lng: -111.9575 },
-          { name: "64th St", lat: 33.4484, lng: -111.9500 },
-          { name: "68th St", lat: 33.4484, lng: -111.9425 },
+          // Tier 4: Secondary streets and avenues
+          { name: "Papago Park", lat: 33.4550, lng: -111.9500, tier: 4 },
+          { name: "Osborn Rd", lat: 33.4870, lng: -112.0740, tier: 4 },
+          { name: "Lower Buckeye Rd", lat: 33.4220, lng: -112.0740, tier: 4 },
+          { name: "Dobbins Rd", lat: 33.3660, lng: -112.0740, tier: 4 },
+          { name: "Elliot Rd", lat: 33.3490, lng: -112.0740, tier: 4 },
+          { name: "Warner Rd", lat: 33.3350, lng: -112.0740, tier: 4 },
+          { name: "Ray Rd", lat: 33.3200, lng: -112.0740, tier: 4 },
+          { name: "Chandler Blvd", lat: 33.3060, lng: -112.0740, tier: 4 },
+          { name: "7th St", lat: 33.4484, lng: -112.0550, tier: 4 },
+          { name: "7th Ave", lat: 33.4484, lng: -112.0840, tier: 4 },
+          { name: "19th Ave", lat: 33.4484, lng: -112.1050, tier: 4 },
+          { name: "24th St", lat: 33.4484, lng: -112.0250, tier: 4 },
+          { name: "32nd St", lat: 33.4484, lng: -112.0100, tier: 4 },
+          { name: "44th St", lat: 33.4484, lng: -111.9875, tier: 4 },
 
-          // Avenues (West of Central) - Every 3rd or 4th avenue
-          { name: "3rd Ave", lat: 33.4484, lng: -112.0795 },
-          { name: "7th Ave", lat: 33.4484, lng: -112.0840 },
-          { name: "12th Ave", lat: 33.4484, lng: -112.0920 },
-          { name: "15th Ave", lat: 33.4484, lng: -112.0975 },
-          { name: "19th Ave", lat: 33.4484, lng: -112.1050 },
-          { name: "23rd Ave", lat: 33.4484, lng: -112.1115 },
-          { name: "27th Ave", lat: 33.4484, lng: -112.1180 },
-          { name: "31st Ave", lat: 33.4484, lng: -112.1245 },
-          { name: "35th Ave", lat: 33.4484, lng: -112.1320 },
-          { name: "39th Ave", lat: 33.4484, lng: -112.1390 },
-          { name: "43rd Ave", lat: 33.4484, lng: -112.1460 },
-          { name: "47th Ave", lat: 33.4484, lng: -112.1530 },
-          { name: "51st Ave", lat: 33.4484, lng: -112.1600 },
-          { name: "55th Ave", lat: 33.4484, lng: -112.1670 },
-          { name: "59th Ave", lat: 33.4484, lng: -112.1740 },
-          { name: "63rd Ave", lat: 33.4484, lng: -112.1810 },
-          { name: "67th Ave", lat: 33.4484, lng: -112.1880 },
-          { name: "75th Ave", lat: 33.4484, lng: -112.2020 },
-          { name: "83rd Ave", lat: 33.4484, lng: -112.2160 },
-          { name: "91st Ave", lat: 33.4484, lng: -112.2300 },
-          { name: "99th Ave", lat: 33.4484, lng: -112.2440 },
-          { name: "107th Ave", lat: 33.4484, lng: -112.2580 },
-
-          // Landmarks
-          { name: "Phoenix Sky Harbor Airport", lat: 33.4343, lng: -112.0080 },
-          { name: "Downtown Phoenix", lat: 33.4484, lng: -112.0740 },
-          { name: "Camelback Mountain", lat: 33.5145, lng: -111.9710 },
-          { name: "South Mountain", lat: 33.3390, lng: -112.0800 },
-          { name: "Papago Park", lat: 33.4550, lng: -111.9500 },
+          // Tier 5: Minor streets (only show when very close)
+          { name: "3rd St", lat: 33.4484, lng: -112.0685, tier: 5 },
+          { name: "12th St", lat: 33.4484, lng: -112.0475, tier: 5 },
+          { name: "16th St", lat: 33.4484, lng: -112.0400, tier: 5 },
+          { name: "20th St", lat: 33.4484, lng: -112.0325, tier: 5 },
+          { name: "28th St", lat: 33.4484, lng: -112.0175, tier: 5 },
+          { name: "36th St", lat: 33.4484, lng: -112.0025, tier: 5 },
+          { name: "40th St", lat: 33.4484, lng: -111.9950, tier: 5 },
+          { name: "48th St", lat: 33.4484, lng: -111.9800, tier: 5 },
+          { name: "52nd St", lat: 33.4484, lng: -111.9725, tier: 5 },
+          { name: "56th St", lat: 33.4484, lng: -111.9650, tier: 5 },
+          { name: "60th St", lat: 33.4484, lng: -111.9575, tier: 5 },
+          { name: "64th St", lat: 33.4484, lng: -111.9500, tier: 5 },
+          { name: "68th St", lat: 33.4484, lng: -111.9425, tier: 5 },
+          { name: "3rd Ave", lat: 33.4484, lng: -112.0795, tier: 5 },
+          { name: "12th Ave", lat: 33.4484, lng: -112.0920, tier: 5 },
+          { name: "15th Ave", lat: 33.4484, lng: -112.0975, tier: 5 },
+          { name: "23rd Ave", lat: 33.4484, lng: -112.1115, tier: 5 },
+          { name: "27th Ave", lat: 33.4484, lng: -112.1180, tier: 5 },
+          { name: "31st Ave", lat: 33.4484, lng: -112.1245, tier: 5 },
+          { name: "35th Ave", lat: 33.4484, lng: -112.1320, tier: 5 },
+          { name: "39th Ave", lat: 33.4484, lng: -112.1390, tier: 5 },
+          { name: "43rd Ave", lat: 33.4484, lng: -112.1460, tier: 5 },
+          { name: "47th Ave", lat: 33.4484, lng: -112.1530, tier: 5 },
+          { name: "51st Ave", lat: 33.4484, lng: -112.1600, tier: 5 },
+          { name: "55th Ave", lat: 33.4484, lng: -112.1670, tier: 5 },
+          { name: "59th Ave", lat: 33.4484, lng: -112.1740, tier: 5 },
+          { name: "63rd Ave", lat: 33.4484, lng: -112.1810, tier: 5 },
+          { name: "67th Ave", lat: 33.4484, lng: -112.1880, tier: 5 },
+          { name: "75th Ave", lat: 33.4484, lng: -112.2020, tier: 5 },
+          { name: "83rd Ave", lat: 33.4484, lng: -112.2160, tier: 5 },
+          { name: "91st Ave", lat: 33.4484, lng: -112.2300, tier: 5 },
+          { name: "99th Ave", lat: 33.4484, lng: -112.2440, tier: 5 },
+          { name: "107th Ave", lat: 33.4484, lng: -112.2580, tier: 5 },
         ];
 
         // Test if labels  are being added
@@ -443,44 +441,83 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           const labelCartesian = Cesium.Cartesian3.fromDegrees(label.lng, label.lat, 0);
           const distance = Cesium.Cartesian3.distance(startCartesian, labelCartesian);
 
-          // Map distance to height:
-          // - Closer labels (0-2000m): height 100-300 feet
-          // - Medium distance (2000-5000m): height 300-500 feet
-          // - Far labels (5000-10000m): height 500-800 feet
-          // - Very far labels (>10000m): height 800-1000 feet
-          const minDistance = 0;
-          const maxDistance = 10000; // meters
-          const minHeight = 100; // feet
-          const maxHeight = 1000; // feet
+          // Tier-based styling for visual hierarchy
+          // Tier 1 (Freeways): White, largest, always visible
+          // Tier 2 (Major landmarks): Cyan, large
+          // Tier 3 (Major streets): Light blue, medium
+          // Tier 4 (Secondary streets): Light gray, smaller
+          // Tier 5 (Minor streets): Dark gray, smallest, only close-up
 
-          const normalizedDistance = Math.min(distance / maxDistance, 1.0);
-          const height = minHeight + (normalizedDistance * (maxHeight - minHeight));
+          let fillColor, fontSize, maxDistance, minDistance, baseHeight;
 
-          // Calculate opacity based on distance (closer = more opaque, farther = more transparent)
-          // Closer labels: 1.0 opacity (fully opaque)
-          // Far labels: 0.3 opacity (more transparent)
-          const minOpacity = 0.3;
-          const maxOpacity = 1.0;
-          // Invert: closer distance = higher opacity, farther distance = lower opacity
-          const opacity = maxOpacity - (normalizedDistance * (maxOpacity - minOpacity));
+          switch(label.tier) {
+            case 1: // Major Freeways
+              fillColor = Cesium.Color.WHITE;
+              fontSize = 24;
+              maxDistance = 15840; // 3 miles
+              minDistance = 0;
+              baseHeight = 200; // Higher for better visibility
+              break;
+            case 2: // Major landmarks & arterials
+              fillColor = Cesium.Color.CYAN;
+              fontSize = 22;
+              maxDistance = 10560; // 2 miles
+              minDistance = 0;
+              baseHeight = 150;
+              break;
+            case 3: // Major streets
+              fillColor = Cesium.Color.LIGHTBLUE;
+              fontSize = 18;
+              maxDistance = 7920; // 1.5 miles
+              minDistance = 0;
+              baseHeight = 100;
+              break;
+            case 4: // Secondary streets
+              fillColor = Cesium.Color.LIGHTGRAY;
+              fontSize = 16;
+              maxDistance = 5280; // 1 mile
+              minDistance = 1000; // Only show when closer than 1000 feet
+              baseHeight = 80;
+              break;
+            case 5: // Minor streets
+              fillColor = Cesium.Color.DARKGRAY;
+              fontSize = 14;
+              maxDistance = 2640; // 0.5 miles
+              minDistance = 1000; // Only show when closer than 1000 feet
+              baseHeight = 60;
+              break;
+            default:
+              fillColor = Cesium.Color.WHITE;
+              fontSize = 18;
+              maxDistance = 10560;
+              minDistance = 0;
+              baseHeight = 100;
+          }
+
+          // Calculate height based on distance (closer = lower, farther = higher for better distribution)
+          const normalizedDistance = Math.min(distance / 10000, 1.0);
+          const height = baseHeight + (normalizedDistance * 100); // Vary by 100 feet
 
           viewer.entities.add({
             position: Cesium.Cartesian3.fromDegrees(label.lng, label.lat, height),
             label: {
               text: label.name,
-              font: 'bold 20px sans-serif',
-              fillColor: Cesium.Color.YELLOW.withAlpha(opacity),
-              outlineColor: Cesium.Color.BLACK.withAlpha(opacity * 0.8), // Slightly less opaque outline
-              outlineWidth: 4,
+              font: `bold ${fontSize}px sans-serif`,
+              fillColor: fillColor,
+              outlineColor: Cesium.Color.BLACK,
+              outlineWidth: 3,
               style: Cesium.LabelStyle.FILL_AND_OUTLINE,
               verticalOrigin: Cesium.VerticalOrigin.CENTER,
               horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
               pixelOffset: new Cesium.Cartesian2(0, 0),
               disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always visible through terrain
               eyeOffset: new Cesium.Cartesian3(0, 0, 0),
-              scaleByDistance: new Cesium.NearFarScalar(500, 2.0, 20000, 0.5),
-              translucencyByDistance: new Cesium.NearFarScalar(500, 1.0, 30000, 0.3),
-              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 10560), // Only show within 2 miles (10,560 feet)
+              // Scale: larger when close, smaller when far
+              scaleByDistance: new Cesium.NearFarScalar(1000, 1.5, maxDistance * 0.8, 0.6),
+              // Fade out gradually at max distance
+              translucencyByDistance: new Cesium.NearFarScalar(maxDistance * 0.5, 1.0, maxDistance, 0.0),
+              // Only show within tier-specific distance
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(minDistance, maxDistance),
             }
           });
         });
