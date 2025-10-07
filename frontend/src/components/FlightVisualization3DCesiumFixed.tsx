@@ -20,6 +20,18 @@ interface FlightPosition {
   altitude_agl_feet?: number;
 }
 
+export interface HudData {
+  speed: number;
+  altitude: number;
+  heading: number;
+  groundElevation: number;
+  altitudeAGL: number;
+  distanceFromSearch: number;
+  timeRemaining: number;
+  timeToSearchRadius: number;
+  isWithinSearchRadius: boolean;
+}
+
 interface FlightVisualization3DCesiumFixedProps {
   positions: FlightPosition[];
   currentPositionIndex?: number;
@@ -28,6 +40,7 @@ interface FlightVisualization3DCesiumFixedProps {
   onStartAnimationRef?: React.MutableRefObject<(() => void) | null>;
   onStopAnimationRef?: React.MutableRefObject<(() => void) | null>;
   onAnimationStateChange?: (isAnimating: boolean) => void;
+  onHudDataChange?: (hudData: HudData | null) => void;
   searchContext?: {
     lat: number;
     lng: number;
@@ -36,7 +49,7 @@ interface FlightVisualization3DCesiumFixedProps {
 }
 
 // Helper function to convert heading degrees to cardinal direction
-const getCardinalDirection = (degrees: number): string => {
+export const getCardinalDirection = (degrees: number): string => {
   const normalized = ((degrees % 360) + 360) % 360; // Normalize to 0-360
   const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
   const index = Math.round(normalized / 22.5) % 16;
@@ -44,7 +57,7 @@ const getCardinalDirection = (degrees: number): string => {
 };
 
 // Helper function to format time in MM:SS format
-const formatTime = (seconds: number): string => {
+export const formatTime = (seconds: number): string => {
   const mins = Math.floor(Math.abs(seconds) / 60);
   const secs = Math.floor(Math.abs(seconds) % 60);
   return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -60,6 +73,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   onStartAnimationRef,
   onStopAnimationRef,
   onAnimationStateChange,
+  onHudDataChange,
   searchContext,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -292,7 +306,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         const Cesium = window.Cesium;
 
         // Suppress the sandboxed iframe warning - must be set before creating viewer
-        window.CESIUM_BASE_URL =
+        // @ts-ignore
+          window.CESIUM_BASE_URL =
           "https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/";
 
         // Set Cesium Ion default access token (your personal token)
@@ -1415,7 +1430,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<
       } catch (err) {
         console.error("Error loading Cesium:", err);
         if (mountedRef.current) {
-          setError(`Failed to load 3D visualization: ${err.message}`);
+          // @ts-ignore
+            setError(`Failed to load 3D visualization: ${err.message}`);
           setIsLoading(false);
         }
         // Reset initialization flag on error
@@ -1782,9 +1798,10 @@ export const FlightVisualization3DCesiumFixed: React.FC<
 
       setIsAnimating(false);
       onAnimationStateChange?.(false);
+      onHudDataChange?.(null); // Clear HUD data when animation stops
       console.log("Animation stopped and camera listener removed");
     }
-  }, [onAnimationStateChange]);
+  }, [onAnimationStateChange, onHudDataChange]);
 
   // Expose stop animation function to parent
   React.useEffect(() => {
@@ -1792,6 +1809,13 @@ export const FlightVisualization3DCesiumFixed: React.FC<
       onStopAnimationRef.current = handleStopAnimation;
     }
   }, [onStopAnimationRef, handleStopAnimation]);
+
+  // Notify parent of HUD data changes
+  React.useEffect(() => {
+    if (isAnimating && onHudDataChange) {
+      onHudDataChange(hudData);
+    }
+  }, [isAnimating, hudData, onHudDataChange]);
 
   const handleResetView = () => {
     const viewer = (window as any).cesiumViewer;
@@ -1858,21 +1882,6 @@ export const FlightVisualization3DCesiumFixed: React.FC<
 
   return (
     <div className="relative w-full space-y-2">
-      {/* Compact Controls - Outside the map */}
-      {!isLoading && (
-        <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur p-3 rounded-lg shadow-lg">
-          <div className="flex items-center justify-center gap-3">
-            {/* Animation status */}
-            {isAnimating && (
-              <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
-                <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-                Playing
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Map Container */}
       <div
         ref={containerRef}

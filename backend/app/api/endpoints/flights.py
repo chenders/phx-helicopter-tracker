@@ -432,34 +432,42 @@ def search_flights(
                 flight_dict["distance_from_search"] = None
                 flight_dict["closest_position"] = None
 
-            # Calculate time spent in radius using actual time differences between consecutive points
+            # Calculate time spent in radius - only count time when consecutive points are BOTH in radius
             time_in_radius_query = text("""
-                WITH in_radius_positions AS (
+                WITH all_positions AS (
                     SELECT
                         fp.timestamp,
-                        LAG(fp.timestamp) OVER (ORDER BY fp.timestamp) as prev_timestamp
+                        fp.location,
+                        LAG(fp.timestamp) OVER (ORDER BY fp.timestamp) as prev_timestamp,
+                        LAG(fp.location) OVER (ORDER BY fp.timestamp) as prev_location,
+                        ST_DWithin(
+                            fp.location,
+                            ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+                            :radius
+                        ) as is_in_radius,
+                        LAG(ST_DWithin(
+                            fp.location,
+                            ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
+                            :radius
+                        )) OVER (ORDER BY fp.timestamp) as prev_in_radius
                     FROM flight_positions fp
                     WHERE fp.flight_log_id = :flight_id
                     AND fp.location IS NOT NULL
-                    AND ST_DWithin(
-                        fp.location,
-                        ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography,
-                        :radius
-                    )
                     ORDER BY fp.timestamp
                 )
                 SELECT
                     COALESCE(
                         SUM(
                             CASE
-                                WHEN prev_timestamp IS NOT NULL
+                                -- Only count time when BOTH current and previous points are in radius
+                                WHEN is_in_radius AND prev_in_radius AND prev_timestamp IS NOT NULL
                                 THEN EXTRACT(EPOCH FROM (timestamp - prev_timestamp))
                                 ELSE 0
                             END
                         ),
                         0
                     ) as time_in_radius_seconds
-                FROM in_radius_positions
+                FROM all_positions
             """)
 
             time_result = db.execute(time_in_radius_query, {
@@ -519,3 +527,150 @@ def get_flight_cost_summary(
     return flight_log_crud.calculate_cost_summary(
         db, start_date=start_date, end_date=end_date, aircraft_id=aircraft_id
     )
+
+
+@router.get("/data-quality-metrics")
+def get_data_quality_metrics(
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Get data quality metrics showing discrepancies between flight metadata
+    and actual position data timestamps
+    """
+    from sqlalchemy import text
+
+    # Summary statistics
+    summary_query = text("""
+        WITH flight_position_spans AS (
+            SELECT
+                fl.id,
+                fl.departure_time,
+                fl.arrival_time,
+                fl.flight_duration_minutes,
+                MIN(fp.timestamp) as first_position,
+                MAX(fp.timestamp) as last_position,
+                EXTRACT(EPOCH FROM (MAX(fp.timestamp) - MIN(fp.timestamp)))/60 as position_span_minutes
+            FROM flight_logs fl
+            JOIN flight_positions fp ON fp.flight_log_id = fl.id
+            GROUP BY fl.id, fl.departure_time, fl.arrival_time, fl.flight_duration_minutes
+        )
+        SELECT
+            COUNT(*) as total_flights,
+            COUNT(*) FILTER (WHERE first_position < departure_time) as flights_with_early_positions,
+            COUNT(*) FILTER (WHERE last_position > arrival_time) as flights_with_late_positions,
+            COUNT(*) FILTER (WHERE first_position < departure_time OR last_position > arrival_time) as flights_with_any_discrepancy,
+            COUNT(*) FILTER (WHERE position_span_minutes > flight_duration_minutes * 1.5) as flights_with_50pct_longer_span,
+            COUNT(*) FILTER (WHERE position_span_minutes > flight_duration_minutes * 2) as flights_with_double_span,
+            AVG(position_span_minutes - flight_duration_minutes) as avg_discrepancy_minutes,
+            MAX(position_span_minutes - flight_duration_minutes) as max_discrepancy_minutes
+        FROM flight_position_spans
+    """)
+
+    summary_result = db.execute(summary_query).first()
+
+    # Time series data (monthly aggregation)
+    time_series_query = text("""
+        WITH flight_position_spans AS (
+            SELECT
+                fl.id,
+                fl.departure_time,
+                fl.arrival_time,
+                fl.flight_duration_minutes,
+                MIN(fp.timestamp) as first_position,
+                MAX(fp.timestamp) as last_position,
+                EXTRACT(EPOCH FROM (MAX(fp.timestamp) - MIN(fp.timestamp)))/60 as position_span_minutes,
+                EXTRACT(EPOCH FROM (MIN(fp.timestamp) - fl.departure_time))/60 as minutes_before_departure,
+                EXTRACT(EPOCH FROM (MAX(fp.timestamp) - fl.arrival_time))/60 as minutes_after_arrival
+            FROM flight_logs fl
+            JOIN flight_positions fp ON fp.flight_log_id = fl.id
+            GROUP BY fl.id, fl.departure_time, fl.arrival_time, fl.flight_duration_minutes
+        )
+        SELECT
+            TO_CHAR(departure_time, 'YYYY-MM') as month,
+            AVG(position_span_minutes - flight_duration_minutes) as avg_discrepancy_minutes,
+            MAX(position_span_minutes - flight_duration_minutes) as max_discrepancy_minutes,
+            COUNT(*) FILTER (WHERE first_position < departure_time OR last_position > arrival_time) as flights_with_discrepancy,
+            COUNT(*) as total_flights,
+            (COUNT(*) FILTER (WHERE first_position < departure_time OR last_position > arrival_time)::float / COUNT(*) * 100) as pct_with_discrepancy,
+            COUNT(*) FILTER (WHERE position_span_minutes > flight_duration_minutes * 1.5) as flights_50pct_longer,
+            COUNT(*) FILTER (WHERE position_span_minutes > flight_duration_minutes * 2) as flights_double
+        FROM flight_position_spans
+        GROUP BY TO_CHAR(departure_time, 'YYYY-MM')
+        ORDER BY month
+    """)
+
+    time_series_result = db.execute(time_series_query).fetchall()
+
+    # Worst cases
+    worst_cases_query = text("""
+        WITH flight_position_spans AS (
+            SELECT
+                fl.id,
+                fl.flight_id,
+                fl.departure_time,
+                fl.arrival_time,
+                fl.flight_duration_minutes,
+                MIN(fp.timestamp) as first_position,
+                MAX(fp.timestamp) as last_position,
+                EXTRACT(EPOCH FROM (MAX(fp.timestamp) - MIN(fp.timestamp)))/60 as position_span_minutes,
+                EXTRACT(EPOCH FROM (MIN(fp.timestamp) - fl.departure_time))/60 as minutes_before_departure,
+                EXTRACT(EPOCH FROM (MAX(fp.timestamp) - fl.arrival_time))/60 as minutes_after_arrival
+            FROM flight_logs fl
+            JOIN flight_positions fp ON fp.flight_log_id = fl.id
+            GROUP BY fl.id, fl.flight_id, fl.departure_time, fl.arrival_time, fl.flight_duration_minutes
+        )
+        SELECT
+            id,
+            flight_id,
+            departure_time,
+            flight_duration_minutes as recorded_duration_minutes,
+            position_span_minutes as actual_span_minutes,
+            (position_span_minutes - flight_duration_minutes) as discrepancy_minutes,
+            minutes_before_departure,
+            minutes_after_arrival
+        FROM flight_position_spans
+        WHERE position_span_minutes > flight_duration_minutes * 1.2
+        ORDER BY (position_span_minutes - flight_duration_minutes) DESC
+        LIMIT 50
+    """)
+
+    worst_cases_result = db.execute(worst_cases_query).fetchall()
+
+    return {
+        "summary": {
+            "total_flights": summary_result.total_flights,
+            "flights_with_early_positions": summary_result.flights_with_early_positions,
+            "flights_with_late_positions": summary_result.flights_with_late_positions,
+            "flights_with_any_discrepancy": summary_result.flights_with_any_discrepancy,
+            "flights_with_50pct_longer_span": summary_result.flights_with_50pct_longer_span,
+            "flights_with_double_span": summary_result.flights_with_double_span,
+            "avg_discrepancy_minutes": float(summary_result.avg_discrepancy_minutes or 0),
+            "max_discrepancy_minutes": float(summary_result.max_discrepancy_minutes or 0),
+        },
+        "time_series": [
+            {
+                "month": row.month,
+                "avg_discrepancy_minutes": float(row.avg_discrepancy_minutes or 0),
+                "max_discrepancy_minutes": float(row.max_discrepancy_minutes or 0),
+                "flights_with_discrepancy": row.flights_with_discrepancy,
+                "total_flights": row.total_flights,
+                "pct_with_discrepancy": float(row.pct_with_discrepancy or 0),
+                "flights_50pct_longer": row.flights_50pct_longer,
+                "flights_double": row.flights_double,
+            }
+            for row in time_series_result
+        ],
+        "worst_cases": [
+            {
+                "id": row.id,
+                "flight_id": row.flight_id,
+                "departure_time": row.departure_time.isoformat() if row.departure_time else None,
+                "recorded_duration_minutes": float(row.recorded_duration_minutes or 0),
+                "actual_span_minutes": float(row.actual_span_minutes or 0),
+                "discrepancy_minutes": float(row.discrepancy_minutes or 0),
+                "minutes_before_departure": float(row.minutes_before_departure or 0),
+                "minutes_after_arrival": float(row.minutes_after_arrival or 0),
+            }
+            for row in worst_cases_result
+        ]
+    }

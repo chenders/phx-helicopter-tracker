@@ -25,6 +25,87 @@ PHOENIX_PD_REGISTRATIONS = [
     "N621FB", "N622FB", "N623FB", "N624FB", "N625FB"
 ]
 
+@celery_app.task(bind=True, name="download_full_historical_data")
+def download_full_historical_data(self, days_back: int = 730) -> Dict[str, Any]:
+    """
+    Download full 2-year historical data for all Phoenix PD helicopters
+    FR24 allows up to 730 days of historical data
+
+    Args:
+        days_back: Number of days to go back (default 730 = 2 years)
+    """
+    try:
+        logger.info(f"Starting full historical download for {days_back} days")
+
+        results = {
+            "total_registrations": len(PHOENIX_PD_REGISTRATIONS),
+            "days_requested": days_back,
+            "registrations_processed": [],
+            "total_flights_discovered": 0,
+            "errors": []
+        }
+
+        # Process each registration
+        for registration in PHOENIX_PD_REGISTRATIONS:
+            try:
+                logger.info(f"Processing {registration}...")
+
+                # Calculate date range
+                from datetime import datetime, timedelta, timezone
+                end_date = datetime.now(timezone.utc)
+                start_date = end_date - timedelta(days=days_back)
+
+                # FR24 has 14-day pagination limit, so we need to split into chunks
+                chunk_results = []
+                current_start = start_date
+
+                while current_start < end_date:
+                    current_end = min(current_start + timedelta(days=14), end_date)
+
+                    logger.info(f"  Discovering flights for {registration}: {current_start.date()} to {current_end.date()}")
+
+                    # Use existing discover task for each chunk
+                    result = discover_flights_for_registration(
+                        registration=registration,
+                        max_pages=100,  # High limit to get all flights
+                        start_date=current_start.isoformat(),
+                        end_date=current_end.isoformat()
+                    )
+
+                    chunk_results.append(result)
+                    logger.info(f"    Discovered {result.get('flights_new', 0)} new flights")
+
+                    # Move to next chunk
+                    current_start = current_end
+
+                # Aggregate results for this registration
+                reg_summary = {
+                    "registration": registration,
+                    "total_discovered": sum(r.get("flights_discovered", 0) for r in chunk_results),
+                    "total_new": sum(r.get("flights_new", 0) for r in chunk_results),
+                    "chunks_processed": len(chunk_results)
+                }
+
+                results["registrations_processed"].append(reg_summary)
+                results["total_flights_discovered"] += reg_summary["total_new"]
+
+                logger.info(f"  Completed {registration}: {reg_summary['total_new']} new flights")
+
+            except Exception as exc:
+                error_msg = f"Error processing {registration}: {exc}"
+                logger.error(error_msg)
+                results["errors"].append(error_msg)
+                continue
+
+        logger.info(f"Full historical download complete: {results['total_flights_discovered']} total new flights discovered")
+        return results
+
+    except Exception as exc:
+        logger.error(f"Full historical download failed: {exc}")
+        if self.request.retries < 2:
+            raise self.retry(countdown=600, exc=exc)
+        raise
+
 
 @celery_app.task(bind=True, name="discover_flights_for_registration")
 def discover_flights_for_registration(self, registration: str, max_pages: int = 10, start_date: str = None, end_date: str = None) -> Dict[str, Any]:

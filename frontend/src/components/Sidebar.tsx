@@ -20,6 +20,7 @@ export const Sidebar = () => {
 
   const systemItems = [
     { path: '/data-sources', label: 'Data Sources', icon: '💾' },
+    { path: '/data-quality', label: 'Data Quality', icon: '📈' },
     { path: '/tasks', label: 'Tasks', icon: '⚙️' },
     { path: '/logs', label: 'Logs', icon: '📋' },
   ]

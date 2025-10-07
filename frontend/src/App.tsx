@@ -16,6 +16,7 @@ import { RadioPage } from './pages/RadioPage'
 import AbnormalPatternsPage from './pages/AbnormalPatternsPage'
 import { FlightSearchPage } from './pages/FlightSearchPage'
 import { FlightDetailPage } from './pages/FlightDetailPage'
+import { DataQualityPage } from './pages/DataQualityPage'
 import { LogsPage } from './pages/LogsPage'
 import './App.css'
 
@@ -55,6 +56,7 @@ function App() {
                 <Route path="/abnormal" element={<AbnormalPatternsPage />} />
                 <Route path="/search" element={<FlightSearchPage />} />
                 <Route path="/flight/:flightId" element={<FlightDetailPage />} />
+                <Route path="/data-quality" element={<DataQualityPage />} />
                 <Route path="/logs" element={<LogsPage />} />
               </Routes>
             </main>
@@ -78,6 +80,7 @@ function App() {
                 <Route path="/abnormal" element={<AbnormalPatternsPage />} />
                 <Route path="/search" element={<FlightSearchPage />} />
                 <Route path="/flight/:flightId" element={<FlightDetailPage />} />
+                <Route path="/data-quality" element={<DataQualityPage />} />
                 <Route path="/logs" element={<LogsPage />} />
               </Routes>
             </main>

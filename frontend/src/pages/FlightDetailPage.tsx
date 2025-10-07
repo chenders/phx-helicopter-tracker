@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import axios from '@/lib/axios'
 import { formatLocalTime, formatRelativeTime } from '../utils/dateUtils'
-import FlightVisualization3DCesium from '../components/FlightVisualization3DCesiumFixed'
+import FlightVisualization3DCesium, { HudData, getCardinalDirection, formatTime } from '../components/FlightVisualization3DCesiumFixed'
 
 interface FlightDetails {
   id: number
@@ -240,6 +240,7 @@ export function FlightDetailPage() {
   const [playbackSpeed, setPlaybackSpeed] = useState(0.5) // Start at 0.5x speed
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false) // Collapsed by default
   const [is3DAnimating, setIs3DAnimating] = useState(false) // Track 3D animation state
+  const [hudData, setHudData] = useState<HudData | null>(null) // HUD data from 3D visualization
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const animationRef = useRef<number | null>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
@@ -1098,6 +1099,65 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
           </div>
         </div>
 
+        {/* HUD Display - Only show when 3D view is active and animating */}
+        {use3DView && hudData && (
+          <div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+            {/* Speed */}
+            <div className="bg-black/70 backdrop-blur text-green-400 px-4 py-2 rounded-lg font-mono text-sm border border-green-500/30">
+              <div className="text-xs text-green-300/70 mb-1">GROUND SPEED</div>
+              <div className="text-2xl font-bold">
+                {Math.round(hudData.speed * 1.15078)} <span className="text-base">mph</span>
+                <span className="text-sm text-green-300/70 block">({Math.round(hudData.speed)}kts)</span>
+              </div>
+            </div>
+
+            {/* Altitude AGL */}
+            <div className="bg-black/70 backdrop-blur text-yellow-400 px-4 py-2 rounded-lg font-mono text-sm border border-yellow-500/30">
+              <div className="text-xs text-yellow-300/70 mb-1">ALTITUDE AGL</div>
+              <div className="text-2xl font-bold">
+                {hudData.altitudeAGL > 0 ? Math.round(hudData.altitudeAGL) : Math.round(hudData.altitude)} <span className="text-base">ft</span>
+              </div>
+            </div>
+
+            {/* Heading */}
+            <div className="bg-black/70 backdrop-blur text-purple-400 px-4 py-2 rounded-lg font-mono text-sm border border-purple-500/30">
+              <div className="text-xs text-purple-300/70 mb-1">HEADING</div>
+              <div className="text-2xl font-bold">
+                {Math.round((hudData.heading + 360) % 360)}° <span className="text-base">{getCardinalDirection(hudData.heading)}</span>
+              </div>
+            </div>
+
+            {/* Distance from Search Location */}
+            {searchContext.lat && searchContext.lng && hudData.distanceFromSearch >= 0 && (
+              <div className={`bg-black/70 backdrop-blur px-4 py-2 rounded-lg font-mono text-sm border ${
+                hudData.distanceFromSearch <= ((searchContext.radius || 1000) / 1609.34)
+                  ? 'text-red-400 border-red-500/50 animate-pulse'
+                  : 'text-orange-400 border-orange-500/30'
+              }`}>
+                <div className={`text-xs mb-1 flex items-center gap-2 ${
+                  hudData.distanceFromSearch <= ((searchContext.radius || 1000) / 1609.34)
+                    ? 'text-red-300/70'
+                    : 'text-orange-300/70'
+                }`}>
+                  {hudData.distanceFromSearch <= ((searchContext.radius || 1000) / 1609.34) && (
+                    <span className="text-red-500 text-lg">⚠</span>
+                  )}
+                  DISTANCE FROM SEARCH
+                </div>
+                <div className="text-2xl font-bold">
+                  {hudData.distanceFromSearch < 0.1 ?
+                    <>{Math.round(hudData.distanceFromSearch * 5280)} <span className="text-base">ft</span></> :
+                    <>{hudData.distanceFromSearch.toFixed(2)} <span className="text-base">mi</span></>
+                  }
+                  {hudData.distanceFromSearch <= ((searchContext.radius || 1000) / 1609.34) && (
+                    <div className="text-sm mt-1 text-red-300">WITHIN SEARCH RADIUS</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {use3DView ? (
           <FlightVisualization3DCesium
             positions={positions}
@@ -1107,6 +1167,7 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
             onStartAnimationRef={startAnimationRef}
             onStopAnimationRef={stopAnimationRef}
             onAnimationStateChange={setIs3DAnimating}
+            onHudDataChange={setHudData}
             searchContext={searchContext.lat && searchContext.lng ? {
               lat: searchContext.lat,
               lng: searchContext.lng,
