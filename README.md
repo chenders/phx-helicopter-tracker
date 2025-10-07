@@ -3,8 +3,6 @@
 **Real-time tracking and analysis of Phoenix Police Department helicopter surveillance operations**
 
 🔗 **Live Demo**: [https://helos.maxandbramble.org](https://helos:phx@helos.maxandbramble.org)  
-📍 **Live Tracking**: [https://helos.maxandbramble.org/live](https://helos:phx@helos.maxandbramble.org/live)  
-🔑 **Access**: Username: `helos` | Password: `phx`
 
 ## 🎯 Project Mission
 
