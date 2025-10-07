@@ -339,21 +339,33 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         // Add 3D floating labels for major Phoenix roads and landmarks
         // Categorized by importance for visual hierarchy
         const phoenixLabels = [
-          // Tier 1: Major Freeways (highest priority)
+          // Tier 0: Large area landmarks (highest, represents regions)
+          { name: "Phoenix Sky Harbor Airport", lat: 33.4343, lng: -112.0080, tier: 0, isArea: true },
+          { name: "Downtown Phoenix", lat: 33.4484, lng: -112.0740, tier: 0, isArea: true },
+          { name: "Camelback Mountain", lat: 33.5145, lng: -111.9710, tier: 0, isArea: true },
+          { name: "South Mountain", lat: 33.3390, lng: -112.0800, tier: 0, isArea: true },
+          { name: "Papago Park", lat: 33.4550, lng: -111.9500, tier: 0, isArea: true },
+
+          // Tier 1: Major Freeways
           { name: "I-10", lat: 33.4484, lng: -112.0740, tier: 1 },
           { name: "I-17", lat: 33.5000, lng: -112.0980, tier: 1 },
           { name: "Loop 101", lat: 33.5800, lng: -111.9800, tier: 1 },
           { name: "Loop 202", lat: 33.4150, lng: -111.9500, tier: 1 },
           { name: "US-60", lat: 33.4100, lng: -111.8400, tier: 1 },
 
-          // Tier 2: Major landmarks and key arterials
-          { name: "Phoenix Sky Harbor Airport", lat: 33.4343, lng: -112.0080, tier: 2 },
-          { name: "Downtown Phoenix", lat: 33.4484, lng: -112.0740, tier: 2 },
-          { name: "Camelback Mountain", lat: 33.5145, lng: -111.9710, tier: 2 },
-          { name: "South Mountain", lat: 33.3390, lng: -112.0800, tier: 2 },
+          // Tier 2: Major arterials (both named and numbered)
           { name: "Camelback Rd", lat: 33.5090, lng: -112.0740, tier: 2 },
           { name: "Central Ave", lat: 33.4484, lng: -112.0740, tier: 2 },
           { name: "Bell Rd", lat: 33.6390, lng: -112.0740, tier: 2 },
+          { name: "7th St", lat: 33.4484, lng: -112.0550, tier: 2 },
+          { name: "7th Ave", lat: 33.4484, lng: -112.0840, tier: 2 },
+          { name: "16th St", lat: 33.4484, lng: -112.0400, tier: 2 },
+          { name: "24th St", lat: 33.4484, lng: -112.0250, tier: 2 },
+          { name: "32nd St", lat: 33.4484, lng: -112.0100, tier: 2 },
+          { name: "44th St", lat: 33.4484, lng: -111.9875, tier: 2 },
+          { name: "19th Ave", lat: 33.4484, lng: -112.1050, tier: 2 },
+          { name: "35th Ave", lat: 33.4484, lng: -112.1320, tier: 2 },
+          { name: "43rd Ave", lat: 33.4484, lng: -112.1460, tier: 2 },
 
           // Tier 3: Major East-West Streets
           { name: "Greenway Rd", lat: 33.6230, lng: -112.0740, tier: 3 },
@@ -374,7 +386,6 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           { name: "Baseline Rd", lat: 33.3780, lng: -112.0740, tier: 3 },
 
           // Tier 4: Secondary streets and avenues
-          { name: "Papago Park", lat: 33.4550, lng: -111.9500, tier: 4 },
           { name: "Osborn Rd", lat: 33.4870, lng: -112.0740, tier: 4 },
           { name: "Lower Buckeye Rd", lat: 33.4220, lng: -112.0740, tier: 4 },
           { name: "Dobbins Rd", lat: 33.3660, lng: -112.0740, tier: 4 },
@@ -382,38 +393,29 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           { name: "Warner Rd", lat: 33.3350, lng: -112.0740, tier: 4 },
           { name: "Ray Rd", lat: 33.3200, lng: -112.0740, tier: 4 },
           { name: "Chandler Blvd", lat: 33.3060, lng: -112.0740, tier: 4 },
-          { name: "7th St", lat: 33.4484, lng: -112.0550, tier: 4 },
-          { name: "7th Ave", lat: 33.4484, lng: -112.0840, tier: 4 },
-          { name: "19th Ave", lat: 33.4484, lng: -112.1050, tier: 4 },
-          { name: "24th St", lat: 33.4484, lng: -112.0250, tier: 4 },
-          { name: "32nd St", lat: 33.4484, lng: -112.0100, tier: 4 },
-          { name: "44th St", lat: 33.4484, lng: -111.9875, tier: 4 },
+          { name: "12th St", lat: 33.4484, lng: -112.0475, tier: 4 },
+          { name: "20th St", lat: 33.4484, lng: -112.0325, tier: 4 },
+          { name: "40th St", lat: 33.4484, lng: -111.9950, tier: 4 },
+          { name: "48th St", lat: 33.4484, lng: -111.9800, tier: 4 },
+          { name: "12th Ave", lat: 33.4484, lng: -112.0920, tier: 4 },
+          { name: "27th Ave", lat: 33.4484, lng: -112.1180, tier: 4 },
+          { name: "51st Ave", lat: 33.4484, lng: -112.1600, tier: 4 },
 
           // Tier 5: Minor streets (only show when very close)
           { name: "3rd St", lat: 33.4484, lng: -112.0685, tier: 5 },
-          { name: "12th St", lat: 33.4484, lng: -112.0475, tier: 5 },
-          { name: "16th St", lat: 33.4484, lng: -112.0400, tier: 5 },
-          { name: "20th St", lat: 33.4484, lng: -112.0325, tier: 5 },
           { name: "28th St", lat: 33.4484, lng: -112.0175, tier: 5 },
           { name: "36th St", lat: 33.4484, lng: -112.0025, tier: 5 },
-          { name: "40th St", lat: 33.4484, lng: -111.9950, tier: 5 },
-          { name: "48th St", lat: 33.4484, lng: -111.9800, tier: 5 },
-          { name: "52nd St", lat: 33.4484, lng: -111.9725, tier: 5 },
+          { name: "52nd St", lat: 33.4484, lng: -112.0100, tier: 5 },
           { name: "56th St", lat: 33.4484, lng: -111.9650, tier: 5 },
           { name: "60th St", lat: 33.4484, lng: -111.9575, tier: 5 },
           { name: "64th St", lat: 33.4484, lng: -111.9500, tier: 5 },
           { name: "68th St", lat: 33.4484, lng: -111.9425, tier: 5 },
           { name: "3rd Ave", lat: 33.4484, lng: -112.0795, tier: 5 },
-          { name: "12th Ave", lat: 33.4484, lng: -112.0920, tier: 5 },
           { name: "15th Ave", lat: 33.4484, lng: -112.0975, tier: 5 },
           { name: "23rd Ave", lat: 33.4484, lng: -112.1115, tier: 5 },
-          { name: "27th Ave", lat: 33.4484, lng: -112.1180, tier: 5 },
           { name: "31st Ave", lat: 33.4484, lng: -112.1245, tier: 5 },
-          { name: "35th Ave", lat: 33.4484, lng: -112.1320, tier: 5 },
           { name: "39th Ave", lat: 33.4484, lng: -112.1390, tier: 5 },
-          { name: "43rd Ave", lat: 33.4484, lng: -112.1460, tier: 5 },
           { name: "47th Ave", lat: 33.4484, lng: -112.1530, tier: 5 },
-          { name: "51st Ave", lat: 33.4484, lng: -112.1600, tier: 5 },
           { name: "55th Ave", lat: 33.4484, lng: -112.1670, tier: 5 },
           { name: "59th Ave", lat: 33.4484, lng: -112.1740, tier: 5 },
           { name: "63rd Ave", lat: 33.4484, lng: -112.1810, tier: 5 },
@@ -430,28 +432,36 @@ export const FlightVisualization3DCesiumFixed: React.FC<
 
         phoenixLabels.forEach(label => {
           // Tier-based styling for visual hierarchy
-          // Tier 1 (Freeways): White, largest, always visible
-          // Tier 2 (Major landmarks): Cyan, large
+          // Tier 0 (Area landmarks): Gold, largest, highest elevation (represents regions)
+          // Tier 1 (Freeways): White, large, high visibility
+          // Tier 2 (Major arterials): Cyan, medium-large
           // Tier 3 (Major streets): Light blue, medium
           // Tier 4 (Secondary streets): Light gray, smaller
-          // Tier 5 (Minor streets): Dark gray, smallest, only close-up
+          // Tier 5 (Minor streets): Dark gray, smallest
 
           let fillColor, fontSize, maxDistance, minDistance, baseHeight;
 
           switch(label.tier) {
+            case 0: // Area landmarks (Downtown, Mountains, Airport, etc.)
+              fillColor = Cesium.Color.GOLD;
+              fontSize = 26;
+              maxDistance = 31680; // 6 miles - visible from far away
+              minDistance = 0;
+              baseHeight = 1000; // Very high - these represent areas, not points
+              break;
             case 1: // Major Freeways
               fillColor = Cesium.Color.WHITE;
               fontSize = 24;
               maxDistance = 26400; // 5 miles (3D distance, accounting for altitude)
               minDistance = 0;
-              baseHeight = 500; // Higher for visibility from altitude
+              baseHeight = 600; // Higher for visibility from altitude
               break;
-            case 2: // Major landmarks & arterials
+            case 2: // Major arterials (both named and numbered)
               fillColor = Cesium.Color.CYAN;
               fontSize = 22;
               maxDistance = 21120; // 4 miles
               minDistance = 0;
-              baseHeight = 450;
+              baseHeight = 500;
               break;
             case 3: // Major streets
               fillColor = Cesium.Color.LIGHTBLUE;
