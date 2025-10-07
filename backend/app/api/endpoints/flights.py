@@ -674,3 +674,202 @@ def get_data_quality_metrics(
             for row in worst_cases_result
         ]
     }
+
+
+@router.get("/camelback-mountain-analysis")
+def analyze_camelback_mountain_flights(
+    db: Session = Depends(get_db)
+) -> Dict[str, Any]:
+    """
+    Analyze flights near Camelback Mountain peaks.
+
+    Camelback Mountain has two prominent peaks:
+    - Eastern peak (the "head"): 33.5145° N, 111.9710° W, elevation ~2,704 ft
+    - Western peak (the "hump"): 33.5156° N, 111.9780° W, elevation ~2,400 ft
+
+    This endpoint finds flights that flew within 500 feet (horizontally) of either peak
+    at or above the peak elevation, which may indicate sightseeing rather than police work.
+    """
+
+    from sqlalchemy import text
+
+    # Define the two peak locations
+    # Eastern peak ("head") - higher peak
+    east_peak_lat = 33.5145
+    east_peak_lng = -111.9710
+    east_peak_elevation = 2704  # feet
+
+    # Western peak ("hump")
+    west_peak_lat = 33.5156
+    west_peak_lng = -111.9780
+    west_peak_elevation = 2400  # feet
+
+    # 500 feet radius in degrees (approximately)
+    # At Phoenix latitude, 1 degree ≈ 364,000 feet latitude, 288,000 feet longitude
+    radius_lat = 500 / 364000  # ~0.00137 degrees
+    radius_lng = 500 / 288000  # ~0.00174 degrees
+
+    query = text("""
+        WITH peak_visits AS (
+            -- Find positions near eastern peak
+            SELECT DISTINCT
+                fp.flight_log_id,
+                fl.flight_id,
+                fl.departure_time,
+                fl.aircraft_id,
+                a.registration,
+                'Eastern Peak (Head)' as peak_name,
+                COUNT(*) OVER (PARTITION BY fp.flight_log_id) as visit_count,
+                MIN(fp.altitude_feet) OVER (PARTITION BY fp.flight_log_id) as min_altitude,
+                MAX(fp.altitude_feet) OVER (PARTITION BY fp.flight_log_id) as max_altitude,
+                AVG(fp.altitude_feet) OVER (PARTITION BY fp.flight_log_id) as avg_altitude,
+                SUM(CASE WHEN fp.is_hovering THEN 1 ELSE 0 END) OVER (PARTITION BY fp.flight_log_id) as hover_positions,
+                SUM(CASE WHEN fp.is_circling THEN 1 ELSE 0 END) OVER (PARTITION BY fp.flight_log_id) as circling_positions
+            FROM flight_positions fp
+            JOIN flight_logs fl ON fp.flight_log_id = fl.id
+            JOIN aircraft a ON fl.aircraft_id = a.id
+            WHERE fp.latitude BETWEEN :east_lat - :radius_lat AND :east_lat + :radius_lat
+                AND fp.longitude BETWEEN :east_lng - :radius_lng AND :east_lng + :radius_lng
+                AND fp.altitude_feet >= :east_elevation - 200  -- Within 200 ft of peak elevation
+
+            UNION ALL
+
+            -- Find positions near western peak
+            SELECT DISTINCT
+                fp.flight_log_id,
+                fl.flight_id,
+                fl.departure_time,
+                fl.aircraft_id,
+                a.registration,
+                'Western Peak (Hump)' as peak_name,
+                COUNT(*) OVER (PARTITION BY fp.flight_log_id) as visit_count,
+                MIN(fp.altitude_feet) OVER (PARTITION BY fp.flight_log_id) as min_altitude,
+                MAX(fp.altitude_feet) OVER (PARTITION BY fp.flight_log_id) as max_altitude,
+                AVG(fp.altitude_feet) OVER (PARTITION BY fp.flight_log_id) as avg_altitude,
+                SUM(CASE WHEN fp.is_hovering THEN 1 ELSE 0 END) OVER (PARTITION BY fp.flight_log_id) as hover_positions,
+                SUM(CASE WHEN fp.is_circling THEN 1 ELSE 0 END) OVER (PARTITION BY fp.flight_log_id) as circling_positions
+            FROM flight_positions fp
+            JOIN flight_logs fl ON fp.flight_log_id = fl.id
+            JOIN aircraft a ON fl.aircraft_id = a.id
+            WHERE fp.latitude BETWEEN :west_lat - :radius_lat AND :west_lat + :radius_lat
+                AND fp.longitude BETWEEN :west_lng - :radius_lng AND :west_lng + :radius_lng
+                AND fp.altitude_feet >= :west_elevation - 200  -- Within 200 ft of peak elevation
+        ),
+        unique_flights AS (
+            SELECT DISTINCT
+                flight_log_id,
+                flight_id,
+                departure_time,
+                aircraft_id,
+                registration,
+                STRING_AGG(DISTINCT peak_name, ', ') as peaks_visited,
+                MAX(visit_count) as max_positions_near_peak,
+                MIN(min_altitude) as min_altitude,
+                MAX(max_altitude) as max_altitude,
+                AVG(avg_altitude) as avg_altitude,
+                MAX(hover_positions) as hover_positions,
+                MAX(circling_positions) as circling_positions
+            FROM peak_visits
+            GROUP BY flight_log_id, flight_id, departure_time, aircraft_id, registration
+        )
+        SELECT
+            flight_log_id,
+            flight_id,
+            departure_time,
+            registration,
+            peaks_visited,
+            max_positions_near_peak,
+            min_altitude,
+            max_altitude,
+            avg_altitude,
+            hover_positions,
+            circling_positions,
+            CASE
+                WHEN hover_positions > 5 OR circling_positions > 5 THEN 'Likely Sightseeing'
+                WHEN max_positions_near_peak > 10 THEN 'Possible Sightseeing'
+                ELSE 'Passing Through'
+            END as likely_purpose
+        FROM unique_flights
+        ORDER BY departure_time DESC
+    """)
+
+    results = db.execute(query, {
+        "east_lat": east_peak_lat,
+        "east_lng": east_peak_lng,
+        "east_elevation": east_peak_elevation,
+        "west_lat": west_peak_lat,
+        "west_lng": west_peak_lng,
+        "west_elevation": west_peak_elevation,
+        "radius_lat": radius_lat,
+        "radius_lng": radius_lng,
+    }).fetchall()
+
+    # Get summary statistics
+    summary_query = text("""
+        WITH peak_visits AS (
+            -- Eastern peak
+            SELECT DISTINCT fp.flight_log_id
+            FROM flight_positions fp
+            WHERE fp.latitude BETWEEN :east_lat - :radius_lat AND :east_lat + :radius_lat
+                AND fp.longitude BETWEEN :east_lng - :radius_lng AND :east_lng + :radius_lng
+                AND fp.altitude_feet >= :east_elevation - 200
+
+            UNION
+
+            -- Western peak
+            SELECT DISTINCT fp.flight_log_id
+            FROM flight_positions fp
+            WHERE fp.latitude BETWEEN :west_lat - :radius_lat AND :west_lat + :radius_lat
+                AND fp.longitude BETWEEN :west_lng - :radius_lng AND :west_lng + :radius_lng
+                AND fp.altitude_feet >= :west_elevation - 200
+        )
+        SELECT
+            COUNT(*) as flights_near_peaks,
+            (SELECT COUNT(*) FROM flight_logs) as total_flights,
+            ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM flight_logs), 2) as percentage
+        FROM peak_visits
+    """)
+
+    summary = db.execute(summary_query, {
+        "east_lat": east_peak_lat,
+        "east_lng": east_peak_lng,
+        "east_elevation": east_peak_elevation,
+        "west_lat": west_peak_lat,
+        "west_lng": west_peak_lng,
+        "west_elevation": west_peak_elevation,
+        "radius_lat": radius_lat,
+        "radius_lng": radius_lng,
+    }).fetchone()
+
+    return {
+        "summary": {
+            "total_flights_in_database": summary.total_flights,
+            "flights_near_camelback_peaks": summary.flights_near_peaks,
+            "percentage_of_all_flights": float(summary.percentage),
+            "search_criteria": {
+                "eastern_peak": {"lat": east_peak_lat, "lng": east_peak_lng, "elevation_ft": east_peak_elevation},
+                "western_peak": {"lat": west_peak_lat, "lng": west_peak_lng, "elevation_ft": west_peak_elevation},
+                "search_radius_feet": 500,
+                "elevation_tolerance_feet": 200,
+            }
+        },
+        "flights": [
+            {
+                "flight_log_id": row.flight_log_id,
+                "flight_id": row.flight_id,
+                "departure_time": row.departure_time.isoformat() if row.departure_time else None,
+                "aircraft": row.registration,
+                "peaks_visited": row.peaks_visited,
+                "positions_near_peak": row.max_positions_near_peak,
+                "altitude_range": {
+                    "min": float(row.min_altitude),
+                    "max": float(row.max_altitude),
+                    "avg": float(row.avg_altitude),
+                },
+                "hovering_positions": row.hover_positions,
+                "circling_positions": row.circling_positions,
+                "likely_purpose": row.likely_purpose,
+            }
+            for row in results
+        ]
+    }
