@@ -94,6 +94,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   const [tileLoadProgress, setTileLoadProgress] = useState(0);
   const isInitializingRef = useRef(false);
   const hasInitializedRef = useRef(false);
+  const [isControlsExpanded, setIsControlsExpanded] = useState(true); // Controls panel state
   const [hudData, setHudData] = useState({
     speed: 0,
     altitude: 0,
@@ -1939,6 +1940,76 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                 {formatTime(hudData.timeRemaining)}
               </div>
               <div className="text-xs mt-2 opacity-80">Time in radius this pass</div>
+            </div>
+          </div>
+        )}
+
+        {/* Camera Controls Help Inset */}
+        {!isLoading && (
+          <div className="absolute top-4 right-4 z-40 w-72">
+            <div className="bg-black/80 backdrop-blur rounded-lg shadow-xl overflow-hidden">
+              {/* Header - Clickable to toggle */}
+              <button
+                onClick={() => setIsControlsExpanded(!isControlsExpanded)}
+                className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/10 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-white text-sm font-semibold">🎮 Camera Controls</span>
+                </div>
+                <span className="text-white text-xs">
+                  {isControlsExpanded ? '▼' : '▶'}
+                </span>
+              </button>
+
+              {/* Controls List - Collapsible */}
+              {isControlsExpanded && (
+                <div className="px-4 py-3 space-y-2 text-white text-xs border-t border-white/20">
+                  <div className="space-y-1.5">
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-400 font-mono min-w-[80px]">Left Click</span>
+                      <span className="text-gray-300">Pan camera</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-400 font-mono min-w-[80px]">Right Click</span>
+                      <span className="text-gray-300">Rotate camera (tilt/heading)</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-400 font-mono min-w-[80px]">Scroll</span>
+                      <span className="text-gray-300">Zoom in/out</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-400 font-mono min-w-[80px]">Middle Click</span>
+                      <span className="text-gray-300">Drag to rotate around point</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-white/10">
+                    <div className="text-gray-400 mb-1.5 font-semibold">Keyboard Shortcuts:</div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-start gap-2">
+                        <span className="text-green-400 font-mono min-w-[80px]">Arrow Keys</span>
+                        <span className="text-gray-300">Pan camera</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-green-400 font-mono min-w-[80px]">+ / -</span>
+                        <span className="text-gray-300">Zoom in/out</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-green-400 font-mono min-w-[80px]">Shift + ↑↓</span>
+                        <span className="text-gray-300">Tilt camera</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="text-green-400 font-mono min-w-[80px]">Shift + ←→</span>
+                        <span className="text-gray-300">Rotate camera</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-white/10 text-gray-400 text-[10px] italic">
+                    Tip: Double-click terrain to fly there
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
