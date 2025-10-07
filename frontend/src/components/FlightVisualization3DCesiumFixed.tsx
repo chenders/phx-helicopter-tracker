@@ -442,48 +442,47 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             case 1: // Major Freeways
               fillColor = Cesium.Color.WHITE;
               fontSize = 24;
-              maxDistance = 15840; // 3 miles
+              maxDistance = 26400; // 5 miles (3D distance, accounting for altitude)
               minDistance = 0;
-              baseHeight = 200; // Higher for better visibility
+              baseHeight = 500; // Higher for visibility from altitude
               break;
             case 2: // Major landmarks & arterials
               fillColor = Cesium.Color.CYAN;
               fontSize = 22;
-              maxDistance = 10560; // 2 miles
+              maxDistance = 21120; // 4 miles
               minDistance = 0;
-              baseHeight = 150;
+              baseHeight = 450;
               break;
             case 3: // Major streets
               fillColor = Cesium.Color.LIGHTBLUE;
               fontSize = 18;
-              maxDistance = 7920; // 1.5 miles
+              maxDistance = 15840; // 3 miles
               minDistance = 0;
-              baseHeight = 100;
+              baseHeight = 400;
               break;
             case 4: // Secondary streets
               fillColor = Cesium.Color.LIGHTGRAY;
               fontSize = 16;
-              maxDistance = 5280; // 1 mile
+              maxDistance = 10560; // 2 miles
               minDistance = 0;
-              baseHeight = 80;
+              baseHeight = 350;
               break;
             case 5: // Minor streets
               fillColor = Cesium.Color.DARKGRAY;
               fontSize = 14;
-              maxDistance = 3960; // 0.75 miles (increased from 0.5)
+              maxDistance = 7920; // 1.5 miles
               minDistance = 0;
-              baseHeight = 60;
+              baseHeight = 300;
               break;
             default:
               fillColor = Cesium.Color.WHITE;
               fontSize = 18;
-              maxDistance = 10560;
+              maxDistance = 15840;
               minDistance = 0;
-              baseHeight = 100;
+              baseHeight = 400;
           }
 
-          // Use a fixed height for all labels instead of distance-based
-          // This prevents labels from bunching up
+          // Position labels at a height that's visible from typical helicopter altitudes (1000-2000 ft)
           const height = baseHeight;
 
           viewer.entities.add({
@@ -500,10 +499,10 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               pixelOffset: new Cesium.Cartesian2(0, 0),
               disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always visible through terrain
               eyeOffset: new Cesium.Cartesian3(0, 0, 0),
-              // Scale: larger when close, smaller when far (from camera, not start position)
-              scaleByDistance: new Cesium.NearFarScalar(500, 2.0, maxDistance, 0.5),
+              // Scale: larger when very close, normal at medium range
+              scaleByDistance: new Cesium.NearFarScalar(1000, 1.5, maxDistance * 0.7, 0.8),
               // Fade out gradually at max distance (from camera)
-              translucencyByDistance: new Cesium.NearFarScalar(maxDistance * 0.6, 1.0, maxDistance, 0.0),
+              translucencyByDistance: new Cesium.NearFarScalar(maxDistance * 0.7, 1.0, maxDistance, 0.0),
               // Show within tier-specific distance FROM CAMERA (this updates as camera moves)
               distanceDisplayCondition: new Cesium.DistanceDisplayCondition(minDistance, maxDistance),
             }
