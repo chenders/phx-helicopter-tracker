@@ -14,13 +14,17 @@ This system documents Phoenix Police Department helicopter operations to support
 
 ### 🗺️ Live Flight Tracking
 - **Real-time helicopter positions** from database (updated every 5 minutes)
-- **Google Maps integration** showing current and historical flight paths
+- **2D Google Maps view** with flight paths, heatmaps, and zones
+- **3D Cesium globe view** with photorealistic terrain and cinematic flight replay
 - **Complete position tracking** - 100% of available flight positions captured
 - **Smart API fallback** - Uses FR24 API only when database has no recent data
 - **Cost calculator** tracking taxpayer expense at $2,160/hour
+- **HUD display** showing speed, altitude, heading during 3D animations
 
 ### 📊 Comprehensive Dashboard
-- **Fleet overview** of all Phoenix PD helicopters (N621FB - N625FB)
+- **Fleet overview** of Phoenix PD helicopters:
+  - **Active**: N621FB, N623FB, N624FB, N625FB (Airbus H125)
+  - **Inactive**: N626FB, N627FB, N628FB
 - **Current activity display** with live status updates
 - **Flight statistics** including total hours, patterns, and costs
 - **Privacy impact scores** rating surveillance intensity (1-5 scale)
@@ -40,6 +44,11 @@ This system documents Phoenix Police Department helicopter operations to support
 - **Surveillance scoring** (0-1 scale) for each flight
 - **Fourth Amendment concern flagging**
 - **Cost analysis** per flight and cumulative
+- **Abnormal pattern detection** (skywriting, unusual paths)
+- **Data quality monitoring** with missing position detection
+- **Historical analysis** with trend visualization
+- **Geographic heatmaps** showing surveillance concentration
+- **Legal document management** for case preparation
 
 ## 🚀 Quick Start
 
@@ -66,44 +75,54 @@ docker compose logs -f
 
 ### Access Points
 
-- 🌐 **Main Application**: http://localhost:9080 (nginx proxy with auth)
-- 📡 **Backend API**: http://localhost:8001
+- 🌐 **Frontend Application**: http://localhost:3000 (development)
+- 🔒 **Production Access**: http://localhost:9080 (nginx proxy with auth)
+- 📡 **Backend API**: http://localhost:8001 (internal: 9000)
 - 📚 **API Documentation**: http://localhost:8001/docs
 - 🌻 **Task Monitor (Flower)**: http://localhost:5555
-- 🗄️ **Database (PostgreSQL/TimescaleDB)**: localhost:5433
+- 🗄️ **Database (PostgreSQL 15 + PostGIS)**: localhost:5433
 - 📦 **Redis**: localhost:6380
 
 ## 🛠️ Technology Stack
 
 ### Backend
 - **FastAPI** (Python 3.11) - High-performance async API
-- **PostgreSQL 15** with **TimescaleDB** - Time-series optimized database
+- **PostgreSQL 15** with **PostGIS** - Spatial database with geographic queries
 - **Celery** + **Redis** - Distributed task processing with beat scheduler
 - **SQLAlchemy** 2.0 - Modern ORM with async support
 - **Alembic** - Database migration management
+- **FlightRadar24 API** - Official SDK for flight tracking data
+- **Whisper AI** - Radio transcription (OpenAI)
 
 ### Frontend
 - **React 18** with **TypeScript** - Type-safe UI
 - **Vite** - Lightning-fast build tool with HMR
 - **Tailwind CSS** - Utility-first styling with dark mode
 - **React Query** - Server state management and caching
-- **Google Maps API** - Interactive mapping with heatmaps
+- **Google Maps API** - Interactive 2D mapping with heatmaps
+- **Cesium** - Photorealistic 3D globe visualization with terrain
+- **Recharts** - Data visualization and analytics charts
+- **Leaflet** - Lightweight mapping library
 - **Axios** - HTTP client with interceptors
+- **Socket.io** - Real-time WebSocket communication
 
 ### Infrastructure
 - **Docker Compose** - Multi-container orchestration
 - **Nginx** - Reverse proxy with basic auth
 - **Flower** - Celery task monitoring UI
+- **Playwright** - End-to-end testing framework
 
 ## 📊 Data Sources
 
 ### FlightRadar24 API (Primary)
-- ✅ **Production API** with official SDK
+- ✅ **Essential Account** with official SDK
 - ✅ **Complete flight tracks** - 100% of positions after landing
 - ✅ **Live monitoring** - Active flight detection every 5 minutes
 - ✅ **666,000 monthly credit limit** with usage tracking
 - ✅ **Intelligent caching** to minimize API calls
-- ✅ **Rate limiting** protection (60 req/min, 500 req/hour)
+- ✅ **Rate limiting** protection (30 req/min, 3 second minimum delay)
+- ✅ **Historical access** - 2 years (730 days) of flight data
+- ✅ **Export formats** - CSV and KML support
 
 ### Broadcastify Radio Archives
 - Phoenix PD aviation feed (Feed ID: 12145)
@@ -123,38 +142,82 @@ docker compose logs -f
 phx-helicopter-tracker/
 ├── backend/
 │   ├── app/
-│   │   ├── api/          # RESTful endpoints
-│   │   │   └── endpoints/
-│   │   │       ├── live_database.py    # Live tracking from DB
-│   │   │       ├── manual_fr24.py      # FR24 import tools
-│   │   │       ├── radio.py            # Radio archive API
-│   │   │       └── analysis.py         # Pattern analysis
-│   │   ├── models/       # SQLAlchemy ORM models
-│   │   │   ├── flight_logs.py         # Flight & position data
+│   │   ├── api/endpoints/              # RESTful API endpoints
+│   │   │   ├── aircraft.py            # Aircraft fleet management
+│   │   │   ├── flights.py             # Flight search & detail
+│   │   │   ├── flight_redownload.py   # Re-fetch flight data
+│   │   │   ├── live_database.py       # Real-time tracking from DB
+│   │   │   ├── tracking.py            # Flight tracking control
+│   │   │   ├── radio.py               # Radio archive API
+│   │   │   ├── analysis.py            # Flight analysis
+│   │   │   ├── patterns.py            # Pattern detection
+│   │   │   ├── legal.py               # Legal document management
+│   │   │   ├── task_monitoring.py     # Task status & monitoring
+│   │   │   ├── data_sources.py        # Data source info
+│   │   │   ├── rate_limit_status.py   # FR24 API status
+│   │   │   ├── logs.py                # System logs
+│   │   │   └── config.py              # Configuration
+│   │   ├── models/                    # SQLAlchemy ORM models
+│   │   │   ├── flight_logs.py         # Flight records
+│   │   │   ├── flight_positions.py    # GPS positions
+│   │   │   ├── flight_discoveries.py  # FR24 discoveries
 │   │   │   ├── aircraft.py            # Aircraft registry
-│   │   │   └── task_history.py        # Task tracking
-│   │   ├── services/     # Business logic
-│   │   │   ├── flightradar24_api_service.py  # FR24 integration
+│   │   │   ├── abnormal_patterns.py   # Pattern detections
+│   │   │   ├── task_history.py        # Celery task tracking
+│   │   │   └── legal.py               # Legal documents
+│   │   ├── services/                  # Business logic layer
+│   │   │   ├── flightradar24_api_service.py  # FR24 API wrapper
+│   │   │   ├── fr24_rate_limiter.py          # Rate limit protection
 │   │   │   ├── flight_tracker.py             # Complete tracking
-│   │   │   └── fr24_rate_limiter.py          # API protection
-│   │   └── workers/      # Celery background tasks
-│   │       ├── flight_tracking_tasks.py  # Monitor & download
-│   │       ├── analysis_tasks.py         # Pattern detection
-│   │       ├── radio_tasks.py            # Broadcastify sync
-│   │       └── celery_app.py            # Beat scheduler
-│   └── alembic/          # Database migrations
+│   │   │   ├── tracking_service.py           # Track coordination
+│   │   │   ├── elevation_service.py          # Terrain elevation
+│   │   │   ├── cache_service.py              # Redis caching
+│   │   │   ├── websocket_manager.py          # Real-time updates
+│   │   │   └── data_integrity_service.py     # Data validation
+│   │   └── workers/                   # Celery background tasks
+│   │       ├── celery_app.py                 # Celery + Beat scheduler
+│   │       ├── flight_discovery_tasks.py     # Discover new flights
+│   │       ├── flight_tracking_tasks.py      # Download tracks
+│   │       ├── analysis_tasks.py             # Pattern analysis
+│   │       ├── abnormal_pattern_tasks.py     # Detect anomalies
+│   │       ├── radio_tasks.py                # Broadcastify sync
+│   │       ├── legal_tasks.py                # Legal processing
+│   │       ├── data_import_tasks.py          # Bulk imports
+│   │       └── data_maintenance_tasks.py     # Cleanup & optimization
+│   ├── alembic/                       # Database migrations
+│   └── scripts/                       # Utility scripts
+│       ├── backup_database.sh         # Database backups
+│       └── redownload_flights.py      # Batch redownload
 ├── frontend/
 │   ├── src/
-│   │   ├── components/   # Reusable UI components
-│   │   ├── pages/        # Application pages
-│   │   │   ├── HomePage.tsx           # Dashboard
-│   │   │   ├── LiveTrackingPage.tsx   # Real-time map
-│   │   │   ├── RadioPage.tsx          # Radio archives
-│   │   │   └── FlightsPage.tsx        # Flight history
-│   │   └── hooks/        # Custom React hooks
-│   │       └── useRealtimeFlightsDB.ts  # Live data hook
-│   └── public/           # Static assets
-└── docker-compose.yml    # Container orchestration
+│   │   ├── components/                # Reusable UI components
+│   │   │   ├── FlightVisualization3DCesiumFixed.tsx  # 3D globe
+│   │   │   ├── LiveMap.tsx                           # 2D tracking
+│   │   │   └── [other components]
+│   │   ├── pages/                     # Application pages
+│   │   │   ├── HomePage.tsx                  # Dashboard
+│   │   │   ├── LiveTrackingPage.tsx          # Real-time map
+│   │   │   ├── FlightSearchPage.tsx          # Search flights
+│   │   │   ├── FlightDetailPage.tsx          # Flight detail + 3D
+│   │   │   ├── RadioPage.tsx                 # Radio archives
+│   │   │   ├── PatternAnalysisPage.tsx       # Pattern detection
+│   │   │   ├── AbnormalPatternsPage.tsx      # Anomalies
+│   │   │   ├── CostAnalysisPage.tsx          # Cost tracking
+│   │   │   ├── HistoricalAnalysisPage.tsx    # Trends
+│   │   │   ├── LegalDocumentsPage.tsx        # Legal docs
+│   │   │   ├── DataSourcesPage.tsx           # Source info
+│   │   │   ├── DataQualityPage.tsx           # Quality metrics
+│   │   │   ├── TaskMonitoringPage.tsx        # Task status
+│   │   │   └── LogsPage.tsx                  # System logs
+│   │   └── hooks/                     # Custom React hooks
+│   └── public/                        # Static assets
+├── docker-compose.yml                 # Container orchestration
+├── scripts/                           # System scripts
+│   ├── backup_database.sh             # Automated backups
+│   └── monitor_backups.sh             # Backup monitoring
+└── data/                              # Data storage (gitignored)
+    ├── radio/                         # Radio recordings
+    └── [other data files]
 ```
 
 ## 🔍 Complete Flight Tracking System
@@ -185,28 +248,52 @@ The system uses a sophisticated approach to capture 100% of available flight pos
 ## 📱 Key Pages
 
 ### Dashboard (`/`)
-Overview of current activity, recent flights, fleet status, and key statistics. Shows active helicopters with real-time position updates from the database.
+Overview of current activity, recent flights, fleet status, and key statistics with real-time updates.
 
 ### Live Tracking (`/live`)
-Interactive Google Maps display with:
-- Real-time helicopter positions
-- Flight paths (last 50 positions)
-- Hover indicators and surveillance zones
-- Cost accumulator
-- Smart data source (DB primary, FR24 fallback)
+Interactive 2D Google Maps display with real-time helicopter positions, flight paths, and surveillance zones.
+
+### Flight Search (`/flights`)
+Advanced search interface with filtering by date, aircraft, patterns, and surveillance indicators.
+
+### Flight Detail (`/flights/:id`)
+Comprehensive flight analysis with:
+- **2D map view** - Traditional Google Maps with flight path
+- **3D Cesium view** - Photorealistic globe with terrain and cinematic replay
+- **HUD display** - Real-time speed, altitude, heading during animation
+- Pattern analysis and surveillance scoring
+- Position-by-position timeline
+- Data quality indicators
 
 ### Radio Archive (`/radio`)
-Searchable police radio communications with:
-- Transcription search
-- Click-to-play at specific timestamps
-- Navigation to full recordings
-- Download capabilities
+Searchable police radio communications with AI transcription, click-to-play, and audio downloads.
 
-### Flight History (`/flights`)
-Complete flight log database with:
-- Filtering by date, aircraft, patterns
-- Detailed flight analysis
-- Export capabilities
+### Pattern Analysis (`/patterns`)
+Detection and visualization of flight patterns including hover events, circling, and low-altitude segments.
+
+### Abnormal Patterns (`/abnormal-patterns`)
+Anomaly detection results showing unusual flight behaviors like skywriting or erratic paths.
+
+### Cost Analysis (`/cost`)
+Financial impact tracking with per-flight costs, cumulative expenses, and budget analysis.
+
+### Historical Analysis (`/historical`)
+Long-term trend visualization with charts, statistics, and pattern evolution over time.
+
+### Legal Documents (`/legal`)
+Case preparation tools with document storage, precedent references, and constitutional analysis.
+
+### Data Sources (`/data-sources`)
+Information about FlightRadar24 API, Broadcastify, and other data providers with usage statistics.
+
+### Data Quality (`/data-quality`)
+Monitoring dashboard showing data completeness, missing positions, and quality metrics.
+
+### Task Monitoring (`/tasks`)
+Celery task status, execution history, and background job monitoring via Flower integration.
+
+### System Logs (`/logs`)
+Real-time application logs with filtering and search capabilities.
 
 ## 🤝 Contributing
 
@@ -255,17 +342,29 @@ This project supports constitutional challenges based on:
 
 ## 🗺️ Roadmap
 
+### Completed ✅
+- [x] **Complete flight tracking** - 100% position capture
+- [x] **3D Cesium visualization** - Photorealistic globe with terrain
+- [x] **Radio transcription** - AI-powered audio-to-text
+- [x] **Pattern detection** - Hover, circling, low-altitude
+- [x] **Cost analysis** - Financial impact tracking
+- [x] **Legal document management** - Case preparation tools
+- [x] **Data quality monitoring** - Completeness tracking
+- [x] **Task monitoring** - Background job visibility
+
 ### Near Term
-- [ ] **Pattern Recognition ML** - Advanced surveillance detection
-- [ ] **Public Records Integration** - Automated FOIA filing
-- [ ] **Community Reports** - Crowdsourced incident reporting
-- [ ] **Mobile App** - iOS/Android native applications
+- [ ] **Enhanced ML patterns** - Deep learning for anomaly detection
+- [ ] **Public records integration** - Automated FOIA filing
+- [ ] **Community reports** - Crowdsourced incident reporting
+- [ ] **Mobile app** - iOS/Android native applications
+- [ ] **Real-time alerts** - Push notifications for surveillance events
+- [ ] **Export improvements** - PDF reports, KML exports
 
 ### Long Term
-- [ ] **Multi-city Support** - Expand beyond Phoenix
-- [ ] **Legal Document Generator** - Automated case preparation
+- [ ] **Multi-city support** - Expand beyond Phoenix
 - [ ] **Public API** - Enable third-party integrations
-- [ ] **Real-time Alerts** - Surveillance notification system
+- [ ] **Automated legal briefs** - AI-generated case documents
+- [ ] **Neighborhood analytics** - Per-area surveillance metrics
 
 ## 📄 License
 
