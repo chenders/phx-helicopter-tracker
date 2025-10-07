@@ -388,7 +388,7 @@ def search_flights(
             }).first()
 
             if quality_result and quality_result.actual_span_minutes:
-                discrepancy_pct = abs(quality_result.discrepancy_minutes) / flight.flight_duration_minutes if flight.flight_duration_minutes > 0 else 0
+                discrepancy_pct = abs(float(quality_result.discrepancy_minutes)) / flight.flight_duration_minutes if flight.flight_duration_minutes > 0 else 0
                 # Flag as issue if discrepancy is more than 20% of recorded duration
                 if discrepancy_pct > 0.20:
                     has_data_quality_issue = True

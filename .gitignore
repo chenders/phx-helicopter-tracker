@@ -19,6 +19,8 @@ backend/*.pyc
 backend/.pytest_cache/
 backend/celerybeat-schedule*
 backend/poetry.lock
+backend/logs/
+backend/celerybeat-schedule
 
 # Data directories
 data/

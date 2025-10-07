@@ -16,6 +16,7 @@ from app.api.endpoints import (
     live_database,
     logs,
     config,
+    flight_redownload,
 )
 from app.api.v1 import abnormal_patterns
 
@@ -52,3 +53,6 @@ api_router.include_router(
 )
 api_router.include_router(logs.router, tags=["logs"])
 api_router.include_router(config.router, prefix="/app", tags=["config"])
+api_router.include_router(
+    flight_redownload.router, prefix="/flight-redownload", tags=["flight_redownload"]
+)

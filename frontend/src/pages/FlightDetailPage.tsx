@@ -876,7 +876,10 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
                 </h4>
                 <p className="text-sm text-orange-700 dark:text-orange-400 mb-2">
                   The position data time span differs significantly from the recorded flight duration.
-                  This may indicate incomplete or inaccurate flight metadata from FlightRadar24.
+                  This may indicate incomplete or inaccurate flight metadata from FlightRadar24.{' '}
+                  <Link to="/data-quality" className="underline hover:text-orange-800 dark:hover:text-orange-300 font-medium">
+                    View all data quality issues →
+                  </Link>
                 </p>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mt-3">
                   <div className="bg-white/50 dark:bg-black/20 rounded px-2 py-1.5">

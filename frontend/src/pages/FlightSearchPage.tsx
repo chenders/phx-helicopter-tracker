@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { GoogleMap, MarkerF, Circle, Polyline, Autocomplete } from '@react-google-maps/api'
 import { Search, Calendar, MapPin, Plane, Clock, Radio, ChevronRight, Play, Pause, Volume2, ArrowUpDown, Users } from 'lucide-react'
 import axios from '@/lib/axios'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { formatLocalTime } from '../utils/dateUtils'
 
 interface FlightResult {
@@ -29,6 +29,13 @@ interface FlightResult {
   }
   grouped_count?: number
   grouped_flights?: FlightResult[]
+  has_data_quality_issue?: boolean
+  data_quality_info?: {
+    recorded_duration_minutes: number
+    actual_span_minutes: number
+    discrepancy_minutes: number
+    discrepancy_percentage: number
+  }
 }
 
 interface SearchFilters {
@@ -707,12 +714,13 @@ export function FlightSearchPage() {
                                 </span>
                               )}
                               {flight.has_data_quality_issue && (
-                                <span
-                                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+                                <Link
+                                  to="/data-quality"
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors"
                                   title={`Position data span (${Math.round(flight.data_quality_info?.actual_span_minutes || 0)} min) differs from recorded duration (${Math.round(flight.data_quality_info?.recorded_duration_minutes || 0)} min) by ${Math.round(flight.data_quality_info?.discrepancy_percentage || 0)}%`}
                                 >
                                   ⚠️ Data Issue
-                                </span>
+                                </Link>
                               )}
                             </div>
                             {flight.surveillance_score > 0.7 ? (
