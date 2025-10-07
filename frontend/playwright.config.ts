@@ -10,9 +10,15 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
+    screenshot: {
+      mode: 'only-on-failure',
+      fullPage: true,
+    },
     video: 'retain-on-failure',
   },
+
+  // Configure screenshot output directory
+  outputDir: './tests/images',
 
   projects: [
     {
