@@ -365,6 +365,40 @@ def search_flights(
 
     results = []
     for flight in flights:
+        # Check for data quality issues (significant discrepancy between recorded duration and position span)
+        has_data_quality_issue = False
+        data_quality_info = None
+
+        if flight.departure_time and flight.arrival_time and flight.flight_duration_minutes:
+            from sqlalchemy import text
+
+            quality_check_query = text("""
+                SELECT
+                    EXTRACT(EPOCH FROM (MAX(fp.timestamp) - MIN(fp.timestamp))) / 60.0 as actual_span_minutes,
+                    :recorded_duration as recorded_duration_minutes,
+                    (EXTRACT(EPOCH FROM (MAX(fp.timestamp) - MIN(fp.timestamp))) / 60.0) - :recorded_duration as discrepancy_minutes
+                FROM flight_positions fp
+                WHERE fp.flight_log_id = :flight_id
+                HAVING COUNT(*) > 1
+            """)
+
+            quality_result = db.execute(quality_check_query, {
+                'flight_id': flight.id,
+                'recorded_duration': flight.flight_duration_minutes
+            }).first()
+
+            if quality_result and quality_result.actual_span_minutes:
+                discrepancy_pct = abs(quality_result.discrepancy_minutes) / flight.flight_duration_minutes if flight.flight_duration_minutes > 0 else 0
+                # Flag as issue if discrepancy is more than 20% of recorded duration
+                if discrepancy_pct > 0.20:
+                    has_data_quality_issue = True
+                    data_quality_info = {
+                        "recorded_duration_minutes": flight.flight_duration_minutes,
+                        "actual_span_minutes": float(quality_result.actual_span_minutes),
+                        "discrepancy_minutes": float(quality_result.discrepancy_minutes),
+                        "discrepancy_percentage": float(discrepancy_pct * 100)
+                    }
+
         flight_dict = {
             "id": flight.id,
             "aircraft_id": flight.aircraft_id,
@@ -378,6 +412,8 @@ def search_flights(
             "positions_count": len(flight.positions) if hasattr(flight, 'positions') else 0,
             "hover_locations": flight.hover_locations,
             "surveillance_score": flight.surveillance_likelihood or 0,
+            "has_data_quality_issue": has_data_quality_issue,
+            "data_quality_info": data_quality_info,
         }
 
         # If location search, get distance info using PostGIS

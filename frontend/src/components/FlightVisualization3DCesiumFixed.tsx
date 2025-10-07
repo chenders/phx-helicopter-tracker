@@ -1946,7 +1946,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
 
         {/* Camera Controls Help Inset */}
         {!isLoading && (
-          <div className="absolute top-4 right-4 z-40 w-72">
+          <div className="absolute top-4 left-4 z-40 w-72">
             <div className="bg-black/80 backdrop-blur rounded-lg shadow-xl overflow-hidden">
               {/* Header - Clickable to toggle */}
               <button

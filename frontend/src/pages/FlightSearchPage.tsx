@@ -706,6 +706,14 @@ export function FlightSearchPage() {
                                   #{flight.id}
                                 </span>
                               )}
+                              {flight.has_data_quality_issue && (
+                                <span
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+                                  title={`Position data span (${Math.round(flight.data_quality_info?.actual_span_minutes || 0)} min) differs from recorded duration (${Math.round(flight.data_quality_info?.recorded_duration_minutes || 0)} min) by ${Math.round(flight.data_quality_info?.discrepancy_percentage || 0)}%`}
+                                >
+                                  ⚠️ Data Issue
+                                </span>
+                              )}
                             </div>
                             {flight.surveillance_score > 0.7 ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
