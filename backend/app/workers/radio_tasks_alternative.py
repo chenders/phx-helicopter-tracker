@@ -18,8 +18,8 @@ from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
-# Data paths
-RADIO_DATA_PATH = Path("../data/radio/phoenix_pd")
+# Data paths - use absolute path for GPU worker compatibility
+RADIO_DATA_PATH = Path("/app/data/radio/phoenix_pd")
 RADIO_DATA_PATH.mkdir(parents=True, exist_ok=True)
 
 # Archive settings
@@ -277,15 +277,20 @@ def transcribe_phoenix_pd_archives(
 
                 logger.info(f"Transcribing: {mp3_file.name}")
 
-                # Transcribe with Whisper
+                # Transcribe with Whisper - optimized for police radio
                 result = model.transcribe(
                     str(mp3_file),
                     fp16=False,  # Use FP32 for better compatibility
                     language="en",
                     task="transcribe",
                     verbose=False,
-                    temperature=0,  # More deterministic results
-                    condition_on_previous_text=False,  # Faster processing
+                    temperature=0,  # More deterministic results for technical content
+                    condition_on_previous_text=True,  # Better context for unit numbers/callsigns
+                    initial_prompt="Phoenix Police Department radio communications with unit numbers, callsigns, addresses, and dispatch codes.",
+                    compression_ratio_threshold=2.4,  # Detect repetition/hallucination
+                    logprob_threshold=-1.0,  # Filter low confidence segments
+                    no_speech_threshold=0.6,  # Handle static and silence
+                    beam_size=5,  # Beam search for better accuracy
                 )
 
                 # Extract timestamp from filename (YYYYMMDDHHMM format)

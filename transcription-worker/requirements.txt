@@ -1,0 +1,27 @@
+# Celery and message queue
+celery==5.3.4
+redis==5.0.1
+
+# Database
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+
+# OpenAI Whisper dependencies
+openai-whisper==20231117
+torch>=2.0.0
+torchaudio>=2.0.0
+torchvision>=0.15.0
+
+# Audio processing
+ffmpeg-python==0.2.0
+librosa==0.10.1
+soundfile==0.12.1
+
+# Web scraping for Broadcastify
+requests==2.31.0
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3

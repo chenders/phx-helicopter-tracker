@@ -31,6 +31,14 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_track_started=True,
+    # Broker heartbeat settings - prevent "missed heartbeat" errors on long tasks
+    broker_transport_options={
+        'visibility_timeout': 7200,  # 2 hours - how long task can run before broker reclaims it
+        'fanout_prefix': True,
+        'fanout_patterns': True,
+    },
+    broker_heartbeat=0,  # Disable broker heartbeat checks (workers send task updates instead)
+    worker_send_task_events=True,  # Send task events for monitoring
     # Task routing for different queues
     # IMPORTANT: Transcription queue is handled by dedicated GPU workers (WSL2/M1 Mac)
     # Main workers MUST exclude the 'transcription' queue

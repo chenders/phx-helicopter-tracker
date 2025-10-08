@@ -1,0 +1,35 @@
+==========================================
+TRANSFER TO WINDOWS MACHINE INSTRUCTIONS
+==========================================
+
+METHOD 1: Network Share (Easiest if on same network)
+-----------------------------------------------------
+On Windows:
+1. Open File Explorer
+2. In address bar type: \\192.168.1.47\phx
+3. Navigate to phx-helicopter-tracker\transcription-worker
+4. Copy the entire folder to C:\transcription-worker
+
+METHOD 2: Create Zip and Download
+----------------------------------
+On Linux Server (192.168.1.47):
+1. cd /home/phx/phx-helicopter-tracker
+2. zip -r transcription-worker.zip transcription-worker/
+3. Download via web browser or SCP
+
+On Windows:
+4. Extract transcription-worker.zip to C:\transcription-worker
+
+METHOD 3: USB Drive
+-------------------
+1. Copy transcription-worker folder to USB drive
+2. Plug into Windows machine
+3. Copy to C:\transcription-worker
+
+AFTER TRANSFER:
+---------------
+1. Open PowerShell in C:\transcription-worker
+2. Run: .\start.ps1
+3. Follow the prompts
+
+See QUICKSTART.md for detailed setup instructions.

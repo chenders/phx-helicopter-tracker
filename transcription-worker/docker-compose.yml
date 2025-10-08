@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  transcription-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gpu-transcription-worker
+    hostname: gpu-worker
+    restart: unless-stopped
+
+    # NVIDIA GPU configuration
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+      # Whisper configuration
+      - WHISPER_MODEL=base
+
+      # Redis connection (CHANGE THIS to your server IP)
+      - REDIS_URL=redis://192.168.1.47:6380
+
+      # Database connection (CHANGE THIS to your server IP)
+      - DATABASE_URL=postgresql://postgres:postgres@192.168.1.47:5433/phoenix_helicopters
+
+      # Python settings
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+
+    volumes:
+      # Mount network share for radio files (read-write for transcription storage)
+      - H:/radio:/app/data/radio
+      # Mount logs directory
+      - ./logs:/app/logs
+
+    # Resource limits
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.workers.celery_app", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

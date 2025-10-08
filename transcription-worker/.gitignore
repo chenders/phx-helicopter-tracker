@@ -1,0 +1,23 @@
+# Backend code (copied from main server)
+backend/
+
+# Data directories
+data/
+logs/
+
+# Environment variables
+.env
+
+# Docker volumes
+volumes/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
