@@ -164,6 +164,13 @@ export function HistoricalAnalysisPage() {
         .filter((f: any) => !showOnlySurveillance || f.is_surveillance)
         .sort((a: any, b: any) => {
           if (flightSortBy === 'surveillance') {
+            // First, prioritize actual surveillance flights (is_surveillance = true)
+            const aIsSurveillance = a.is_surveillance ? 1 : 0
+            const bIsSurveillance = b.is_surveillance ? 1 : 0
+            if (aIsSurveillance !== bIsSurveillance) {
+              return bIsSurveillance - aIsSurveillance // Surveillance flights first
+            }
+            // Within each group (surveillance or not), sort by likelihood score
             return (b.surveillance_likelihood || 0) - (a.surveillance_likelihood || 0)
           } else if (flightSortBy === 'date') {
             return new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime()
