@@ -240,14 +240,23 @@ export function HistoricalAnalysisPage() {
               <span className="text-sm text-gray-700 dark:text-gray-300">Surveillance Heatmap</span>
             </label>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm ml-auto">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs ml-auto">
+              <div className="font-semibold text-gray-700 dark:text-gray-300 mr-1">Surveillance Likelihood:</div>
               <div className="flex items-center">
-                <div className="w-3 h-3 rounded-full mr-1" style={{ backgroundColor: '#00ffff' }}></div>
-                <span className="text-gray-700 dark:text-gray-300">Normal Flight</span>
+                <div className="w-3 h-3 rounded-full mr-1" style={{ backgroundColor: '#0088ff' }}></div>
+                <span className="text-gray-700 dark:text-gray-300">Low (0-30%)</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-3 h-3 rounded-full mr-1" style={{ backgroundColor: '#ffaa00' }}></div>
+                <span className="text-gray-700 dark:text-gray-300">Medium (30-50%)</span>
+              </div>
+              <div className="flex items-center">
+                <div className="w-3 h-3 rounded-full mr-1" style={{ backgroundColor: '#ff6600' }}></div>
+                <span className="text-gray-700 dark:text-gray-300">High (50-70%)</span>
               </div>
               <div className="flex items-center">
                 <div className="w-3 h-3 rounded-full mr-1" style={{ backgroundColor: '#ff0000' }}></div>
-                <span className="text-gray-700 dark:text-gray-300">Surveillance Activity</span>
+                <span className="text-gray-700 dark:text-gray-300">Critical (70%+)</span>
               </div>
             </div>
           </div>
@@ -292,7 +301,17 @@ export function HistoricalAnalysisPage() {
       {/* Main Content */}
       {viewMode === 'map' && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
-          <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">Historical Flight Paths</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Historical Flight Paths</h2>
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              Showing {historicalData?.flight_paths?.length || 0} of {historicalData?.total_flights || 0} flights
+              {historicalData?.flight_paths && historicalData.flight_paths.length > 0 && (
+                <span className="ml-2">
+                  • {historicalData.flight_paths.reduce((sum: number, p: any) => sum + (p.coordinates?.length || 0), 0).toLocaleString()} GPS points
+                </span>
+              )}
+            </div>
+          </div>
 
           <GoogleMap
             mapContainerStyle={mapContainerStyle}
@@ -336,15 +355,35 @@ export function HistoricalAnalysisPage() {
                 )
               })}
 
-              {/* Flight Paths with bright colors */}
+              {/* Flight Paths with graduated color coding based on surveillance likelihood */}
               {showFlightPaths && pathsReady && historicalData?.flight_paths?.map((path: any, index: number) => {
-                // Use bright colors for flight paths - high contrast against dark map
-                let pathColor = '#00ffff' // Bright cyan for default
+                // Color gradient based on surveillance_likelihood (0.0 - 1.0)
+                const likelihood = path.surveillance_likelihood || 0
+                let pathColor = '#0088ff' // Blue for low likelihood (0.0-0.3)
                 let strokeWeight = 3
+                let strokeOpacity = 0.8
 
-                if (path.is_surveillance) {
-                  pathColor = '#ff0000' // Bright red for surveillance
+                if (likelihood >= 0.7) {
+                  // High surveillance: Red
+                  pathColor = '#ff0000'
+                  strokeWeight = 5
+                  strokeOpacity = 0.95
+                } else if (likelihood >= 0.5) {
+                  // Medium-high surveillance: Orange-red
+                  pathColor = '#ff6600'
                   strokeWeight = 4
+                  strokeOpacity = 0.9
+                } else if (likelihood >= 0.3) {
+                  // Medium surveillance: Yellow-orange
+                  pathColor = '#ffaa00'
+                  strokeWeight = 4
+                  strokeOpacity = 0.85
+                } else {
+                  // Low surveillance: Blue to cyan gradient
+                  const blueValue = Math.floor(136 + (likelihood / 0.3) * 119) // 0x88 to 0xff
+                  pathColor = `#00${blueValue.toString(16).padStart(2, '0')}ff`
+                  strokeWeight = 3
+                  strokeOpacity = 0.75
                 }
 
                 return (
@@ -353,10 +392,10 @@ export function HistoricalAnalysisPage() {
                     path={path.coordinates}
                     options={{
                       strokeColor: pathColor,
-                      strokeOpacity: 0.9,
+                      strokeOpacity: strokeOpacity,
                       strokeWeight: strokeWeight,
                       geodesic: true,
-                      zIndex: path.is_surveillance ? 1000 : 100,
+                      zIndex: Math.floor(likelihood * 1000) + 100, // Higher surveillance on top
                     }}
                   />
                 )
