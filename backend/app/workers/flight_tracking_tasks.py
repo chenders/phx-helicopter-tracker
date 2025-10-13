@@ -303,7 +303,8 @@ def generate_complete_flight_report(
     Generate detailed report for a flight with complete track data
     Useful for legal documentation
     """
-    from app.models.flight_logs import FlightLog, FlightPosition
+    from app.models.flight_logs import FlightLog
+    from app.models.flight_positions import FlightPosition  # Use PostGIS-enabled model
     from app.models.aircraft import Aircraft
     
     db = SessionLocal()

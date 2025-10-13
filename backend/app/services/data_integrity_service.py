@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func, and_
 
 from app.db.database import SessionLocal
-from app.models.flight_logs import FlightLog, FlightPosition
+from app.models.flight_logs import FlightLog
+from app.models.flight_positions import FlightPosition  # Use PostGIS-enabled model
 from app.models.flight_discoveries import FlightDiscovery
 
 logger = logging.getLogger(__name__)

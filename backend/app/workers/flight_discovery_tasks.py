@@ -10,7 +10,8 @@ from celery import current_task
 from app.workers.celery_app import celery_app
 from app.db.database import SessionLocal
 from app.models.flight_discoveries import FlightDiscovery
-from app.models.flight_logs import FlightLog, FlightPosition
+from app.models.flight_logs import FlightLog
+from app.models.flight_positions import FlightPosition  # Use PostGIS-enabled model
 from app.models.aircraft import Aircraft
 from app.services.flightradar24_api_service import fr24_api_service
 from app.schemas.flights import FlightLogCreate, FlightPositionCreate

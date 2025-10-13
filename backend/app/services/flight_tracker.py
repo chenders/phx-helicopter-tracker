@@ -8,7 +8,8 @@ from typing import Dict, List, Optional, Set, Tuple
 from collections import defaultdict
 from sqlalchemy.orm import Session
 from app.db.database import SessionLocal
-from app.models.flight_logs import FlightLog, FlightPosition
+from app.models.flight_logs import FlightLog
+from app.models.flight_positions import FlightPosition  # Use PostGIS-enabled model
 from app.models.aircraft import Aircraft
 
 logger = logging.getLogger(__name__)

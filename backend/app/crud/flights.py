@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, desc, asc
 
 from app.crud.base import CRUDBase
-from app.models.flight_logs import FlightLog, FlightPosition
+from app.models.flight_logs import FlightLog
+from app.models.flight_positions import FlightPosition  # Use PostGIS-enabled model
 from app.models.aircraft import Aircraft
 from app.schemas.flights import FlightLogCreate, FlightLogUpdate, FlightPositionCreate
 

@@ -232,8 +232,14 @@ async def get_tracking_statistics(*, db: Session = Depends(get_db)) -> TrackingS
     for flight in recent_flights:
         active_aircraft.add(flight.aircraft_id)
 
-    # Get today's flights
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Get today's flights (using Phoenix time zone since that's where operations occur)
+    from zoneinfo import ZoneInfo
+    phoenix_tz = ZoneInfo("America/Phoenix")
+    now_phoenix = datetime.now(phoenix_tz)
+    today_start_phoenix = now_phoenix.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Convert back to UTC for database query
+    today_start = today_start_phoenix.astimezone(timezone.utc)
+
     todays_flights = flight_log_crud.get_by_date_range(
         db, start_date=today_start, end_date=now
     )
@@ -254,6 +260,14 @@ async def get_tracking_statistics(*, db: Session = Depends(get_db)) -> TrackingS
     total_cost = (
         total_hours * 2160
     )  # $2160 per flight hour (actual Phoenix PD estimate)
+
+    # Get pattern alerts for today (using Phoenix time)
+    from app.models.abnormal_patterns import AbnormalPattern
+    todays_patterns = db.query(AbnormalPattern).filter(
+        AbnormalPattern.detected_at >= today_start,
+        AbnormalPattern.pattern_type != "normal"  # Exclude normal patterns
+    ).all()
+    pattern_alerts_count = len(todays_patterns)
 
     # Get LIVE tracking data to count currently active flights
     try:
@@ -285,7 +299,7 @@ async def get_tracking_statistics(*, db: Session = Depends(get_db)) -> TrackingS
         active_flights=current_active_flights,  # Now using real-time data
         surveillance_incidents_today=surveillance_count,
         total_cost_today=total_cost,
-        pattern_alerts=0,  # Would need pattern analysis data
+        pattern_alerts=pattern_alerts_count,  # Now using actual pattern analysis data
     )
 
 

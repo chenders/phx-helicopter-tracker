@@ -138,7 +138,7 @@ async def get_abnormal_pattern_detail(
                 })
         else:
             # Otherwise get from FlightPosition table
-            from app.models.flight_logs import FlightPosition
+            from app.models.flight_positions import FlightPosition  # Use PostGIS-enabled model
             flight_positions = db.query(FlightPosition).filter(
                 FlightPosition.flight_log_id == flight.id
             ).order_by(FlightPosition.timestamp).all()

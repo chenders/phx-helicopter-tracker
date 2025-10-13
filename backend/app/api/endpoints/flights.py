@@ -17,7 +17,7 @@ from app.schemas.flights import (
     FlightPositionList,
 )
 from app.models.flight_logs import FlightLog as FlightLogModel
-from app.models.flight_logs import FlightPosition as FlightPositionModel
+from app.models.flight_positions import FlightPosition as FlightPositionModel  # Use PostGIS-enabled model
 
 router = APIRouter()
 
