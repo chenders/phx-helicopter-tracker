@@ -177,11 +177,11 @@ export function HistoricalAnalysisPage() {
             return new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime()
           } else if (flightSortBy === 'duration') {
             return (b.duration_minutes || 0) - (a.duration_minutes || 0)
-          } else { // neighborhood
-            // Sort by first neighborhood alphabetically, flights with no neighborhood go last
-            const aNeighborhood = a.neighborhoods && a.neighborhoods.length > 0 ? a.neighborhoods[0] : 'ZZZZZ'
-            const bNeighborhood = b.neighborhoods && b.neighborhoods.length > 0 ? b.neighborhoods[0] : 'ZZZZZ'
-            return aNeighborhood.localeCompare(bNeighborhood)
+          } else { // hover_area
+            // Sort by first hover area alphabetically, flights with no hover areas go last
+            const aHoverArea = a.hover_areas && a.hover_areas.length > 0 ? a.hover_areas[0] : 'ZZZZZ'
+            const bHoverArea = b.hover_areas && b.hover_areas.length > 0 ? b.hover_areas[0] : 'ZZZZZ'
+            return aHoverArea.localeCompare(bHoverArea)
           }
         })
     : []
@@ -427,7 +427,7 @@ export function HistoricalAnalysisPage() {
                     <option value="surveillance">Surveillance Likelihood</option>
                     <option value="date">Date (Newest First)</option>
                     <option value="duration">Duration</option>
-                    <option value="neighborhood">Neighborhood</option>
+                    <option value="neighborhood">Hover Location</option>
                   </select>
                 </div>
 
@@ -550,11 +550,15 @@ export function HistoricalAnalysisPage() {
                         )}
                       </div>
 
-                      {/* Neighborhood information */}
-                      {flight.neighborhoods && flight.neighborhoods.length > 0 && (
+                      {/* Hover location information */}
+                      {flight.hover_areas && flight.hover_areas.length > 0 && (
                         <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-                          <span className="font-medium">📍 </span>
-                          {flight.neighborhoods.join(', ')}
+                          <span className="font-medium">📍 Hover: </span>
+                          <div className="ml-4 mt-0.5 space-y-0.5">
+                            {flight.hover_areas.map((area: string, idx: number) => (
+                              <div key={idx}>{area}</div>
+                            ))}
+                          </div>
                         </div>
                       )}
 
