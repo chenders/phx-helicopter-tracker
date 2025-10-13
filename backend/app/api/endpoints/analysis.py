@@ -1032,10 +1032,26 @@ def get_historical_analysis(
     # Generate flight paths for map display using REAL FlightPosition data
     from app.models.flight_positions import FlightPosition
     from app.models.aircraft import Aircraft
+    from app.models.abnormal_patterns import AbnormalPattern
     import json
 
     flight_paths = []
     heatmap_data = []
+
+    # Fetch abnormal patterns for these flights
+    patterns_map = {}
+    if flights:
+        flight_ids = [f.id for f in flights]
+        patterns = db.query(AbnormalPattern).filter(
+            AbnormalPattern.flight_log_id.in_(flight_ids),
+            AbnormalPattern.pattern_type != "normal"  # Exclude normal patterns
+        ).all()
+
+        # Map patterns by flight_log_id
+        for pattern in patterns:
+            if pattern.flight_log_id not in patterns_map:
+                patterns_map[pattern.flight_log_id] = []
+            patterns_map[pattern.flight_log_id].append(pattern)
 
     # Pre-fetch all aircraft to avoid N+1 queries
     aircraft_map = {}
@@ -1113,7 +1129,30 @@ def get_historical_analysis(
             except:
                 pass
 
+        # Get patterns for this flight
+        flight_patterns = patterns_map.get(flight.id, [])
+        pattern_types = [p.pattern_type for p in flight_patterns]
+        max_confidence = max([p.confidence_score for p in flight_patterns], default=0.0)
+
+        # Extract hover locations from patterns
+        hover_locations = []
+        for pattern in flight_patterns:
+            if pattern.detection_metadata and isinstance(pattern.detection_metadata, dict):
+                hovers = pattern.detection_metadata.get('hovering', [])
+                if isinstance(hovers, list):
+                    for hover in hovers:
+                        if isinstance(hover, dict) and 'latitude' in hover and 'longitude' in hover:
+                            hover_locations.append({
+                                'lat': hover['latitude'],
+                                'lng': hover['longitude'],
+                                'duration_minutes': hover.get('duration_minutes', 0),
+                                'position_count': hover.get('position_count', 0),
+                                'start_time': hover.get('start_time'),
+                                'end_time': hover.get('end_time'),
+                            })
+
         flight_paths.append({
+            "id": flight.id,  # Add ID for matching with flights_list
             "flight_id": flight.flight_id,
             "aircraft_registration": aircraft_reg,
             "coordinates": coordinates,
@@ -1122,6 +1161,9 @@ def get_historical_analysis(
             "timestamp": flight.departure_time.isoformat() if flight.departure_time else None,
             "duration_minutes": flight.flight_duration_minutes,
             "hover_count": hover_count,
+            "patterns": pattern_types,
+            "pattern_confidence": float(max_confidence),
+            "hover_locations": hover_locations,
         })
 
         # Add positions to heatmap with weight based on surveillance score
@@ -1157,6 +1199,12 @@ def get_historical_analysis(
             except:
                 pass
 
+        # Get patterns for this flight
+        flight_patterns = patterns_map.get(flight.id, [])
+        pattern_types = [p.pattern_type for p in flight_patterns]
+        max_confidence = max([p.confidence_score for p in flight_patterns], default=0.0)
+        has_patterns = len(flight_patterns) > 0
+
         flights_list.append({
             "id": flight.id,
             "flight_id": flight.flight_id,
@@ -1170,6 +1218,9 @@ def get_historical_analysis(
             "min_altitude": flight.min_altitude_feet,
             "max_altitude": flight.max_altitude_feet,
             "privacy_concern_level": flight.privacy_concern_level or 0,
+            "patterns": pattern_types,
+            "pattern_confidence": float(max_confidence),
+            "has_patterns": has_patterns,
         })
 
     # Sort flights list by surveillance likelihood descending, then by date

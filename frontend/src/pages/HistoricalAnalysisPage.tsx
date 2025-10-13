@@ -459,7 +459,7 @@ export function HistoricalAnalysisPage() {
                         />
                       </div>
 
-                      <div className="mt-1 flex items-center gap-2 text-xs">
+                      <div className="mt-1 flex flex-wrap items-center gap-1 text-xs">
                         {isSurveillance && (
                           <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded">
                             Surveillance
@@ -468,6 +468,14 @@ export function HistoricalAnalysisPage() {
                         {flight.hover_count > 0 && (
                           <span className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 rounded">
                             {flight.hover_count} hovers
+                          </span>
+                        )}
+                        {flight.has_patterns && flight.patterns && flight.patterns.length > 0 && (
+                          <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 rounded flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            {flight.patterns.map((p: string) => p.replace('_', ' ')).join(', ')}
                           </span>
                         )}
                       </div>
@@ -595,6 +603,27 @@ export function HistoricalAnalysisPage() {
                     }}
                   />
                 )
+              })}
+
+              {/* Hover Location Markers */}
+              {showFlightPaths && pathsReady && visibleFlightPaths.map((path: any) => {
+                if (!path.hover_locations || path.hover_locations.length === 0) return null
+
+                return path.hover_locations.map((hover: any, idx: number) => (
+                  <Marker
+                    key={`hover-${path.flight_id}-${idx}`}
+                    position={{ lat: hover.lat, lng: hover.lng }}
+                    icon={{
+                      path: window.google.maps.SymbolPath.CIRCLE,
+                      scale: 8,
+                      fillColor: '#ff6600',
+                      fillOpacity: 0.8,
+                      strokeColor: '#ff0000',
+                      strokeWeight: 2,
+                    }}
+                    title={`Hover: ${hover.duration_minutes?.toFixed(1) || 0}min`}
+                  />
+                ))
               })}
 
               {/* Heatmap with better visibility */}
