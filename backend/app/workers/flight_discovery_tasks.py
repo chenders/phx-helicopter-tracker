@@ -617,11 +617,16 @@ async def _download_tracks_async(batch_size: int) -> Dict[str, Any]:
                     await elevation_service.initialize()
                     elevations = await elevation_service.get_elevations_batch(coordinates)
 
-                    # Variables to track AGL stats
+                    # Variables to track altitude stats (both MSL and AGL)
                     agl_altitudes = []
+                    msl_altitudes = []
 
                     # Save all positions
                     for pos in positions:
+                        # Track MSL altitude for stats
+                        if pos.altitude_feet is not None:
+                            msl_altitudes.append(pos.altitude_feet)
+
                         # Get elevation for this position
                         ground_elevation = elevations.get((pos.latitude, pos.longitude))
 
@@ -650,12 +655,20 @@ async def _download_tracks_async(batch_size: int) -> Dict[str, Any]:
                         )
                         flight_position_crud.create(db, obj_in=position_data)
 
-                    # Update flight log with AGL statistics if we have them
+                    # Update flight log with altitude statistics
+                    # MSL (Mean Sea Level) altitudes - primary display values
+                    if msl_altitudes:
+                        flight_log.min_altitude_feet = min(msl_altitudes)
+                        flight_log.max_altitude_feet = max(msl_altitudes)
+                        flight_log.avg_altitude_feet = int(sum(msl_altitudes) / len(msl_altitudes))
+
+                    # AGL (Above Ground Level) altitudes - additional context
                     if agl_altitudes:
-                        flight_log.max_altitude_agl_feet = max(agl_altitudes)
                         flight_log.min_altitude_agl_feet = min(agl_altitudes)
+                        flight_log.max_altitude_agl_feet = max(agl_altitudes)
                         flight_log.avg_altitude_agl_feet = int(sum(agl_altitudes) / len(agl_altitudes))
-                        db.commit()
+
+                    db.commit()
                     
                     # Update discovery record
                     flight.track_downloaded = True
