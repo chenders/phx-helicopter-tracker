@@ -237,6 +237,39 @@ export function HistoricalAnalysisPage() {
     selectedFlightIds.has(path.id)
   ) || []
 
+  // Auto-zoom map to fit selected flight paths
+  useEffect(() => {
+    if (!map || !visibleFlightPaths || visibleFlightPaths.length === 0) {
+      return
+    }
+
+    // Create bounds object
+    const bounds = new window.google.maps.LatLngBounds()
+
+    // Add all coordinates from visible flight paths to bounds
+    let hasCoordinates = false
+    visibleFlightPaths.forEach((path: any) => {
+      if (path.coordinates && Array.isArray(path.coordinates)) {
+        path.coordinates.forEach((coord: any) => {
+          if (coord.lat && coord.lng) {
+            bounds.extend(new window.google.maps.LatLng(coord.lat, coord.lng))
+            hasCoordinates = true
+          }
+        })
+      }
+    })
+
+    // Only fit bounds if we have coordinates
+    if (hasCoordinates) {
+      map.fitBounds(bounds, {
+        top: 50,
+        right: 50,
+        bottom: 50,
+        left: 50,
+      })
+    }
+  }, [map, visibleFlightPaths])
+
   if (dataLoading) {
     return (
       <div className="flex items-center justify-center min-h-64">
