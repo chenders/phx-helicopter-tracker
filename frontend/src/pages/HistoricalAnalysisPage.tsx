@@ -122,6 +122,8 @@ export function HistoricalAnalysisPage() {
   const [selectedFlightIds, setSelectedFlightIds] = useState<Set<number>>(new Set())
   const [flightSortBy, setFlightSortBy] = useState<'surveillance' | 'date' | 'duration'>('surveillance')
   const [showOnlySurveillance, setShowOnlySurveillance] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const flightsPerPage = 20
 
   const { data: historicalData, isLoading: dataLoading } = useHistoricalData(timeRange, selectedAircraft)
 
@@ -170,6 +172,17 @@ export function HistoricalAnalysisPage() {
           }
         })
     : []
+
+  // Pagination
+  const totalPages = Math.ceil(filteredFlights.length / flightsPerPage)
+  const startIndex = (currentPage - 1) * flightsPerPage
+  const endIndex = startIndex + flightsPerPage
+  const paginatedFlights = filteredFlights.slice(startIndex, endIndex)
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [timeRange, selectedAircraft, showOnlySurveillance, flightSortBy])
 
   // Toggle flight selection
   const toggleFlight = (flightId: number) => {
@@ -417,9 +430,14 @@ export function HistoricalAnalysisPage() {
                 </div>
               </div>
 
+              {/* Pagination Info */}
+              <div className="text-xs text-gray-600 dark:text-gray-400 text-center mb-2">
+                Page {currentPage} of {totalPages} ({startIndex + 1}-{Math.min(endIndex, filteredFlights.length)} of {filteredFlights.length})
+              </div>
+
               {/* Flight List */}
               <div className="space-y-2">
-                {filteredFlights.map((flight: any) => {
+                {paginatedFlights.map((flight: any) => {
                   const isSelected = selectedFlightIds.has(flight.id)
                   const likelihood = flight.surveillance_likelihood || 0
                   const isSurveillance = flight.is_surveillance
@@ -483,13 +501,40 @@ export function HistoricalAnalysisPage() {
                       <div className="mt-1">
                         <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
                           <span>Likelihood: {(likelihood * 100).toFixed(0)}%</span>
-                          <span>{flight.min_altitude}-{flight.max_altitude}ft</span>
+                          <span>
+                            {flight.min_altitude != null && flight.max_altitude != null
+                              ? `${Math.round(flight.min_altitude)}-${Math.round(flight.max_altitude)}ft`
+                              : 'N/A'}
+                          </span>
                         </div>
                       </div>
                     </div>
                   )
                 })}
               </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs text-gray-600 dark:text-gray-400">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
