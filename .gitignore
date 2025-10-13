@@ -14,12 +14,11 @@ frontend/.vite/
 frontend/.vitest/
 test-results/
 frontend/.env
-celerybeat-schedule
 # Backend
 backend/__pycache__/
 backend/*.pyc
 backend/.pytest_cache/
-backend/celerybeat-schedule*
+backend/celerybeat-schedule
 backend/poetry.lock
 backend/logs/
 backend/celerybeat-schedule

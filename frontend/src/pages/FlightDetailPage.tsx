@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { GoogleMap, Polyline, MarkerF, InfoWindow, Circle } from '@react-google-maps/api'
 import {
   ArrowLeft,
@@ -126,6 +126,13 @@ const getHelicopterIcon = (heading: number = 0, isPlaying: boolean = false) => {
   return null
 }
 
+// Mobile device detection utility
+const isMobileDevice = (): boolean => {
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const isSmallScreen = window.innerWidth <= 768;
+  return isTouchDevice && isSmallScreen;
+};
+
 const darkMapStyles = [
   { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
@@ -236,7 +243,7 @@ export function FlightDetailPage() {
   const [playingAudio, setPlayingAudio] = useState<string | null>(null)
   const [currentPositionIndex, setCurrentPositionIndex] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
-  const [use3DView, setUse3DView] = useState(true) // Default to 3D view
+  const [use3DView, setUse3DView] = useState(!isMobileDevice()) // Default to 2D on mobile, 3D on desktop
   const [playbackSpeed, setPlaybackSpeed] = useState(0.5) // Start at 0.5x speed
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false) // Collapsed by default
   const [is3DAnimating, setIs3DAnimating] = useState(false) // Track 3D animation state
@@ -1115,6 +1122,19 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
 
       {/* Map */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4" data-map-section>
+        {/* Mobile 3D Warning */}
+        {isMobileDevice() && use3DView && (
+          <div className="mb-3 p-3 bg-orange-50 dark:bg-orange-900/20 border-l-4 border-orange-500 rounded">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-orange-700 dark:text-orange-300">
+                <strong>Mobile Performance Warning:</strong> 3D view is resource-intensive and may cause slowness or crashes on mobile devices.
+                Consider switching to 2D view for better performance.
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Flight Path

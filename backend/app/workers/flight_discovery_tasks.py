@@ -158,7 +158,6 @@ async def _discover_flights_async(registration: str, max_pages: int, start_date:
                     # Get flight summary page
                     logger.info(f"Getting flight summary for {registration}, page {page}")
                     if start_date and end_date:
-                        from datetime import datetime
                         start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
                         end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
                         data = await fr24_api_service.get_flight_summary(registration, page, start_date=start_dt, end_date=end_dt)

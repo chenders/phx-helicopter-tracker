@@ -241,8 +241,15 @@ def transcribe_phoenix_pd_archives(
             },
         )
 
-        model = whisper.load_model(model_name)
-        logger.info(f"Loaded Whisper model: {model_name}")
+        # Load model with GPU support
+        import torch
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = whisper.load_model(model_name, device=device)
+        logger.info(f"Loaded Whisper model: {model_name} on device: {device}")
+        if device == "cuda":
+            logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+        else:
+            logger.warning("CUDA not available! Running on CPU (will be very slow)")
 
         # Get list of MP3 files
         mp3_files = list(Path(directory_path).glob("*.mp3"))
@@ -278,9 +285,9 @@ def transcribe_phoenix_pd_archives(
                 logger.info(f"Transcribing: {mp3_file.name}")
 
                 # Transcribe with Whisper - optimized for police radio
+                # FP16 is automatically used on CUDA if available
                 result = model.transcribe(
                     str(mp3_file),
-                    fp16=False,  # Use FP32 for better compatibility
                     language="en",
                     task="transcribe",
                     verbose=False,

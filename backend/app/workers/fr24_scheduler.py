@@ -143,25 +143,8 @@ def schedule_fr24_downloads(self) -> Dict[str, Any]:
                     # using 90% fewer API credits
                     logging.warning(
                         f"Skipping deprecated download task for {aircraft.registration}. "
-                        "Use monitor_and_download_complete_flights instead."
-                    )
-                    # Skip scheduling the deprecated task
-                    task = None
-
-                    results["scheduled_tasks"].append(
-                        {
-                            "registration": aircraft.registration,
-                            "task_id": task.id,
-                            "start_date": start_date.strftime("%Y-%m-%d"),
-                            "end_date": end_date.strftime("%Y-%m-%d"),
-                            "interval_hours": interval_hours,
-                            "delay_seconds": delay,
-                        }
-                    )
-
-                    logger.info(
-                        f"Scheduled download for {aircraft.registration}: "
-                        f"{start_date.date()} to {end_date.date()}"
+                        "Use monitor_and_download_complete_flights instead. "
+                        "Flight discovery tasks are scheduled separately via beat schedule."
                     )
 
                 # Handle aircraft that were skipped due to credits

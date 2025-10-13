@@ -1,52 +1,201 @@
-version: '3.8'
-
 services:
-  transcription-worker:
+  db:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: gpu-transcription-worker
-    hostname: gpu-worker
-    restart: unless-stopped
-
-    # NVIDIA GPU configuration
-    runtime: nvidia
+      dockerfile: Dockerfile.postgres
     environment:
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-
-      # Whisper configuration
-      - WHISPER_MODEL=base
-
-      # Redis connection (CHANGE THIS to your server IP)
-      - REDIS_URL=redis://192.168.1.47:6380
-
-      # Database connection (CHANGE THIS to your server IP)
-      - DATABASE_URL=postgresql://postgres:postgres@192.168.1.47:5433/phoenix_helicopters
-
-      # Python settings
-      - PYTHONUNBUFFERED=1
-      - PYTHONDONTWRITEBYTECODE=1
-
+      POSTGRES_DB: phoenix_helicopters
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST_AUTH_METHOD: "md5"
+    ports:
+      - "5433:5432"
     volumes:
-      # Mount network share for radio files (read-write for transcription storage)
-      - H:/radio:/app/data/radio
-      # Mount logs directory
-      - ./logs:/app/logs
-
-    # Resource limits
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-
-    # Health check
+      # CRITICAL: This must match where PostgreSQL actually stores data
+      - postgres_data:/var/lib/postgresql/data
+      # Mount backups directory for easy access
+      - ./backups:/backups:ro
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: >
+      postgres
+      -c listen_addresses='*'
+      -c max_wal_size=4GB
+      -c min_wal_size=1GB
+      -c wal_buffers=16MB
+      -c checkpoint_completion_target=0.9
+      -c shared_buffers=256MB
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=256MB
+      -c work_mem=16MB
+      -c max_connections=200
+      -c log_min_duration_statement=1000
+      -c log_checkpoints=on
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "celery", "-A", "app.workers.celery_app", "inspect", "ping"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8001:9000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
+      - REDIS_URL=redis://redis:6379
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - SECRET_KEY=${SECRET_KEY:-dev_secret_key_change_in_production}
+      - FR24_API_KEY_SANDBOX=${FR24_API_KEY_SANDBOX}
+      - FR24_API_KEY_PRODUCTION=${FR24_API_KEY_PRODUCTION}
+      - FR24_API_ENVIRONMENT=${FR24_API_ENVIRONMENT}
+      - FR24_MONTHLY_CREDIT_LIMIT=${FR24_MONTHLY_CREDIT_LIMIT}
+      - BROADCASTIFY_USERNAME=${BROADCASTIFY_USERNAME}
+      - BROADCASTIFY_PASSWORD=${BROADCASTIFY_PASSWORD}
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 9000
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=${SECRET_KEY:-dev_secret_key_change_in_production}
+      - FR24_API_KEY_SANDBOX=${FR24_API_KEY_SANDBOX}
+      - FR24_API_KEY_PRODUCTION=${FR24_API_KEY_PRODUCTION}
+      - FR24_API_ENVIRONMENT=${FR24_API_ENVIRONMENT}
+      - FR24_MONTHLY_CREDIT_LIMIT=${FR24_MONTHLY_CREDIT_LIMIT}
+      - BROADCASTIFY_USERNAME=${BROADCASTIFY_USERNAME}
+      - BROADCASTIFY_PASSWORD=${BROADCASTIFY_PASSWORD}
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    # IMPORTANT: Exclude transcription queue - handled by dedicated GPU workers
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 --queues=celery,tracking,analysis,legal,data_import,radio,scheduler
+
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=${SECRET_KEY:-dev_secret_key_change_in_production}
+      - FR24_API_KEY_SANDBOX=${FR24_API_KEY_SANDBOX}
+      - FR24_API_KEY_PRODUCTION=${FR24_API_KEY_PRODUCTION}
+      - FR24_API_ENVIRONMENT=${FR24_API_ENVIRONMENT}
+      - FR24_MONTHLY_CREDIT_LIMIT=${FR24_MONTHLY_CREDIT_LIMIT}
+      - BROADCASTIFY_USERNAME=${BROADCASTIFY_USERNAME}
+      - BROADCASTIFY_PASSWORD=${BROADCASTIFY_PASSWORD}
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: celery -A app.workers.celery_app beat --loglevel=info
+
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5555:5555"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/phoenix_helicopters
+      - REDIS_URL=redis://redis:6379
+      - SECRET_KEY=${SECRET_KEY:-dev_secret_key_change_in_production}
+      - FLOWER_UNAUTHENTICATED_API=${FLOWER_UNAUTHENTICATED_API:-false}
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./backend:/app
+    depends_on:
+      redis:
+        condition: service_started
+      celery:
+        condition: service_started
+      celery-beat:
+        condition: service_started
+    command: celery -A app.workers.celery_app flower --port=5555 --address=0.0.0.0
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=development
+        - VITE_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+        - VITE_GOOGLE_TILES_API_KEY=${GOOGLE_TILES_API_KEY}
+    ports:
+      - "3000:3000"
+    environment:
+      # Don't set API URL - let the app use relative URLs to prevent HTTPS issues
+      # - REACT_APP_API_URL=http://${APP_HOSTNAME:-localhost}:9080
+      - VITE_GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      - VITE_GOOGLE_TILES_API_KEY=${GOOGLE_TILES_API_KEY}
+      - NODE_ENV=development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "9080:80"
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend/.htpasswd:/etc/nginx/.htpasswd:ro
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

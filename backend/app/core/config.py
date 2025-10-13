@@ -6,7 +6,7 @@ import os
 
 class Settings(BaseSettings):
     # Application settings
-    DEBUG: bool = True
+    DEBUG: bool = False
     SECRET_KEY: str = "change_this_in_production"
     LOG_LEVEL: str = "INFO"
 

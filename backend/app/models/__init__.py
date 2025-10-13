@@ -5,6 +5,7 @@ from .flight_discoveries import FlightDiscovery
 from .abnormal_patterns import AbnormalPattern
 from .legal import LegalDocument, ConstitutionalAnalysis, LegalPrecedent
 from .task_history import TaskHistory, TaskEvent, TaskMetrics
+from .system_issues import SystemIssue
 
 __all__ = [
     "Base",
@@ -19,4 +20,5 @@ __all__ = [
     "TaskHistory",
     "TaskEvent",
     "TaskMetrics",
+    "SystemIssue",
 ]

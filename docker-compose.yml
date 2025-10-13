@@ -1,8 +1,6 @@
 services:
   db:
-    build:
-      context: .
-      dockerfile: Dockerfile.postgres
+    image: timescale/timescaledb-ha:pg15-ts2.14-all
     environment:
       POSTGRES_DB: phoenix_helicopters
       POSTGRES_USER: postgres

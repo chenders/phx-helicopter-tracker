@@ -9,7 +9,7 @@ from celery import current_task
 
 from app.workers.celery_app import celery_app
 from app.db.database import SessionLocal
-from app.services.flight_tracker import CompleteFlightTracker
+from app.services.flight_tracker import CompleteFlightTracker, PHOENIX_PD_REGISTRATIONS
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +256,7 @@ def analyze_phoenix_pd_fleet_status(self) -> Dict[str, Any]:
         
         for flight in active_flights:
             registration = flight.get('registration', '')
-            if registration in tracker.PHOENIX_PD_REGISTRATIONS:
+            if registration in PHOENIX_PD_REGISTRATIONS:
                 results["currently_airborne"] += 1
         
         # Today's flights
