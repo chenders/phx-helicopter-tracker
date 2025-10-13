@@ -118,6 +118,10 @@ export function HistoricalAnalysisPage() {
   const [showHeatmap, setShowHeatmap] = useState(false)
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [pathsReady, setPathsReady] = useState(false)
+  const [showSidebar, setShowSidebar] = useState(true)
+  const [selectedFlightIds, setSelectedFlightIds] = useState<Set<number>>(new Set())
+  const [flightSortBy, setFlightSortBy] = useState<'surveillance' | 'date' | 'duration'>('surveillance')
+  const [showOnlySurveillance, setShowOnlySurveillance] = useState(false)
 
   const { data: historicalData, isLoading: dataLoading } = useHistoricalData(timeRange, selectedAircraft)
 
@@ -129,6 +133,14 @@ export function HistoricalAnalysisPage() {
   const onMapUnmount = useCallback(() => {
     setMap(null)
   }, [])
+
+  // Initialize selected flights when data loads (select all by default)
+  useEffect(() => {
+    if (historicalData?.flights_list && selectedFlightIds.size === 0) {
+      const allIds = new Set<number>(historicalData.flights_list.map((f: any) => f.id as number))
+      setSelectedFlightIds(allIds)
+    }
+  }, [historicalData?.flights_list])
 
   // Ensure paths are ready after both map and data are loaded
   useEffect(() => {
@@ -143,6 +155,49 @@ export function HistoricalAnalysisPage() {
       setPathsReady(false);
     }
   }, [map, historicalData, showFlightPaths])
+
+  // Filter and sort flights for sidebar
+  const filteredFlights = historicalData?.flights_list
+    ? historicalData.flights_list
+        .filter((f: any) => !showOnlySurveillance || f.is_surveillance)
+        .sort((a: any, b: any) => {
+          if (flightSortBy === 'surveillance') {
+            return (b.surveillance_likelihood || 0) - (a.surveillance_likelihood || 0)
+          } else if (flightSortBy === 'date') {
+            return new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime()
+          } else { // duration
+            return (b.duration_minutes || 0) - (a.duration_minutes || 0)
+          }
+        })
+    : []
+
+  // Toggle flight selection
+  const toggleFlight = (flightId: number) => {
+    setSelectedFlightIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(flightId)) {
+        newSet.delete(flightId)
+      } else {
+        newSet.add(flightId)
+      }
+      return newSet
+    })
+  }
+
+  // Select/deselect all flights
+  const selectAll = () => {
+    const allIds = new Set<number>(filteredFlights.map((f: any) => f.id as number))
+    setSelectedFlightIds(allIds)
+  }
+
+  const deselectAll = () => {
+    setSelectedFlightIds(new Set())
+  }
+
+  // Filter flight paths to only show selected flights
+  const visibleFlightPaths = historicalData?.flight_paths?.filter((path: any) =>
+    selectedFlightIds.has(path.id)
+  ) || []
 
   if (dataLoading) {
     return (
@@ -300,18 +355,159 @@ export function HistoricalAnalysisPage() {
 
       {/* Main Content */}
       {viewMode === 'map' && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Historical Flight Paths</h2>
-            <div className="text-sm text-gray-600 dark:text-gray-400">
-              Showing {historicalData?.flight_paths?.length || 0} of {historicalData?.total_flights || 0} flights
-              {historicalData?.flight_paths && historicalData.flight_paths.length > 0 && (
-                <span className="ml-2">
-                  • {historicalData.flight_paths.reduce((sum: number, p: any) => sum + (p.coordinates?.length || 0), 0).toLocaleString()} GPS points
-                </span>
-              )}
+        <div className="flex gap-3">
+          {/* Flight Selection Sidebar */}
+          {showSidebar && (
+            <div className="w-80 flex-shrink-0 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 max-h-[800px] overflow-y-auto">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Flights</h3>
+                <button
+                  onClick={() => setShowSidebar(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  title="Hide sidebar"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Sidebar Controls */}
+              <div className="space-y-3 mb-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Sort By</label>
+                  <select
+                    value={flightSortBy}
+                    onChange={(e) => setFlightSortBy(e.target.value as any)}
+                    className="w-full text-sm border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-2 py-1"
+                  >
+                    <option value="surveillance">Surveillance Likelihood</option>
+                    <option value="date">Date (Newest First)</option>
+                    <option value="duration">Duration</option>
+                  </select>
+                </div>
+
+                <label className="flex items-center text-sm">
+                  <input
+                    type="checkbox"
+                    checked={showOnlySurveillance}
+                    onChange={(e) => setShowOnlySurveillance(e.target.checked)}
+                    className="mr-2"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">Surveillance Only</span>
+                </label>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={selectAll}
+                    className="flex-1 text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    onClick={deselectAll}
+                    className="flex-1 text-xs px-2 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+
+                <div className="text-xs text-gray-600 dark:text-gray-400 text-center">
+                  {selectedFlightIds.size} of {filteredFlights.length} selected
+                </div>
+              </div>
+
+              {/* Flight List */}
+              <div className="space-y-2">
+                {filteredFlights.map((flight: any) => {
+                  const isSelected = selectedFlightIds.has(flight.id)
+                  const likelihood = flight.surveillance_likelihood || 0
+                  const isSurveillance = flight.is_surveillance
+
+                  // Get color based on surveillance likelihood
+                  let borderColor = 'border-gray-300 dark:border-gray-600'
+                  if (likelihood >= 0.7) borderColor = 'border-red-500'
+                  else if (likelihood >= 0.5) borderColor = 'border-orange-500'
+                  else if (likelihood >= 0.3) borderColor = 'border-yellow-500'
+                  else borderColor = 'border-blue-500'
+
+                  return (
+                    <div
+                      key={flight.id}
+                      onClick={() => toggleFlight(flight.id)}
+                      className={`p-2 border-l-4 rounded cursor-pointer transition-all ${borderColor} ${
+                        isSelected
+                          ? 'bg-blue-50 dark:bg-blue-900/20 shadow-sm'
+                          : 'bg-gray-50 dark:bg-gray-700/50 opacity-60 hover:opacity-80'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            {flight.aircraft_registration}
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            {new Date(flight.departure_time).toLocaleDateString()} • {flight.duration_minutes}min
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleFlight(flight.id)}
+                          className="ml-2 mt-1"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+
+                      <div className="mt-1 flex items-center gap-2 text-xs">
+                        {isSurveillance && (
+                          <span className="px-1.5 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 rounded">
+                            Surveillance
+                          </span>
+                        )}
+                        {flight.hover_count > 0 && (
+                          <span className="px-1.5 py-0.5 bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 rounded">
+                            {flight.hover_count} hovers
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-1">
+                        <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
+                          <span>Likelihood: {(likelihood * 100).toFixed(0)}%</span>
+                          <span>{flight.min_altitude}-{flight.max_altitude}ft</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Map Container */}
+          <div className="flex-1 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                {!showSidebar && (
+                  <button
+                    onClick={() => setShowSidebar(true)}
+                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                  >
+                    Show Flights
+                  </button>
+                )}
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Historical Flight Paths</h2>
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Showing {visibleFlightPaths.length} of {historicalData?.total_flights || 0} flights
+                {visibleFlightPaths.length > 0 && (
+                  <span className="ml-2">
+                    • {visibleFlightPaths.reduce((sum: number, p: any) => sum + (p.coordinates?.length || 0), 0).toLocaleString()} GPS points
+                  </span>
+                )}
+              </div>
+            </div>
 
           <GoogleMap
             mapContainerStyle={mapContainerStyle}
@@ -356,7 +552,7 @@ export function HistoricalAnalysisPage() {
               })}
 
               {/* Flight Paths with graduated color coding based on surveillance likelihood */}
-              {showFlightPaths && pathsReady && historicalData?.flight_paths?.map((path: any, index: number) => {
+              {showFlightPaths && pathsReady && visibleFlightPaths.map((path: any, index: number) => {
                 // Color gradient based on surveillance_likelihood (0.0 - 1.0)
                 const likelihood = path.surveillance_likelihood || 0
                 let pathColor = '#0088ff' // Blue for low likelihood (0.0-0.3)
@@ -431,6 +627,7 @@ export function HistoricalAnalysisPage() {
                 />
               )}
             </GoogleMap>
+          </div>
         </div>
       )}
 
