@@ -1215,6 +1215,16 @@ def get_historical_analysis(
         max_confidence = max([p.confidence_score for p in flight_patterns], default=0.0)
         has_patterns = len(flight_patterns) > 0
 
+        # Extract neighborhoods from pattern metadata (hover locations)
+        neighborhoods = set()
+        for pattern in flight_patterns:
+            if pattern.detection_metadata and isinstance(pattern.detection_metadata, dict):
+                hovers = pattern.detection_metadata.get('hovering', [])
+                if isinstance(hovers, list):
+                    for hover in hovers:
+                        if isinstance(hover, dict) and 'neighborhood' in hover:
+                            neighborhoods.add(hover['neighborhood'])
+
         # Determine if this is a surveillance flight: high likelihood OR has abnormal patterns
         is_surveillance = (
             (flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5) or
@@ -1237,6 +1247,7 @@ def get_historical_analysis(
             "patterns": pattern_types,
             "pattern_confidence": float(max_confidence),
             "has_patterns": has_patterns,
+            "neighborhoods": list(neighborhoods) if neighborhoods else None,
         })
 
     # Sort flights list by surveillance likelihood descending, then by date
