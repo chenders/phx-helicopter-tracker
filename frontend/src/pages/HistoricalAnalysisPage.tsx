@@ -809,14 +809,16 @@ export function HistoricalAnalysisPage() {
                 />
               )}
             </GoogleMap>
+          </div>
 
-            {/* Map Legend - positioned as overlay */}
-            <div className="absolute bottom-4 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-3 max-w-xs border border-gray-200 dark:border-gray-700">
-              <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Map Legend</h4>
+          {/* Map Legend - positioned below map */}
+          <div className="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4 border border-gray-200 dark:border-gray-700">
+            <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Map Legend</h4>
 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Flight Path Colors */}
-              <div className="space-y-1.5 mb-3">
-                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Flight Paths (by surveillance likelihood):</div>
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Flight Paths (by surveillance likelihood):</div>
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-0.5" style={{ backgroundColor: '#0088ff' }}></div>
                   <span className="text-xs text-gray-600 dark:text-gray-400">Low (0-30%)</span>
@@ -836,8 +838,8 @@ export function HistoricalAnalysisPage() {
               </div>
 
               {/* Hover Markers */}
-              <div className="space-y-1.5 border-t border-gray-200 dark:border-gray-700 pt-2">
-                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Markers:</div>
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">Markers:</div>
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#ff6600', border: '2px solid #ff0000' }}></div>
                   <span className="text-xs text-gray-600 dark:text-gray-400">Hover location</span>
@@ -845,8 +847,10 @@ export function HistoricalAnalysisPage() {
               </div>
 
               {/* Line Thickness Note */}
-              <div className="text-xs text-gray-500 dark:text-gray-500 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                Line thickness increases with surveillance likelihood
+              <div className="flex items-center">
+                <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+                  Line thickness increases with surveillance likelihood
+                </div>
               </div>
             </div>
           </div>
