@@ -871,11 +871,12 @@ def get_historical_analysis(
         db, start_date=start_date, end_date=end_date
     )
 
-    # Calculate metrics - use surveillance_likelihood > 0.5 as proxy for surveillance
+    # Calculate metrics - use surveillance_likelihood > 0.5 OR has abnormal patterns as surveillance
+    # Flights with detected patterns (like excessive hovering) are surveillance regardless of score
     surveillance_flights = [
-        f
-        for f in flights
-        if f.surveillance_likelihood and f.surveillance_likelihood > 0.5
+        f for f in flights
+        if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5) or
+           (f.id in patterns_map and len(patterns_map[f.id]) > 0)
     ]
     constitutional_violations = len(
         [
@@ -895,7 +896,7 @@ def get_historical_analysis(
             surveillance_durations.append(duration_minutes)
 
     avg_surveillance_duration = (
-        sum(surveillance_durations) / len(surveillance_durations)
+        int(sum(surveillance_durations) / len(surveillance_durations))
         if surveillance_durations
         else 0
     )
@@ -953,9 +954,9 @@ def get_historical_analysis(
                     day_flights.append(f)
 
         day_surveillance = [
-            f
-            for f in day_flights
-            if f.surveillance_likelihood and f.surveillance_likelihood > 0.5
+            f for f in day_flights
+            if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5) or
+               (f.id in patterns_map and len(patterns_map[f.id]) > 0)
         ]
 
         timeline_data.append(
@@ -975,9 +976,9 @@ def get_historical_analysis(
             f for f in flights if f.departure_time and f.departure_time.hour == hour
         ]
         hour_surveillance = [
-            f
-            for f in hour_flights
-            if f.surveillance_likelihood and f.surveillance_likelihood > 0.5
+            f for f in hour_flights
+            if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5) or
+               (f.id in patterns_map and len(patterns_map[f.id]) > 0)
         ]
 
         hourly_pattern.append(
@@ -1151,12 +1152,18 @@ def get_historical_analysis(
                                 'end_time': hover.get('end_time'),
                             })
 
+        # Determine if this is a surveillance flight: high likelihood OR has abnormal patterns
+        is_surveillance = (
+            (flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5) or
+            len(flight_patterns) > 0
+        )
+
         flight_paths.append({
             "id": flight.id,  # Add ID for matching with flights_list
             "flight_id": flight.flight_id,
             "aircraft_registration": aircraft_reg,
             "coordinates": coordinates,
-            "is_surveillance": flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5,
+            "is_surveillance": is_surveillance,
             "surveillance_likelihood": float(flight.surveillance_likelihood) if flight.surveillance_likelihood else 0.0,
             "timestamp": flight.departure_time.isoformat() if flight.departure_time else None,
             "duration_minutes": flight.flight_duration_minutes,
@@ -1205,6 +1212,12 @@ def get_historical_analysis(
         max_confidence = max([p.confidence_score for p in flight_patterns], default=0.0)
         has_patterns = len(flight_patterns) > 0
 
+        # Determine if this is a surveillance flight: high likelihood OR has abnormal patterns
+        is_surveillance = (
+            (flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5) or
+            has_patterns
+        )
+
         flights_list.append({
             "id": flight.id,
             "flight_id": flight.flight_id,
@@ -1213,7 +1226,7 @@ def get_historical_analysis(
             "arrival_time": flight.arrival_time.isoformat() if flight.arrival_time else None,
             "duration_minutes": flight.flight_duration_minutes,
             "surveillance_likelihood": float(flight.surveillance_likelihood) if flight.surveillance_likelihood else 0.0,
-            "is_surveillance": flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5,
+            "is_surveillance": is_surveillance,
             "hover_count": hover_count,
             "min_altitude": flight.min_altitude_feet,
             "max_altitude": flight.max_altitude_feet,
