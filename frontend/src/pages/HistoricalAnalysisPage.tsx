@@ -204,7 +204,7 @@ export function HistoricalAnalysisPage() {
     })
   }
 
-  // Select/deselect all flights
+  // Select/deselect all flights (all pages)
   const selectAll = () => {
     const allIds = new Set<number>(filteredFlights.map((f: any) => f.id as number))
     setSelectedFlightIds(allIds)
@@ -212,6 +212,23 @@ export function HistoricalAnalysisPage() {
 
   const deselectAll = () => {
     setSelectedFlightIds(new Set())
+  }
+
+  // Select/deselect current page only
+  const selectCurrentPage = () => {
+    setSelectedFlightIds(prev => {
+      const newSet = new Set(prev)
+      paginatedFlights.forEach((f: any) => newSet.add(f.id))
+      return newSet
+    })
+  }
+
+  const deselectCurrentPage = () => {
+    setSelectedFlightIds(prev => {
+      const newSet = new Set(prev)
+      paginatedFlights.forEach((f: any) => newSet.delete(f.id))
+      return newSet
+    })
   }
 
   // Filter flight paths to only show selected flights
@@ -417,22 +434,43 @@ export function HistoricalAnalysisPage() {
                   <span className="text-gray-700 dark:text-gray-300">Surveillance Only</span>
                 </label>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={selectAll}
-                    className="flex-1 text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  >
-                    Select All
-                  </button>
-                  <button
-                    onClick={deselectAll}
-                    className="flex-1 text-xs px-2 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
-                  >
-                    Deselect All
-                  </button>
+                <div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">This Page:</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={selectCurrentPage}
+                      className="flex-1 text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Select
+                    </button>
+                    <button
+                      onClick={deselectCurrentPage}
+                      className="flex-1 text-xs px-2 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
+                    >
+                      Deselect
+                    </button>
+                  </div>
                 </div>
 
-                <div className="text-xs text-gray-600 dark:text-gray-400 text-center">
+                <div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">All Pages:</div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={selectAll}
+                      className="flex-1 text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+                    >
+                      Select All
+                    </button>
+                    <button
+                      onClick={deselectAll}
+                      className="flex-1 text-xs px-2 py-1 bg-gray-600 text-white rounded hover:bg-gray-700"
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-xs text-gray-600 dark:text-gray-400 text-center pt-2 border-t border-gray-200 dark:border-gray-700">
                   {selectedFlightIds.size} of {filteredFlights.length} selected
                 </div>
               </div>
