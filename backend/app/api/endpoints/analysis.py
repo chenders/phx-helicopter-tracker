@@ -2,6 +2,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, BackgroundTasks
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.api.deps import get_db
 from app.schemas.analysis import (
@@ -1028,19 +1029,79 @@ def get_historical_analysis(
             }
         )
 
-    # Generate flight paths for map display
+    # Generate flight paths for map display using REAL FlightPosition data
+    from app.models.flight_positions import FlightPosition
+    from app.models.aircraft import Aircraft
+    import json
+
     flight_paths = []
     heatmap_data = []
 
-    import random
-    import json
+    # Pre-fetch all aircraft to avoid N+1 queries
+    aircraft_map = {}
+    if flights:
+        aircraft_ids = [f.aircraft_id for f in flights if f.aircraft_id]
+        if aircraft_ids:
+            aircrafts = db.query(Aircraft).filter(Aircraft.id.in_(aircraft_ids)).all()
+            aircraft_map = {a.id: a.registration for a in aircrafts}
 
-    for flight in flights[:30]:  # Limit to 30 flights for performance
-        # Generate sample flight path based on available data
+    # Limit flights displayed for performance (default 20, can be increased)
+    max_flights_to_display = 20
+
+    # Get position counts for all flights to help with sorting
+    position_counts = {}
+    if flights:
+        flight_ids = [f.id for f in flights]
+        position_count_query = db.query(
+            FlightPosition.flight_log_id,
+            func.count(FlightPosition.id).label('count')
+        ).filter(
+            FlightPosition.flight_log_id.in_(flight_ids)
+        ).group_by(FlightPosition.flight_log_id).all()
+
+        position_counts = {row.flight_log_id: row.count for row in position_count_query}
+
+    # Prioritize surveillance flights and flights with good position data for display
+    display_flights = sorted(
+        flights,
+        key=lambda f: (
+            (f.surveillance_likelihood or 0) > 0.5,  # Surveillance first
+            f.surveillance_likelihood or 0,  # Then by score
+            position_counts.get(f.id, 0),  # Then by number of positions (better viz)
+            f.departure_time or datetime.min.replace(tzinfo=timezone.utc)  # Then by date
+        ),
+        reverse=True
+    )[:max_flights_to_display]
+
+    for flight in display_flights:
+        # Get actual flight positions from database
+        positions = db.query(FlightPosition).filter(
+            FlightPosition.flight_log_id == flight.id
+        ).order_by(FlightPosition.timestamp).all()
+
+        if not positions or len(positions) < 2:
+            continue
+
+        # Build coordinate array from actual position data
         coordinates = []
+        for pos in positions:
+            if pos.latitude and pos.longitude:
+                coordinates.append({
+                    "lat": pos.latitude,
+                    "lng": pos.longitude,
+                    "alt": pos.altitude_feet,
+                    "timestamp": pos.timestamp.isoformat() if pos.timestamp else None
+                })
 
-        # Check if we have hover locations
-        if hasattr(flight, "hover_locations") and flight.hover_locations:
+        if len(coordinates) < 2:
+            continue
+
+        # Get aircraft registration from pre-fetched map
+        aircraft_reg = aircraft_map.get(flight.aircraft_id, "Unknown")
+
+        # Parse hover_locations safely
+        hover_count = 0
+        if flight.hover_locations:
             try:
                 hover_locs = (
                     json.loads(flight.hover_locations)
@@ -1048,89 +1109,74 @@ def get_historical_analysis(
                     else flight.hover_locations
                 )
                 if isinstance(hover_locs, list):
-                    for loc in hover_locs:
-                        if isinstance(loc, dict) and "lat" in loc and "lng" in loc:
-                            coordinates.append({"lat": loc["lat"], "lng": loc["lng"]})
+                    hover_count = len(hover_locs)
             except:
                 pass
 
-        # If no hover locations, generate a sample path
-        if not coordinates and flight.departure_time:
-            # Generate a realistic flight path over Phoenix
-            num_points = random.randint(10, 30)
-            base_lat = 33.4484 + random.uniform(-0.15, 0.15)
-            base_lng = -112.0740 + random.uniform(-0.15, 0.15)
+        flight_paths.append({
+            "flight_id": flight.flight_id,
+            "aircraft_registration": aircraft_reg,
+            "coordinates": coordinates,
+            "is_surveillance": flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5,
+            "surveillance_likelihood": float(flight.surveillance_likelihood) if flight.surveillance_likelihood else 0.0,
+            "timestamp": flight.departure_time.isoformat() if flight.departure_time else None,
+            "duration_minutes": flight.flight_duration_minutes,
+            "hover_count": hover_count,
+        })
 
-            for i in range(num_points):
-                # Create a path with some variation
-                lat = base_lat + random.uniform(-0.05, 0.05) + (i * 0.002)
-                lng = base_lng + random.uniform(-0.05, 0.05) + (i * 0.001)
-                coordinates.append({"lat": lat, "lng": lng})
+        # Add positions to heatmap with weight based on surveillance score
+        # Sample every Nth position for performance (don't need all positions in heatmap)
+        sample_rate = max(1, len(coordinates) // 50)  # Max 50 points per flight in heatmap
+        for i, coord in enumerate(coordinates):
+            if i % sample_rate == 0:
+                weight = 1
+                if flight.surveillance_likelihood:
+                    weight = max(1, int(flight.surveillance_likelihood * 10))
+                heatmap_data.append({
+                    "lat": coord["lat"],
+                    "lng": coord["lng"],
+                    "weight": weight
+                })
 
-        if coordinates and len(coordinates) > 1:
-            flight_paths.append(
-                {
-                    "flight_id": str(flight.id),
-                    "aircraft_registration": flight.aircraft_id
-                    if hasattr(flight, "aircraft_id")
-                    else "Unknown",
-                    "coordinates": coordinates,
-                    "is_surveillance": flight.surveillance_likelihood
-                    and flight.surveillance_likelihood > 0.5,
-                    "timestamp": flight.departure_time.isoformat()
-                    if flight.departure_time
-                    else None,
-                }
-            )
+    # Build flight list for frontend selection (aircraft_map already created above)
+    flights_list = []
+    for flight in flights:
+        aircraft_reg = aircraft_map.get(flight.aircraft_id, "Unknown")
 
-            # Add positions to heatmap with weight based on surveillance score
-            weight = 1
-            if flight.surveillance_likelihood:
-                weight = max(1, int(flight.surveillance_likelihood * 10))
-
-            for coord in coordinates:
-                # Add to heatmap data (will be converted to google.maps.LatLng client-side)
-                heatmap_data.append(
-                    {"lat": coord["lat"], "lng": coord["lng"], "weight": weight}
+        # Parse hover_locations safely
+        hover_count = 0
+        if flight.hover_locations:
+            try:
+                hover_locs = (
+                    json.loads(flight.hover_locations)
+                    if isinstance(flight.hover_locations, str)
+                    else flight.hover_locations
                 )
+                if isinstance(hover_locs, list):
+                    hover_count = len(hover_locs)
+            except:
+                pass
 
-    # If no positions, create sample data from flight logs
-    if not heatmap_data and flights:
-        for flight in flights[:50]:  # Limit to 50 flights for performance
-            if hasattr(flight, "hover_locations") and flight.hover_locations:
-                # Parse hover locations if available
-                try:
-                    import json
+        flights_list.append({
+            "id": flight.id,
+            "flight_id": flight.flight_id,
+            "aircraft_registration": aircraft_reg,
+            "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
+            "arrival_time": flight.arrival_time.isoformat() if flight.arrival_time else None,
+            "duration_minutes": flight.flight_duration_minutes,
+            "surveillance_likelihood": float(flight.surveillance_likelihood) if flight.surveillance_likelihood else 0.0,
+            "is_surveillance": flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5,
+            "hover_count": hover_count,
+            "min_altitude": flight.min_altitude_feet,
+            "max_altitude": flight.max_altitude_feet,
+            "privacy_concern_level": flight.privacy_concern_level or 0,
+        })
 
-                    hover_locs = (
-                        json.loads(flight.hover_locations)
-                        if isinstance(flight.hover_locations, str)
-                        else flight.hover_locations
-                    )
-                    for loc in hover_locs:
-                        heatmap_data.append(
-                            {
-                                "lat": loc.get("lat", 33.4484),
-                                "lng": loc.get("lng", -112.0740),
-                                "weight": 5,
-                            }
-                        )
-                except:
-                    pass
-            else:
-                # Use Phoenix center with some variation for demo
-                import random
-
-                heatmap_data.append(
-                    {
-                        "lat": 33.4484 + random.uniform(-0.2, 0.2),
-                        "lng": -112.0740 + random.uniform(-0.2, 0.2),
-                        "weight": 2
-                        if flight.surveillance_likelihood
-                        and flight.surveillance_likelihood > 0.5
-                        else 1,
-                    }
-                )
+    # Sort flights list by surveillance likelihood descending, then by date
+    flights_list.sort(
+        key=lambda f: (f["surveillance_likelihood"], f["departure_time"] or ""),
+        reverse=True
+    )
 
     # Build response
     historical_data = {
@@ -1143,6 +1189,7 @@ def get_historical_analysis(
         "constitutional_violations": constitutional_violations,
         "avg_surveillance_duration": int(avg_surveillance_duration),
         "flight_paths": flight_paths,
+        "flights_list": flights_list,  # NEW: List of all flights for selection
         "heatmap_data": heatmap_data,
         "summary": {
             "total_flights": summary.get("total_flights", 0),
