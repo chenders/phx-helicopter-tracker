@@ -120,7 +120,7 @@ export function HistoricalAnalysisPage() {
   const [pathsReady, setPathsReady] = useState(false)
   const [showSidebar, setShowSidebar] = useState(true)
   const [selectedFlightIds, setSelectedFlightIds] = useState<Set<number>>(new Set())
-  const [flightSortBy, setFlightSortBy] = useState<'surveillance' | 'date' | 'duration'>('surveillance')
+  const [flightSortBy, setFlightSortBy] = useState<'surveillance' | 'date' | 'duration' | 'neighborhood'>('surveillance')
   const [showOnlySurveillance, setShowOnlySurveillance] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const flightsPerPage = 20
@@ -174,8 +174,13 @@ export function HistoricalAnalysisPage() {
             return (b.surveillance_likelihood || 0) - (a.surveillance_likelihood || 0)
           } else if (flightSortBy === 'date') {
             return new Date(b.departure_time).getTime() - new Date(a.departure_time).getTime()
-          } else { // duration
+          } else if (flightSortBy === 'duration') {
             return (b.duration_minutes || 0) - (a.duration_minutes || 0)
+          } else { // neighborhood
+            // Sort by first neighborhood alphabetically, flights with no neighborhood go last
+            const aNeighborhood = a.neighborhoods && a.neighborhoods.length > 0 ? a.neighborhoods[0] : 'ZZZZZ'
+            const bNeighborhood = b.neighborhoods && b.neighborhoods.length > 0 ? b.neighborhoods[0] : 'ZZZZZ'
+            return aNeighborhood.localeCompare(bNeighborhood)
           }
         })
     : []
@@ -421,6 +426,7 @@ export function HistoricalAnalysisPage() {
                     <option value="surveillance">Surveillance Likelihood</option>
                     <option value="date">Date (Newest First)</option>
                     <option value="duration">Duration</option>
+                    <option value="neighborhood">Neighborhood</option>
                   </select>
                 </div>
 
