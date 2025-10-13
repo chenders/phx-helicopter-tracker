@@ -543,6 +543,14 @@ export function HistoricalAnalysisPage() {
                         )}
                       </div>
 
+                      {/* Neighborhood information */}
+                      {flight.neighborhoods && flight.neighborhoods.length > 0 && (
+                        <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                          <span className="font-medium">📍 </span>
+                          {flight.neighborhoods.join(', ')}
+                        </div>
+                      )}
+
                       <div className="mt-1">
                         <div className="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400">
                           <span>Likelihood: {(likelihood * 100).toFixed(0)}%</span>
