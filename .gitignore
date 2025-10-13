@@ -14,7 +14,7 @@ frontend/.vite/
 frontend/.vitest/
 test-results/
 frontend/.env
-
+celerybeat-schedule
 # Backend
 backend/__pycache__/
 backend/*.pyc

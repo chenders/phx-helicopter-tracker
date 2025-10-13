@@ -7,6 +7,14 @@ declare global {
   }
 }
 
+// Mobile device detection utility
+const isMobileDevice = (): boolean => {
+  // Check if touch-capable AND small screen
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const isSmallScreen = window.innerWidth <= 768; // Typical mobile breakpoint
+  return isTouchDevice && isSmallScreen;
+};
+
 interface FlightPosition {
   latitude: number;
   longitude: number;
@@ -82,6 +90,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+  const [isMobile] = useState(isMobileDevice()); // Detect mobile once on mount
   const animationRef = useRef<any>(null);
   const animationFunctionRef = useRef<any>(null);
   const mountedRef = useRef(true);
@@ -315,26 +324,59 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         Cesium.Ion.defaultAccessToken =
           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiM2FlZDAyOS00ZjE4LTQ0NjItOTY4ZC0xNzQyNGIzNjhhOTkiLCJpZCI6MzQ2MjQ4LCJpYXQiOjE3NTkzMDkyMjl9.zkS_2D4Y8scZkqmS_lckpl2G_7c8sGaFwMazm26eAT0";
 
-        // Initialize the Cesium Viewer in the HTML element with the `cesiumContainer` ID.
+        // Initialize the Cesium Viewer with mobile-optimized settings
         const viewer = new Cesium.Viewer("cesiumContainer", {
-          terrain: Cesium.Terrain.fromWorldTerrain(),
+          // Use lower quality terrain on mobile, high quality on desktop
+          terrain: isMobile ? undefined : Cesium.Terrain.fromWorldTerrain(),
           navigationHelpButton: false,
           animation: false,  // Disable animation widget - we have custom controls
           timeline: false,   // Disable timeline widget - we have custom controls
           fullscreenButton: false,
           vrButton: false,
+          // Mobile performance optimizations
+          requestRenderMode: isMobile,  // Only render when needed on mobile
+          maximumRenderTimeChange: isMobile ? Infinity : 0.0,  // Reduce render frequency on mobile
         });
 
-        // Add Google Photorealistic 3D Tiles
-        try {
-          const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(2275207);
-          viewer.scene.primitives.add(tileset);
-          console.log("Google Photorealistic 3D Tiles loaded successfully");
-        } catch (error) {
-          console.warn("Failed to load Google 3D Tiles, using OSM buildings:", error);
-          // Fallback to OSM buildings if Google tiles fail
-          const osmBuildings = await Cesium.createOsmBuildingsAsync();
-          viewer.scene.primitives.add(osmBuildings);
+        // Apply mobile-specific scene optimizations
+        if (isMobile) {
+          console.log("Applying mobile performance optimizations...");
+          // Limit frame rate to 30fps on mobile
+          viewer.targetFrameRate = 30;
+          // Increase screen space error to cull more tiles aggressively
+          viewer.scene.globe.maximumScreenSpaceError = 4; // Default is 2
+          // Disable shadows for better performance
+          viewer.shadows = false;
+          // Reduce fog density to minimize far rendering
+          viewer.scene.fog.density = 0.0005; // Default is 0.0002
+          viewer.scene.fog.enabled = true;
+          viewer.scene.fog.minimumBrightness = 0.8;
+        }
+
+        // Add 3D Buildings - skip heavy Google tiles on mobile
+        if (!isMobile) {
+          // Desktop: Use high-quality Google Photorealistic 3D Tiles
+          try {
+            console.log("Loading Google Photorealistic 3D Tiles (desktop)...");
+            const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(2275207);
+            viewer.scene.primitives.add(tileset);
+            console.log("Google Photorealistic 3D Tiles loaded successfully");
+          } catch (error) {
+            console.warn("Failed to load Google 3D Tiles, using OSM buildings:", error);
+            // Fallback to OSM buildings if Google tiles fail
+            const osmBuildings = await Cesium.createOsmBuildingsAsync();
+            viewer.scene.primitives.add(osmBuildings);
+          }
+        } else {
+          // Mobile: Use lightweight OSM buildings only
+          try {
+            console.log("Loading lightweight OSM buildings (mobile)...");
+            const osmBuildings = await Cesium.createOsmBuildingsAsync();
+            viewer.scene.primitives.add(osmBuildings);
+            console.log("OSM buildings loaded successfully");
+          } catch (error) {
+            console.warn("Failed to load OSM buildings, continuing without 3D buildings:", error);
+          }
         }
 
         // Add 3D floating labels for major Phoenix roads and landmarks
@@ -428,10 +470,18 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           { name: "107th Ave", lat: 33.4484, lng: -112.2580, tier: 5 },
         ];
 
-        // Test if labels  are being added
-        console.log("Adding", phoenixLabels.length, "3D floating labels for Phoenix roads and landmarks");
+        // Filter labels for mobile - only show critical labels (tier 0-2)
+        const labelsToShow = isMobile
+          ? phoenixLabels.filter(label => label.tier <= 2)
+          : phoenixLabels;
 
-        phoenixLabels.forEach(label => {
+        // Test if labels are being added
+        console.log(
+          `Adding ${labelsToShow.length} 3D floating labels for Phoenix roads and landmarks` +
+          (isMobile ? ` (mobile mode - showing only tier 0-2)` : ` (desktop mode - showing all)`)
+        );
+
+        labelsToShow.forEach(label => {
           // Tier-based styling for visual hierarchy
           // Tier 0 (Area landmarks): Gold, largest, highest elevation (represents regions)
           // Tier 1 (Freeways): White, large, high visibility
@@ -446,21 +496,21 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             case 0: // Area landmarks (Downtown, Mountains, Airport, etc.)
               fillColor = Cesium.Color.GOLD;
               fontSize = 26;
-              maxDistance = 31680; // 6 miles - visible from far away
+              maxDistance = isMobile ? 15840 : 31680; // Mobile: 3 miles, Desktop: 6 miles
               minDistance = 0;
               baseHeight = 1000; // Very high - these represent areas, not points
               break;
             case 1: // Major Freeways
               fillColor = Cesium.Color.WHITE;
               fontSize = 24;
-              maxDistance = 26400; // 5 miles (3D distance, accounting for altitude)
+              maxDistance = isMobile ? 13200 : 26400; // Mobile: 2.5 miles, Desktop: 5 miles
               minDistance = 0;
               baseHeight = 600; // Higher for visibility from altitude
               break;
             case 2: // Major arterials (both named and numbered)
               fillColor = Cesium.Color.CYAN;
               fontSize = 22;
-              maxDistance = 21120; // 4 miles
+              maxDistance = isMobile ? 10560 : 21120; // Mobile: 2 miles, Desktop: 4 miles
               minDistance = 0;
               baseHeight = 500;
               break;
@@ -1870,8 +1920,22 @@ export const FlightVisualization3DCesiumFixed: React.FC<
       return;
     }
 
-    // Update the camera view to the selected position
+    // Calculate target index and time
     const targetIndex = Math.floor((value / 100) * (positions.length - 1));
+
+    // CRITICAL FIX: Update the Cesium clock's current time
+    // This ensures animation continues from the new position
+    const startTime = viewer.clock.startTime;
+    const stopTime = viewer.clock.stopTime;
+    const totalSeconds = window.Cesium.JulianDate.secondsDifference(stopTime, startTime);
+    const targetSeconds = (value / 100) * totalSeconds;
+
+    // Set the clock to the new time
+    viewer.clock.currentTime = window.Cesium.JulianDate.addSeconds(
+      startTime,
+      targetSeconds,
+      new window.Cesium.JulianDate()
+    );
 
     if (positions[targetIndex]) {
       const targetPos = positions[targetIndex];

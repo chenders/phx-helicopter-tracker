@@ -33,23 +33,32 @@ async def get_radio_archives(
         RADIO_DATA_PATH.mkdir(parents=True, exist_ok=True)
         
         # Get all MP3 files in the radio directory
-        mp3_files = sorted(
+        all_mp3_files = sorted(
             RADIO_DATA_PATH.glob("*.mp3"),
             key=lambda x: x.stat().st_mtime,
             reverse=True
         )
-        
+
+        # Apply transcription filter BEFORE pagination
+        mp3_files = []
+        for mp3_file in all_mp3_files:
+            json_file = mp3_file.with_suffix(".json")
+            txt_file = mp3_file.with_suffix(".txt")
+            has_trans = json_file.exists() or txt_file.exists()
+
+            # Skip if filtering by transcription status
+            if has_transcription is not None and has_trans != has_transcription:
+                continue
+
+            mp3_files.append(mp3_file)
+
+        # Now apply pagination
         archives = []
         for mp3_file in mp3_files[offset:offset + limit]:
             # Check for transcription files
             json_file = mp3_file.with_suffix(".json")
             txt_file = mp3_file.with_suffix(".txt")
-            
             has_trans = json_file.exists() or txt_file.exists()
-            
-            # Skip if filtering by transcription status
-            if has_transcription is not None and has_trans != has_transcription:
-                continue
             
             # Get file metadata
             file_stat = mp3_file.stat()

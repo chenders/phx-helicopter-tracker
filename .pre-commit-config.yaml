@@ -1,0 +1,18 @@
+repos:
+  - repo: local
+    hooks:
+      - id: alembic-check
+        name: Check Alembic Schema Sync
+        entry: bash -c 'cd backend && python check_schema.py'
+        language: system
+        pass_filenames: false
+        files: ^backend/(app/models/.*\.py|alembic/versions/.*\.py)$
+        stages: [commit]
+
+      - id: black
+        name: Format Python code with Black
+        entry: bash -c 'cd backend && black .'
+        language: system
+        pass_filenames: false
+        files: \.py$
+        stages: [commit]

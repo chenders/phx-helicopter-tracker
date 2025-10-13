@@ -1,0 +1,52 @@
+name: Database Schema Check
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/models/**'
+      - 'backend/alembic/versions/**'
+  push:
+    branches: [main]
+
+jobs:
+  check-schema:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgis/postgis:15-3.4
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+
+      - name: Run Alembic migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        run: |
+          cd backend
+          alembic upgrade head
+
+      - name: Check schema is in sync
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        run: |
+          cd backend
+          alembic check

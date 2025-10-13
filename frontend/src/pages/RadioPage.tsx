@@ -111,7 +111,10 @@ export function RadioPage() {
 
   const fetchArchives = async () => {
     try {
-      const response = await axios.get('/api/v1/radio/archives')
+      // Fetch all archives with a high limit to ensure we get everything
+      const response = await axios.get('/api/v1/radio/archives', {
+        params: { limit: 10000 }
+      })
       setArchives(response.data.archives)
     } catch (error) {
       console.error('Failed to fetch archives:', error)

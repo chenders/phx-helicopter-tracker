@@ -1,4 +1,4 @@
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+FROM nvidia/cuda:12.1.0-cudnn9-runtime-ubuntu22.04
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -27,7 +27,7 @@ COPY backend /app
 
 # Install Python dependencies
 RUN pip install --upgrade pip && \
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 && \
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
     pip install -r requirements.txt && \
     pip install openai-whisper
 

@@ -16,10 +16,12 @@ celery_app = Celery(
         "app.workers.fr24_scheduler",
         "app.workers.radio_tasks",
         "app.workers.radio_tasks_alternative",
+        "app.workers.radio_tasks_faster_whisper",
         "app.workers.flight_tracking_tasks",
         "app.workers.flight_discovery_tasks",
         "app.workers.abnormal_pattern_tasks",
         "app.workers.data_maintenance_tasks",
+        "app.workers.system_monitoring_tasks",
     ],
 )
 
@@ -52,6 +54,7 @@ celery_app.conf.update(
         # TRANSCRIPTION TASKS - ONLY processed by dedicated GPU workers
         # DO NOT process these on the main server
         'transcribe_phoenix_pd_archives': {'queue': 'transcription'},
+        'transcribe_phoenix_pd_archives_faster': {'queue': 'transcription'},
         'transcribe_audio_file': {'queue': 'transcription'},
         'batch_transcribe_directory': {'queue': 'transcription'},
         # Ensure radio download tasks stay on radio queue
@@ -229,6 +232,15 @@ celery_app.conf.update(
         #     },
         # },
         # REMOVED cleanup-old-radio-archives - we want to keep all radio archives permanently
+        # System monitoring and error detection
+        "monitor-system-errors": {
+            "task": "monitor_system_errors",
+            "schedule": 3600.0,  # Every hour - check for new errors
+            "kwargs": {
+                "hours_back": 1,  # Check last hour
+                "auto_resolve_age_hours": 24  # Auto-resolve issues not seen in 24 hours
+            }
+        },
     },
 )
 

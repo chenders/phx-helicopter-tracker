@@ -1,6 +1,6 @@
 # Celery and message queue
 celery==5.3.4
-redis==5.0.1
+redis
 
 # Database
 sqlalchemy==2.0.23
