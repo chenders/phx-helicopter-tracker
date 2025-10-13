@@ -871,6 +871,22 @@ def get_historical_analysis(
         db, start_date=start_date, end_date=end_date
     )
 
+    # Fetch abnormal patterns for these flights FIRST (needed for surveillance calculation)
+    from app.models.abnormal_patterns import AbnormalPattern
+    patterns_map = {}
+    if flights:
+        flight_ids = [f.id for f in flights]
+        patterns = db.query(AbnormalPattern).filter(
+            AbnormalPattern.flight_log_id.in_(flight_ids),
+            AbnormalPattern.pattern_type != "normal"  # Exclude normal patterns
+        ).all()
+
+        # Map patterns by flight_log_id
+        for pattern in patterns:
+            if pattern.flight_log_id not in patterns_map:
+                patterns_map[pattern.flight_log_id] = []
+            patterns_map[pattern.flight_log_id].append(pattern)
+
     # Calculate metrics - use surveillance_likelihood > 0.5 OR has abnormal patterns as surveillance
     # Flights with detected patterns (like excessive hovering) are surveillance regardless of score
     surveillance_flights = [
@@ -1039,20 +1055,7 @@ def get_historical_analysis(
     flight_paths = []
     heatmap_data = []
 
-    # Fetch abnormal patterns for these flights
-    patterns_map = {}
-    if flights:
-        flight_ids = [f.id for f in flights]
-        patterns = db.query(AbnormalPattern).filter(
-            AbnormalPattern.flight_log_id.in_(flight_ids),
-            AbnormalPattern.pattern_type != "normal"  # Exclude normal patterns
-        ).all()
-
-        # Map patterns by flight_log_id
-        for pattern in patterns:
-            if pattern.flight_log_id not in patterns_map:
-                patterns_map[pattern.flight_log_id] = []
-            patterns_map[pattern.flight_log_id].append(pattern)
+    # patterns_map already created earlier (line 876) - using that one
 
     # Pre-fetch all aircraft to avoid N+1 queries
     aircraft_map = {}
