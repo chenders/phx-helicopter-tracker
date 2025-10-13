@@ -550,6 +550,66 @@ def get_flight_positions_by_id(
     return positions
 
 
+@router.get("/{flight_id}/patterns")
+def get_flight_patterns(
+    *,
+    db: Session = Depends(get_db),
+    flight_id: int
+) -> Dict[str, Any]:
+    """Get abnormal patterns detected for a specific flight"""
+    from app.models.abnormal_patterns import AbnormalPattern
+
+    flight = flight_log_crud.get(db, id=flight_id)
+    if not flight:
+        raise HTTPException(status_code=404, detail="Flight not found")
+
+    # Get all abnormal patterns for this flight
+    patterns = db.query(AbnormalPattern).filter(
+        AbnormalPattern.flight_log_id == flight_id
+    ).all()
+
+    # Extract hover locations and surveillance types from pattern metadata
+    hover_locations = []
+    surveillance_types = set()
+
+    for pattern in patterns:
+        # Add pattern type to surveillance types
+        if pattern.pattern_type:
+            surveillance_types.add(pattern.pattern_type)
+
+        # Extract hover locations from metadata
+        if pattern.detection_metadata and isinstance(pattern.detection_metadata, dict):
+            hovers = pattern.detection_metadata.get('hovering', [])
+            if isinstance(hovers, list):
+                for hover in hovers:
+                    if isinstance(hover, dict) and 'latitude' in hover and 'longitude' in hover:
+                        hover_locations.append({
+                            'latitude': hover['latitude'],
+                            'longitude': hover['longitude'],
+                            'duration_minutes': hover.get('duration_minutes', 0),
+                            'start_time': hover.get('start_time'),
+                            'end_time': hover.get('end_time'),
+                            'position_count': hover.get('position_count', 0)
+                        })
+
+    return {
+        "flight_id": flight_id,
+        "patterns": [
+            {
+                "id": pattern.id,
+                "pattern_type": pattern.pattern_type,
+                "confidence_score": pattern.confidence_score,
+                "detected_at": pattern.detected_at.isoformat() if pattern.detected_at else None,
+                "detection_metadata": pattern.detection_metadata
+            }
+            for pattern in patterns
+        ],
+        "surveillance_types": sorted(list(surveillance_types)),
+        "hover_locations": hover_locations,
+        "total_hover_time_minutes": sum(h['duration_minutes'] for h in hover_locations)
+    }
+
+
 # Analysis endpoints
 @router.get("/analysis/cost-summary")
 def get_flight_cost_summary(

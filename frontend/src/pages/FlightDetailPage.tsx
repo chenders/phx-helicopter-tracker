@@ -82,6 +82,21 @@ interface RadioArchive {
   timeRange?: string
 }
 
+interface HoverLocation {
+  latitude: number
+  longitude: number
+  duration_minutes: number
+  start_time: string
+  end_time: string
+  position_count: number
+}
+
+interface FlightPatterns {
+  surveillance_types: string[]
+  hover_locations: HoverLocation[]
+  total_hover_time_minutes: number
+}
+
 const mapContainerStyle = {
   width: '100%',
   height: '400px',
@@ -237,6 +252,7 @@ export function FlightDetailPage() {
   const [flight, setFlight] = useState<FlightDetails | null>(null)
   const [positions, setPositions] = useState<FlightPosition[]>([])
   const [radioFiles, setRadioFiles] = useState<RadioArchive[]>([])
+  const [patterns, setPatterns] = useState<FlightPatterns | null>(null)
   const [calculatedClosest, setCalculatedClosest] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [selectedPosition, setSelectedPosition] = useState<FlightPosition | null>(null)
@@ -392,6 +408,10 @@ export function FlightDetailPage() {
       // Load positions
       const positionsResponse = await axios.get(`/api/v1/flights/${flightId}/positions`)
       setPositions(positionsResponse.data)
+
+      // Load abnormal patterns
+      const patternsResponse = await axios.get(`/api/v1/flights/${flightId}/patterns`)
+      setPatterns(patternsResponse.data)
 
       // Check for data quality issues
       if (flightResponse.data.flight_duration_minutes && positionsResponse.data.length > 1) {
@@ -1580,53 +1600,71 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
             Surveillance Analysis
           </h2>
 
-          {/* Surveillance Types */}
-          {flight.surveillance_types && flight.surveillance_types.length > 0 && (
+          {/* Surveillance Types - from pattern detection */}
+          {patterns && patterns.surveillance_types && patterns.surveillance_types.length > 0 && (
             <div className="mb-4">
               <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Detected Patterns
               </div>
               <div className="flex flex-wrap gap-2">
-                {flight.surveillance_types.map((type, idx) => (
+                {patterns.surveillance_types.map((type, idx) => (
                   <span
                     key={idx}
                     className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-sm"
                   >
-                    {type}
+                    {type.replace('_', ' ')}
                   </span>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Hover Locations */}
+          {/* Hover Locations - from pattern detection */}
           <div className="mb-4">
             <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               <Eye className="h-4 w-4" />
-              Hover Locations
+              Hover Locations (Pattern Detection)
             </div>
             <div className="text-gray-900 dark:text-white">
-              {getHoverLocations().length} locations
+              {patterns?.hover_locations.length || 0} locations
             </div>
-            {getHoverLocations().length > 0 && (
-              <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Total hover time: {getHoverLocations().reduce((sum, pos) => sum + pos.hover_duration_seconds, 0)} seconds
-              </div>
+            {patterns && patterns.hover_locations.length > 0 && (
+              <>
+                <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Total hover time: {patterns.total_hover_time_minutes.toFixed(1)} minutes
+                </div>
+                <div className="mt-2 space-y-2">
+                  {patterns.hover_locations.map((hover, idx) => (
+                    <div key={idx} className="text-xs bg-gray-100 dark:bg-gray-700 p-2 rounded">
+                      <div className="font-medium">Location {idx + 1}</div>
+                      <div>Coordinates: {hover.latitude.toFixed(4)}, {hover.longitude.toFixed(4)}</div>
+                      <div>Duration: {hover.duration_minutes.toFixed(1)} minutes ({hover.position_count} positions)</div>
+                      <div className="text-gray-500 dark:text-gray-400">
+                        {new Date(hover.start_time).toLocaleTimeString()} - {new Date(hover.end_time).toLocaleTimeString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
-          {/* Low Altitude Segments */}
+          {/* Low Altitude Segments - from position flags */}
           <div className="mb-4">
             <div className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               <Home className="h-4 w-4" />
-              Low Altitude Over Residential
+              Low Altitude Over Residential (Position Flags)
             </div>
             <div className="text-gray-900 dark:text-white">
               {getLowAltitudeSegments().length} segments
             </div>
-            {getLowAltitudeSegments().length > 0 && (
+            {getLowAltitudeSegments().length > 0 ? (
               <div className="text-sm text-red-600 dark:text-red-400 mt-1">
                 Privacy concern: High
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                Note: Position-level flags may not be populated. See hover locations above for actual pattern detection.
               </div>
             )}
           </div>
