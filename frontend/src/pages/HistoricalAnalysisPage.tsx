@@ -447,7 +447,7 @@ export function HistoricalAnalysisPage() {
                             {flight.aircraft_registration}
                           </div>
                           <div className="text-xs text-gray-600 dark:text-gray-400">
-                            {new Date(flight.departure_time).toLocaleDateString()} • {flight.duration_minutes}min
+                            {new Date(flight.departure_time).toLocaleDateString()} • {Math.round(flight.duration_minutes || 0)}min
                           </div>
                         </div>
                         <input

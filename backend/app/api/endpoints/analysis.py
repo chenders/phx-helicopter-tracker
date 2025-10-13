@@ -1065,8 +1065,8 @@ def get_historical_analysis(
             aircrafts = db.query(Aircraft).filter(Aircraft.id.in_(aircraft_ids)).all()
             aircraft_map = {a.id: a.registration for a in aircrafts}
 
-    # Limit flights displayed for performance (default 20, can be increased)
-    max_flights_to_display = 20
+    # Limit flights displayed for performance (increased to 100 for better visibility)
+    max_flights_to_display = 100
 
     # Get position counts for all flights to help with sorting
     position_counts = {}
