@@ -137,13 +137,8 @@ export function HistoricalAnalysisPage() {
     setMap(null)
   }, [])
 
-  // Initialize selected flights when data loads (select all by default)
-  useEffect(() => {
-    if (historicalData?.flights_list && selectedFlightIds.size === 0) {
-      const allIds = new Set<number>(historicalData.flights_list.map((f: any) => f.id as number))
-      setSelectedFlightIds(allIds)
-    }
-  }, [historicalData?.flights_list])
+  // Flights start unselected by default - user must manually select flights to view
+  // (removed auto-select all behavior)
 
   // Ensure paths are ready after both map and data are loaded
   useEffect(() => {
