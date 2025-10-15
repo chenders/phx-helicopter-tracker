@@ -270,16 +270,36 @@ async def trigger_archive_download(
     }
 
 
-# @router.post("/archives/transcribe")
-# async def trigger_transcription(
-#     batch_size: int = Query(1, ge=1, le=10, description="Number of files to transcribe"),
-#     model_name: Optional[str] = Query(None, description="Whisper model to use")
-# ) -> Dict[str, Any]:
-#     """
-#     Trigger transcription of untranscribed radio archives
-#     """
-#     # TODO: Implement transcribe_radio_archives task
-#     raise HTTPException(status_code=501, detail="Transcription feature not yet implemented")
+@router.post("/archives/transcribe")
+async def trigger_transcription(
+    batch_size: int = Query(1, ge=1, le=10, description="Number of files to transcribe"),
+    model_name: str = Query("base", description="Whisper model to use (tiny, base, small, medium, large)")
+) -> Dict[str, Any]:
+    """
+    Trigger transcription of untranscribed radio archives
+    Uses faster-whisper on dedicated GPU worker
+    """
+    from app.workers.radio_tasks_faster_whisper import transcribe_phoenix_pd_archives_faster
+
+    task = transcribe_phoenix_pd_archives_faster.apply_async(
+        kwargs={
+            "directory_path": str(RADIO_DATA_PATH),
+            "model_name": model_name,
+            "batch_size": batch_size
+        },
+        queue='transcription'  # Route to GPU worker
+    )
+
+    return {
+        "task_id": task.id,
+        "status": "Task queued for GPU worker",
+        "parameters": {
+            "batch_size": batch_size,
+            "model_name": model_name,
+            "queue": "transcription"
+        },
+        "note": "Task will be processed by dedicated GPU transcription worker"
+    }
 
 
 @router.get("/archives/{filename}/audio")
