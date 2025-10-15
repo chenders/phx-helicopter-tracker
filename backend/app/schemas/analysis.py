@@ -211,5 +211,7 @@ class RealTimeAlert(BaseModel):
     altitude_feet: Optional[int] = Field(None, description="Current altitude")
     behavior_description: str = Field(..., description="Behavior description")
     privacy_concern_level: int = Field(..., description="Privacy concern level 1-5")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: Optional[str] = Field(None, description="Alert timestamp ISO format")
     active: bool = Field(default=True, description="Is alert still active")
+    flight_id: Optional[int] = Field(None, description="Associated flight log ID")
+    surveillance_likelihood: Optional[float] = Field(None, description="Surveillance likelihood 0-1")
