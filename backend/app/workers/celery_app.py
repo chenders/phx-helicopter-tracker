@@ -216,21 +216,22 @@ celery_app.conf.update(
                 "min_complexity_threshold": 2.0
             }
         },
-        # TEMPORARILY DISABLED - Radio transcription paused to prioritize flight downloads
-        # "transcribe-radio-archives-single": {
-        #     "task": "transcribe_radio_archives",
-        #     "schedule": 3600.0,  # Every 1 hour
-        #     "kwargs": {
-        #         "batch_size": 1,  # ONLY process 1 file at a time
-        #         "model_name": "base",
-        #     },
-        #     "options": {
-        #         "time_limit": 3600,  # 1 hour limit
-        #         "soft_time_limit": 3300,  # 55 minutes soft limit
-        #         "max_retries": 0,  # No retries to prevent overlap
-        #         "acks_late": False,  # Acknowledge immediately to prevent requeuing
-        #     },
-        # },
+        # Radio transcription - processes untranscribed MP3 files
+        "transcribe-radio-archives-single": {
+            "task": "transcribe_phoenix_pd_archives_faster",
+            "schedule": 3600.0,  # Every 1 hour
+            "kwargs": {
+                "batch_size": 5,  # Process 5 files at a time with faster-whisper
+                "model_name": "base",
+            },
+            "options": {
+                "time_limit": 7200,  # 2 hour limit
+                "soft_time_limit": 6600,  # 1h 50m soft limit
+                "max_retries": 0,  # No retries to prevent overlap
+                "acks_late": False,  # Acknowledge immediately to prevent requeuing
+                "queue": "transcription",  # Route to GPU worker
+            },
+        },
         # REMOVED cleanup-old-radio-archives - we want to keep all radio archives permanently
         # System monitoring and error detection
         "monitor-system-errors": {

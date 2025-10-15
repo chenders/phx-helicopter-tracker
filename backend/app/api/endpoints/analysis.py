@@ -653,10 +653,10 @@ def analyze_geographic_area(
     area_name: str = Query("Custom Area", description="Name for this area analysis"),
 ) -> AreaAnalysis:
     """
-    [PLACEHOLDER] Analyze helicopter activity in a specific geographic area
+    [PRODUCTION] Analyze helicopter activity in a specific geographic area
 
-    This endpoint has partial implementation. It returns basic position counts
-    but lacks full analysis capabilities.
+    This endpoint uses real flight position data from the database.
+    Returns comprehensive analysis of helicopter activity within the specified area.
     """
 
     # Set default date range if not provided
@@ -665,9 +665,9 @@ def analyze_geographic_area(
     if not start_date:
         start_date = end_date - timedelta(days=30)
 
-    # TODO: Implement area analysis using flight_position_crud
     from app.crud.flights import flight_position_crud
 
+    # Get all positions in the area
     positions = flight_position_crud.get_positions_in_area(
         db,
         center_lat=center_lat,
@@ -677,32 +677,110 @@ def analyze_geographic_area(
         end_time=end_date,
     )
 
-    # Basic analysis
+    if not positions:
+        # Return empty analysis if no positions found
+        return AreaAnalysis(
+            area_name=area_name,
+            center_latitude=center_lat,
+            center_longitude=center_lon,
+            radius_meters=radius_meters,
+            total_overflights=0,
+            unique_aircraft=0,
+            total_flight_time_minutes=0.0,
+            hovering_events=0,
+            low_altitude_events=0,
+            night_flights=0,
+            privacy_expectation_level="unknown",
+            constitutional_concern_level=1,
+        )
+
+    # Calculate metrics
     total_overflights = len(positions)
-    unique_aircraft = len(set(pos.aircraft_id for pos in positions))
+    unique_aircraft = len(set(pos.aircraft_id for pos in positions if pos.aircraft_id))
     hovering_events = len([pos for pos in positions if pos.is_hovering])
     low_altitude_events = len(
         [pos for pos in positions if pos.altitude_feet and pos.altitude_feet < 400]
     )
 
-    analysis = AreaAnalysis(
+    # Calculate night flights (22:00-06:00)
+    night_flights = len([
+        pos for pos in positions
+        if pos.timestamp and (pos.timestamp.hour >= 22 or pos.timestamp.hour <= 6)
+    ])
+
+    # Calculate total flight time
+    # Group positions by flight and calculate time span for each flight
+    from collections import defaultdict
+    flight_times = defaultdict(list)
+    for pos in positions:
+        if pos.flight_log_id and pos.timestamp:
+            flight_times[pos.flight_log_id].append(pos.timestamp)
+
+    total_flight_time_minutes = 0.0
+    for flight_id, timestamps in flight_times.items():
+        if len(timestamps) >= 2:
+            timestamps.sort()
+            duration = (timestamps[-1] - timestamps[0]).total_seconds() / 60
+            total_flight_time_minutes += duration
+
+    # Determine privacy expectation level based on land use
+    privacy_expectation_level = "high"  # Default to high for residential
+
+    # Count positions by land use type
+    land_use_counts = defaultdict(int)
+    for pos in positions:
+        if pos.land_use_type:
+            land_use_counts[pos.land_use_type] += 1
+
+    if land_use_counts:
+        # Determine most common land use
+        most_common_land_use = max(land_use_counts, key=land_use_counts.get)
+
+        if most_common_land_use in ['commercial', 'industrial']:
+            privacy_expectation_level = "medium"
+        elif most_common_land_use in ['public', 'park']:
+            privacy_expectation_level = "low"
+        else:  # residential or private
+            privacy_expectation_level = "high"
+
+    # Calculate constitutional concern level (1-5)
+    concern_level = 1
+
+    # Add concern points based on metrics
+    if hovering_events > 5:
+        concern_level += 1
+    if low_altitude_events > 10:
+        concern_level += 1
+    if night_flights > 5:
+        concern_level += 1
+    if privacy_expectation_level == "high":
+        concern_level += 1
+
+    # Cap at 5
+    constitutional_concern_level = min(5, concern_level)
+
+    # Calculate residential density (positions over residential property / total)
+    residential_positions = len([
+        pos for pos in positions
+        if pos.over_private_property or pos.land_use_type == 'residential'
+    ])
+    residential_density = residential_positions / total_overflights if total_overflights > 0 else 0.0
+
+    return AreaAnalysis(
         area_name=area_name,
         center_latitude=center_lat,
         center_longitude=center_lon,
         radius_meters=radius_meters,
         total_overflights=total_overflights,
         unique_aircraft=unique_aircraft,
-        total_flight_time_minutes=0.0,  # TODO: Calculate from position data
+        total_flight_time_minutes=round(total_flight_time_minutes, 2),
         hovering_events=hovering_events,
         low_altitude_events=low_altitude_events,
-        night_flights=0,  # TODO: Calculate
-        privacy_expectation_level="high",  # TODO: Determine based on land use
-        constitutional_concern_level=3
-        if hovering_events > 0 or low_altitude_events > 0
-        else 1,
+        night_flights=night_flights,
+        residential_density=round(residential_density, 3) if residential_density > 0 else None,
+        privacy_expectation_level=privacy_expectation_level,
+        constitutional_concern_level=constitutional_concern_level,
     )
-
-    return analysis
 
 
 # Time Analysis endpoints

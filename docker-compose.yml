@@ -98,8 +98,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    # IMPORTANT: Exclude transcription queue - handled by dedicated GPU workers
-    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 --queues=celery,tracking,analysis,legal,data_import,radio,scheduler
+    # IMPORTANT: Including transcription queue for CPU-based processing (slower than GPU)
+    # For GPU acceleration, deploy separate transcription-worker on GPU-enabled machine
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 --queues=celery,tracking,analysis,legal,data_import,radio,scheduler,transcription
 
   celery-beat:
     build:

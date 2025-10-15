@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { GoogleMap, Marker, Polyline, HeatmapLayer } from '@react-google-maps/api'
+import { GoogleMap, Marker, Polyline, HeatmapLayer, Circle } from '@react-google-maps/api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ScatterChart, Scatter } from 'recharts'
 import { useHistoricalData } from '../hooks/useHistoricalData'
+import { useAreaAnalysis } from '../hooks/useAreaAnalysis'
 
 const mapContainerStyle = {
   width: '100%',
@@ -113,7 +114,7 @@ const mapOptions = {
 
 export function HistoricalAnalysisPage() {
   const [timeRange, setTimeRange] = useState('30d')
-  const [viewMode, setViewMode] = useState('map') // map, timeline, patterns
+  const [viewMode, setViewMode] = useState('map') // map, timeline, patterns, area
   const [selectedAircraft, setSelectedAircraft] = useState('all')
   const [showFlightPaths, setShowFlightPaths] = useState(true)
   const [showHeatmap, setShowHeatmap] = useState(false)
@@ -126,7 +127,13 @@ export function HistoricalAnalysisPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const flightsPerPage = 20
 
+  // Area analysis state
+  const [areaCenter, setAreaCenter] = useState<{ lat: number; lng: number } | null>(null)
+  const [areaRadius, setAreaRadius] = useState(500) // meters
+  const [areaName, setAreaName] = useState('')
+
   const { data: historicalData, isLoading: dataLoading } = useHistoricalData(timeRange, selectedAircraft)
+  const { mutate: analyzeArea, data: areaData, isPending: areaAnalyzing, reset: resetAreaAnalysis } = useAreaAnalysis()
 
   const onMapLoad = useCallback((map: google.maps.Map) => {
     setMap(map)
@@ -231,6 +238,23 @@ export function HistoricalAnalysisPage() {
       return newSet
     })
   }
+
+  // Handle map click for area selection
+  const onMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    if (viewMode === 'area' && e.latLng) {
+      const lat = e.latLng.lat()
+      const lng = e.latLng.lng()
+      setAreaCenter({ lat, lng })
+
+      // Analyze the area automatically
+      analyzeArea({
+        centerLat: lat,
+        centerLon: lng,
+        radiusMeters: areaRadius,
+        areaName: areaName || `Area at ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+      })
+    }
+  }, [viewMode, areaRadius, areaName, analyzeArea])
 
   // Filter flight paths to only show selected flights
   const visibleFlightPaths = historicalData?.flight_paths?.filter((path: any) =>
@@ -338,6 +362,7 @@ export function HistoricalAnalysisPage() {
               <option value="map">Map View</option>
               <option value="timeline">Timeline Analysis</option>
               <option value="patterns">Pattern Analysis</option>
+              <option value="area">Area Analysis</option>
             </select>
           </div>
         </div>
@@ -677,6 +702,7 @@ export function HistoricalAnalysisPage() {
               options={mapOptions}
               onLoad={onMapLoad}
               onUnmount={onMapUnmount}
+              onClick={onMapClick}
             >
               {/* Historical Flight Markers with helicopter icons */}
               {!showFlightPaths && historicalData?.flights?.map((flight: any) => {
@@ -940,6 +966,281 @@ export function HistoricalAnalysisPage() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {viewMode === 'area' && (
+        <div className="space-y-3">
+          {/* Area Selection Instructions */}
+          <div className="bg-blue-50 dark:bg-blue-900/30 border-l-4 border-blue-500 p-4 rounded">
+            <h3 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">📍 Geographic Area Analysis</h3>
+            <p className="text-sm text-blue-700 dark:text-blue-200">
+              Click anywhere on the map to analyze helicopter activity in that area.
+              You can adjust the radius and area name below before clicking.
+            </p>
+          </div>
+
+          {/* Area Analysis Controls */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+            <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">Analysis Parameters</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Analysis Radius (meters)
+                </label>
+                <input
+                  type="number"
+                  min="100"
+                  max="5000"
+                  step="100"
+                  value={areaRadius}
+                  onChange={(e) => setAreaRadius(Number(e.target.value))}
+                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {areaRadius}m ≈ {(areaRadius * 3.28084).toFixed(0)} ft
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Area Name (optional)
+                </label>
+                <input
+                  type="text"
+                  value={areaName}
+                  onChange={(e) => setAreaName(e.target.value)}
+                  placeholder="e.g., My Neighborhood"
+                  className="w-full border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded px-3 py-2"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Map for Area Selection */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+            <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+              {areaCenter ? 'Selected Area' : 'Click Map to Select Area'}
+            </h3>
+            <div className="relative">
+              <GoogleMap
+                mapContainerStyle={mapContainerStyle}
+                center={areaCenter || phoenixCenter}
+                zoom={areaCenter ? 15 : 11}
+                options={{
+                  ...mapOptions,
+                  clickableIcons: false,
+                }}
+                onClick={onMapClick}
+              >
+                {areaCenter && (
+                  <>
+                    <Marker position={areaCenter} />
+                    <Circle
+                      center={areaCenter}
+                      radius={areaRadius}
+                      options={{
+                        fillColor: '#3b82f6',
+                        fillOpacity: 0.2,
+                        strokeColor: '#3b82f6',
+                        strokeOpacity: 0.8,
+                        strokeWeight: 2,
+                      }}
+                    />
+                  </>
+                )}
+              </GoogleMap>
+            </div>
+          </div>
+
+          {/* Area Analysis Results */}
+          {areaAnalyzing && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600 dark:text-gray-400">Analyzing geographic area...</p>
+            </div>
+          )}
+
+          {areaData && !areaAnalyzing && (
+            <div className="space-y-3">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+                  <div className="text-2xl mb-1">✈️</div>
+                  <div className="text-2xl font-bold text-blue-600">{areaData.total_flights}</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">Total Flights</div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+                  <div className="text-2xl mb-1">⏱️</div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {(areaData.total_flight_time_minutes / 60).toFixed(1)}h
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">Total Flight Time</div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+                  <div className="text-2xl mb-1">⚠️</div>
+                  <div className="text-2xl font-bold text-orange-600">
+                    {(areaData.surveillance_likelihood * 100).toFixed(0)}%
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">Surveillance Likelihood</div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+                  <div className="text-2xl mb-1">⚖️</div>
+                  <div className="text-2xl font-bold text-red-600">
+                    {areaData.constitutional_concern_level}/5
+                  </div>
+                  <div className="text-sm text-gray-600 dark:text-gray-300">Constitutional Concern</div>
+                </div>
+              </div>
+
+              {/* Detailed Analysis */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+                  <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+                    Flight Activity Details
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">GPS Positions Recorded:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {areaData.total_positions.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Unique Aircraft:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {areaData.unique_aircraft}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Hovering Events:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {areaData.hovering_events}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Circling Events:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {areaData.circling_events}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Low Altitude Events:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {areaData.low_altitude_events}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Night Flights:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {areaData.night_flights}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+                  <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+                    Altitude Profile
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Average Altitude:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {Math.round(areaData.avg_altitude_feet)} ft
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Minimum Altitude:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {Math.round(areaData.min_altitude_feet)} ft
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Maximum Altitude:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">
+                        {Math.round(areaData.max_altitude_feet)} ft
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <h4 className="font-semibold text-sm mb-2 text-gray-900 dark:text-white">
+                      Privacy Analysis
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Privacy Expectation:</span>
+                        <span className={`font-medium px-2 py-0.5 rounded text-xs ${
+                          areaData.privacy_expectation_level === 'high'
+                            ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200'
+                            : areaData.privacy_expectation_level === 'medium'
+                            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200'
+                            : 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200'
+                        }`}>
+                          {areaData.privacy_expectation_level.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600 dark:text-gray-400">Residential Density:</span>
+                        <span className="font-medium text-gray-900 dark:text-white">
+                          {(areaData.residential_density * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Legal Implications */}
+              {areaData.constitutional_concern_level >= 3 && (
+                <div className="bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500 p-4 rounded">
+                  <h3 className="font-semibold text-red-800 dark:text-red-300 mb-2">
+                    ⚠️ Constitutional Concerns Detected
+                  </h3>
+                  <p className="text-sm text-red-700 dark:text-red-200 mb-3">
+                    This area shows elevated constitutional concern levels ({areaData.constitutional_concern_level}/5)
+                    based on surveillance patterns, privacy expectations, and flight characteristics.
+                  </p>
+                  <ul className="text-sm text-red-700 dark:text-red-200 space-y-1 ml-4">
+                    {areaData.hovering_events > 5 && (
+                      <li>• {areaData.hovering_events} hovering events (prolonged observation)</li>
+                    )}
+                    {areaData.low_altitude_events > 10 && (
+                      <li>• {areaData.low_altitude_events} low-altitude passes (enhanced surveillance capability)</li>
+                    )}
+                    {areaData.night_flights > 5 && (
+                      <li>• {areaData.night_flights} night flights (heightened privacy invasion)</li>
+                    )}
+                    {areaData.privacy_expectation_level === 'high' && (
+                      <li>• High privacy expectation area (residential neighborhood)</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              {/* Most Common Aircraft */}
+              {areaData.most_common_aircraft && areaData.most_common_aircraft.length > 0 && (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-4">
+                  <h3 className="text-lg font-semibold mb-3 text-gray-900 dark:text-white">
+                    Most Active Aircraft in This Area
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {areaData.most_common_aircraft.map((aircraft: string) => (
+                      <span
+                        key={aircraft}
+                        className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-sm font-medium"
+                      >
+                        {aircraft}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
