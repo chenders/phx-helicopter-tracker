@@ -6,7 +6,6 @@ from sqlalchemy import func, case, and_, or_, text
 from app.db.database import get_db
 from app.models import FlightLog, Aircraft, FlightPosition
 from collections import defaultdict
-import random
 
 router = APIRouter()
 
@@ -109,53 +108,46 @@ def get_pattern_analysis(
             {"hour": f"{hour:02d}:00", "count": len(hour_flights)}
         )
 
-    # Neighborhood distribution using fast grid-based aggregation
-    # This is a temporary solution until we implement proper neighborhood boundaries
+    # Neighborhood distribution using actual Phoenix village boundaries
     neighborhood_distribution = []
     try:
-        # Simplified grid approach - just aggregate all positions by grid
-        # Filter by flight_log_id from surveillance flights list
-        surveillance_flight_ids = [f.id for f in flights if f.surveillance_likelihood and f.surveillance_likelihood > 0.5 or (f.flight_duration_minutes and f.flight_duration_minutes > 30)]
+        # Filter surveillance flights
+        surveillance_flight_ids = [
+            f.id for f in flights
+            if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5)
+            or (f.flight_duration_minutes and f.flight_duration_minutes > 30)
+        ]
 
         if surveillance_flight_ids:
-            # Query positions only for surveillance flights
-            grid_data = defaultdict(lambda: {"position_count": 0, "flights": set()})
+            # Query neighborhood distribution using actual village boundaries
+            # Count surveillance flight positions by neighborhood
+            neighborhood_query = text("""
+                SELECT
+                    neighborhood,
+                    COUNT(DISTINCT flight_log_id) as surveillance_count,
+                    COUNT(*) as position_count
+                FROM flight_positions
+                WHERE
+                    flight_log_id = ANY(:flight_ids)
+                    AND neighborhood IS NOT NULL
+                GROUP BY neighborhood
+                ORDER BY surveillance_count DESC
+                LIMIT 10
+            """)
 
-            # Get positions in batches to avoid loading all into memory
-            positions = db.query(
-                FlightPosition.latitude,
-                FlightPosition.longitude,
-                FlightPosition.flight_log_id
-            ).filter(
-                FlightPosition.flight_log_id.in_(surveillance_flight_ids[:1000]),  # Limit to first 1000 flights
-                FlightPosition.latitude.isnot(None),
-                FlightPosition.longitude.isnot(None)
-            ).all()
+            results = db.execute(
+                neighborhood_query,
+                {"flight_ids": surveillance_flight_ids[:1000]}  # Limit to first 1000 flights
+            ).fetchall()
 
-            # Aggregate into grid
-            for pos in positions:
-                grid_lat = round(pos.latitude / 0.02) * 0.02
-                grid_lon = round(pos.longitude / 0.02) * 0.02
-                grid_key = (grid_lat, grid_lon)
-                grid_data[grid_key]["position_count"] += 1
-                grid_data[grid_key]["flights"].add(pos.flight_log_id)
+            for row in results:
+                neighborhood_distribution.append({
+                    "neighborhood": row.neighborhood,
+                    "surveillance_count": row.surveillance_count
+                })
 
-            # Sort by position count and take top 10
-            sorted_grids = sorted(grid_data.items(), key=lambda x: x[1]["position_count"], reverse=True)[:10]
-
-            # Label grid cells as areas
-            area_labels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J']
-            for idx, (grid_key, data) in enumerate(sorted_grids):
-                if idx < len(area_labels) and data["position_count"] > 100:
-                    lat = round(grid_key[0], 3)
-                    lon = round(grid_key[1], 3)
-
-                    neighborhood_distribution.append({
-                        "neighborhood": f"Area {area_labels[idx]} ({lat}, {lon})",
-                        "surveillance_count": len(data["flights"])
-                    })
     except Exception as e:
-        # If grid query fails, return empty array (graceful degradation)
+        # If query fails, return empty array (graceful degradation)
         import logging
         logging.error(f"Error generating neighborhood distribution: {e}")
         neighborhood_distribution = []
@@ -276,11 +268,33 @@ def get_surveillance_hotspots(
 
             risk_level = "High Risk" if risk_score > 0.6 else "Moderate Risk" if risk_score > 0.3 else "Low Risk"
 
+            # Get neighborhood name for this location if available
+            neighborhood_query = text("""
+                SELECT name
+                FROM phoenix_neighborhoods
+                WHERE ST_DWithin(
+                    ST_MakePoint(:lon, :lat)::geography,
+                    boundary,
+                    1000  -- Within 1km of grid center
+                )
+                LIMIT 1
+            """)
+            neighborhood_result = db.execute(
+                neighborhood_query,
+                {"lat": row.grid_lat, "lon": row.grid_lon}
+            ).fetchone()
+
+            location_name = (
+                f"{neighborhood_result.name} Village"
+                if neighborhood_result
+                else f"Area at {round(row.grid_lat, 4)}, {round(row.grid_lon, 4)}"
+            )
+
             hotspots.append({
-                "location": f"Area at {round(row.grid_lat, 4)}, {round(row.grid_lon, 4)}",
+                "location": location_name,
                 "event_count": row.flight_count,
                 "surveillance_intensity": round(surveillance_intensity, 2),
-                "demographic_info": "Grid-based cluster (awaiting neighborhood mapping)",
+                "demographic_info": neighborhood_result.name if neighborhood_result else "Outside Phoenix",
                 "constitutional_risk": risk_level,
                 "hover_events": row.hover_positions,
                 "low_altitude_incidents": row.low_altitude_count

@@ -18,7 +18,37 @@ from app.schemas.analysis import (
 router = APIRouter()
 
 
-# Pattern Analysis endpoints
+# ============================================================================
+# PRODUCTION ENDPOINTS - Used by frontend, fully implemented with real data
+# ============================================================================
+
+# Production endpoints:
+# - GET /patterns - Pattern analysis with real data (used by PatternAnalysis page)
+# - GET /hotspots - Surveillance hotspots (used by PatternAnalysis page)
+# - GET /historical - Historical flight analysis (used by FlightMap page)
+# - GET /costs - Cost analysis (used by CostAnalysis page)
+# - GET /costs/summary - Quick cost summary
+# - GET /flight-pattern-analysis/{flight_id} - Individual flight analysis
+
+# ============================================================================
+# PLACEHOLDER ENDPOINTS - Not implemented, not used by frontend
+# ============================================================================
+
+# These endpoints return placeholder data and are not currently used:
+# - POST /patterns - Create pattern analysis (not implemented)
+# - GET /patterns/{id} - Get pattern analysis by ID (not implemented)
+# - POST /surveillance - Surveillance report (not implemented)
+# - POST /areas - Geographic area analysis (partial implementation)
+# - GET /time-patterns - Time pattern analysis (not implemented)
+# - POST /compare - Comparative analysis (not implemented)
+# - POST /export/{type} - Export functionality (not implemented)
+# - GET /alerts/active - Real-time alerts (not implemented)
+# - POST /alerts/test - Test alerts (not implemented)
+
+# ============================================================================
+# PLACEHOLDER ENDPOINTS (for future implementation)
+# ============================================================================
+
 @router.post("/patterns", response_model=PatternAnalysis)
 def analyze_flight_patterns(
     *,
@@ -37,7 +67,12 @@ def analyze_flight_patterns(
         description="Types of patterns to detect",
     ),
 ) -> PatternAnalysis:
-    """Analyze flight patterns for surveillance detection"""
+    """
+    [PLACEHOLDER] Analyze flight patterns for surveillance detection
+
+    This endpoint is not implemented. It returns placeholder data.
+    For production pattern analysis, use GET /api/v1/patterns/analysis instead.
+    """
 
     # Validate date range
     if end_date <= start_date:
@@ -48,10 +83,9 @@ def analyze_flight_patterns(
             status_code=400, detail="Analysis period cannot exceed 90 days"
         )
 
-    # TODO: Implement actual pattern analysis
+    # Return placeholder data
     analysis_id = f"pattern_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
 
-    # Placeholder analysis result
     analysis = PatternAnalysis(
         analysis_id=analysis_id,
         date_range_start=start_date,
@@ -70,9 +104,6 @@ def analyze_flight_patterns(
         estimated_total_cost=0.0,
     )
 
-    # TODO: Queue background task for actual analysis
-    # background_tasks.add_task(run_pattern_analysis, analysis_id, start_date, end_date, aircraft_filter)
-
     return analysis
 
 
@@ -80,8 +111,12 @@ def analyze_flight_patterns(
 def get_pattern_analysis(
     *, db: Session = Depends(get_db), analysis_id: str
 ) -> PatternAnalysis:
-    """Get completed pattern analysis results"""
-    # TODO: Retrieve analysis from database
+    """
+    [PLACEHOLDER] Get completed pattern analysis results
+
+    This endpoint is not implemented.
+    For production pattern analysis, use GET /api/v1/patterns/analysis instead.
+    """
     raise HTTPException(status_code=404, detail="Pattern analysis not found")
 
 
@@ -93,7 +128,12 @@ def get_pattern_analysis(
         "30d", description="Time range for analysis (e.g., 7d, 30d, 90d)"
     ),
 ) -> dict:
-    """Get pattern analysis for specified time range"""
+    """
+    [PRODUCTION] Get pattern analysis for specified time range
+
+    This endpoint uses real flight data from the database.
+    Note: This is a legacy endpoint. The preferred endpoint is GET /api/v1/patterns/analysis
+    """
     # Parse time range
     import re
 
@@ -233,17 +273,16 @@ def get_pattern_analysis(
             },
         ]
 
-    # Calculate additional metrics
-    discriminatory_ratio = (
-        0.7 if len(surveillance_flights) > 5 else 0.3
-    )  # Higher surveillance in minority areas
+    # Calculate additional metrics from real data
     excessive_hovering = len([f for f in flights if f.hover_locations])
     low_altitude_violations = len(
         [f for f in flights if f.min_altitude_feet and f.min_altitude_feet < 400]
     )
-    systematic_patrol_routes = (
-        3 if len(flights) > 10 else 1
-    )  # Number of repeated patterns
+
+    # Note: These metrics require more sophisticated analysis not yet implemented
+    # Setting to 0 until proper implementation
+    discriminatory_ratio = 0  # Would require demographic data correlation
+    systematic_patrol_routes = 0  # Would require route pattern analysis
 
     return {
         "constitutional_violations": constitutional_violations,
@@ -378,7 +417,12 @@ def get_cost_analysis(
     db: Session = Depends(get_db),
     time_range: str = Query("30d", description="Time range (e.g., 7d, 30d, 90d, 1y)"),
 ) -> dict:
-    """Get cost analysis for specified time range"""
+    """
+    [PRODUCTION] Get cost analysis for specified time range
+
+    This endpoint uses real flight data from the database.
+    Used by the CostAnalysis page in the frontend.
+    """
     # Parse time range
     import re
 
@@ -524,7 +568,11 @@ def get_cost_summary(
     days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
     aircraft_id: Optional[int] = Query(None, description="Filter by aircraft ID"),
 ) -> dict:
-    """Get quick cost summary for recent flights"""
+    """
+    [PRODUCTION] Get quick cost summary for recent flights
+
+    This endpoint uses real flight data from the database.
+    """
     end_date = datetime.now(timezone.utc)
     start_date = end_date - timedelta(days=days)
 
@@ -565,7 +613,11 @@ def analyze_surveillance_patterns(
         True, description="Include constitutional analysis"
     ),
 ) -> SurveillanceReport:
-    """Analyze surveillance patterns for constitutional violations"""
+    """
+    [PLACEHOLDER] Analyze surveillance patterns for constitutional violations
+
+    This endpoint is not implemented. It returns placeholder data.
+    """
 
     report_id = f"surveillance_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
 
@@ -600,7 +652,12 @@ def analyze_geographic_area(
     end_date: Optional[datetime] = Query(None, description="Analysis end date"),
     area_name: str = Query("Custom Area", description="Name for this area analysis"),
 ) -> AreaAnalysis:
-    """Analyze helicopter activity in a specific geographic area"""
+    """
+    [PLACEHOLDER] Analyze helicopter activity in a specific geographic area
+
+    This endpoint has partial implementation. It returns basic position counts
+    but lacks full analysis capabilities.
+    """
 
     # Set default date range if not provided
     if not end_date:
@@ -664,7 +721,11 @@ def analyze_time_patterns(
         None, description="Aircraft registrations to analyze"
     ),
 ) -> TimeAnalysis:
-    """Analyze temporal patterns in helicopter flights"""
+    """
+    [PLACEHOLDER] Analyze temporal patterns in helicopter flights
+
+    This endpoint is not implemented. It returns placeholder data.
+    """
 
     # Set default date range
     if not end_date:
@@ -704,7 +765,11 @@ def get_active_alerts(
         1, ge=1, le=5, description="Minimum privacy concern level"
     ),
 ) -> List[RealTimeAlert]:
-    """Get active real-time surveillance alerts"""
+    """
+    [PLACEHOLDER] Get active real-time surveillance alerts
+
+    This endpoint is not implemented. It returns an empty list.
+    """
     # TODO: Retrieve active alerts from database/cache
     return []
 
@@ -720,7 +785,11 @@ def create_test_alert(
     latitude: float = Query(33.4484, description="Test alert latitude"),
     longitude: float = Query(-112.0740, description="Test alert longitude"),
 ) -> dict:
-    """Create a test surveillance alert for system testing"""
+    """
+    [PLACEHOLDER] Create a test surveillance alert for system testing
+
+    This endpoint returns placeholder test data. Not used in production.
+    """
 
     test_alert = RealTimeAlert(
         alert_id=f"test_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
@@ -752,7 +821,12 @@ def get_historical_analysis(
         "all", description="Aircraft filter (all or specific registration)"
     ),
 ) -> dict:
-    """Get historical flight analysis data"""
+    """
+    [PRODUCTION] Get historical flight analysis data
+
+    This endpoint uses real flight data from the database.
+    Used by the FlightMap page in the frontend.
+    """
 
     # Parse time range
     import re
@@ -1284,7 +1358,12 @@ def get_flight_pattern_analysis(
     db: Session = Depends(get_db),
     flight_id: int = Path(..., description="Flight log ID"),
 ) -> dict:
-    """Get pattern analysis for a specific flight including hover locations"""
+    """
+    [PRODUCTION] Get pattern analysis for a specific flight including hover locations
+
+    This endpoint uses real flight data from the database.
+    Used by the FlightDetailPage in the frontend.
+    """
     from app.models.flight_logs import FlightLog
     from app.models.abnormal_patterns import AbnormalPattern
 
@@ -1335,7 +1414,11 @@ def compare_analysis_periods(
         ["flights", "costs", "surveillance"], description="Metrics to compare"
     ),
 ) -> dict:
-    """Compare helicopter activity between two time periods"""
+    """
+    [PLACEHOLDER] Compare helicopter activity between two time periods
+
+    This endpoint is not implemented. It returns placeholder data.
+    """
 
     # Validate periods don't overlap
     if period1_start <= period2_end and period2_start <= period1_end:
@@ -1366,7 +1449,11 @@ def export_analysis_data(
     format: str = Query("json", regex="^(json|csv|pdf)$", description="Export format"),
     include_raw_data: bool = Query(False, description="Include raw flight data"),
 ) -> dict:
-    """Export analysis results in various formats"""
+    """
+    [PLACEHOLDER] Export analysis results in various formats
+
+    This endpoint is not implemented. It returns placeholder data.
+    """
 
     # TODO: Implement analysis export
     export_id = (
