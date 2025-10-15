@@ -64,6 +64,7 @@ export function RadioPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(25)
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true)
+  const [wordWrapEnabled, setWordWrapEnabled] = useState(true)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const transcriptContainerRef = useRef<HTMLDivElement | null>(null)
   const activeSegmentRef = useRef<HTMLDivElement | null>(null)
@@ -741,7 +742,8 @@ export function RadioPage() {
               
               return (
                 <>
-                  <div className="overflow-x-auto">
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                       <thead>
                         <tr>
@@ -895,6 +897,17 @@ export function RadioPage() {
                                     </span>
                                   </div>
                                   <div className="flex items-center space-x-4">
+                                    {/* Word wrap toggle */}
+                                    <label className="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer hover:text-gray-100 transition-colors">
+                                      <input
+                                        type="checkbox"
+                                        checked={wordWrapEnabled}
+                                        onChange={(e) => setWordWrapEnabled(e.target.checked)}
+                                        className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                                      />
+                                      <span>Word Wrap</span>
+                                    </label>
+
                                     {/* Auto-scroll toggle */}
                                     <label className="flex items-center space-x-2 text-sm text-gray-300 cursor-pointer hover:text-gray-100 transition-colors">
                                       <input
@@ -906,7 +919,7 @@ export function RadioPage() {
                                       <ScrollText className={`h-4 w-4 ${autoScrollEnabled ? 'text-blue-400' : 'text-gray-500'}`} />
                                       <span>Auto-scroll</span>
                                     </label>
-                                    
+
                                     <button
                                       onClick={() => downloadFile(archive.filename, 'txt')}
                                       className="flex items-center space-x-1 md:space-x-2 text-green-400 hover:text-green-300 text-xs md:text-sm"
@@ -942,14 +955,14 @@ export function RadioPage() {
                                           <div className="text-sm text-blue-400 whitespace-nowrap hover:text-blue-300">
                                             [{formatTime(segment.start)} - {formatTime(segment.end)}]
                                           </div>
-                                          <div className="text-sm text-gray-300 flex-1">
+                                          <div className={`text-sm text-gray-300 flex-1 ${wordWrapEnabled ? 'break-words' : 'whitespace-nowrap overflow-x-auto'}`}>
                                             {segment.text}
                                           </div>
                                         </div>
                                       )
                                     })
                                   ) : (
-                                    <div className="text-gray-300 whitespace-pre-wrap">
+                                    <div className={`text-sm text-gray-300 ${wordWrapEnabled ? 'break-words whitespace-pre-wrap' : 'whitespace-pre overflow-x-auto'}`}>
                                       {transcription.text}
                                     </div>
                                   )}
@@ -973,7 +986,224 @@ export function RadioPage() {
                       </tbody>
                     </table>
                   </div>
-                  
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-4">
+                    {paginatedArchives.map((archive) => {
+                      const fileInfo = parseFilename(archive.filename)
+                      const duration = "~30 min"
+                      const isExpanded = expandedRow === archive.filename
+
+                      return (
+                        <div
+                          key={archive.filename}
+                          className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4"
+                          data-filename={archive.filename}
+                        >
+                          {/* Card Header */}
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900 dark:text-white mb-1">
+                                {fileInfo.dateStr}
+                              </div>
+                              <div className="text-sm text-gray-600 dark:text-gray-400 space-y-0.5">
+                                {fileInfo.timeRange && <div>{fileInfo.timeRange}</div>}
+                                <div>{duration} • {archive.size_mb.toFixed(2)} MB</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex items-center space-x-3 mb-3">
+                            <button
+                              onClick={() => handlePlayAudio(archive.filename)}
+                              className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                            >
+                              {playingAudio === archive.filename && audioRef.current && !audioRef.current.paused ? (
+                                <>
+                                  <Pause className="h-4 w-4" />
+                                  <span className="text-sm">Pause</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="h-4 w-4" />
+                                  <span className="text-sm">Play</span>
+                                </>
+                              )}
+                            </button>
+
+                            {archive.has_transcription && (
+                              <button
+                                onClick={() => toggleRowExpansion(archive.filename)}
+                                className="flex-1 flex items-center justify-center space-x-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                              >
+                                <FileText className="h-4 w-4" />
+                                <span className="text-sm">{isExpanded ? 'Hide' : 'Show'} Text</span>
+                              </button>
+                            )}
+
+                            {transcribingFiles.has(archive.filename) && (
+                              <button
+                                disabled
+                                className="px-3 py-2 bg-yellow-500 text-white rounded-lg opacity-75 cursor-not-allowed"
+                              >
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => downloadFile(archive.filename, 'mp3')}
+                              className="px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                            >
+                              <Download className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          {/* Expanded Content */}
+                          {isExpanded && (
+                            <div className="mt-4 space-y-4 border-t border-gray-200 dark:border-gray-600 pt-4">
+                              {/* Audio Player */}
+                              <div className="bg-gray-900 rounded-lg p-3">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="flex items-center space-x-2">
+                                    <Volume2 className="h-4 w-4 text-blue-400" />
+                                    <span className="text-sm font-medium text-white">Audio Player</span>
+                                  </div>
+                                  <button
+                                    onClick={() => downloadFile(archive.filename, 'mp3')}
+                                    className="flex items-center space-x-1 text-blue-400 hover:text-blue-300 text-xs"
+                                  >
+                                    <Download className="h-3 w-3" />
+                                    <span>MP3</span>
+                                  </button>
+                                </div>
+
+                                <div className="flex items-center space-x-2">
+                                  <button
+                                    onClick={() => handlePlayAudio(archive.filename)}
+                                    className="p-2 bg-gray-800 rounded-full hover:bg-gray-700 text-white"
+                                  >
+                                    {playingAudio === archive.filename && audioRef.current && !audioRef.current.paused ? (
+                                      <Pause className="h-4 w-4" />
+                                    ) : (
+                                      <Play className="h-4 w-4" />
+                                    )}
+                                  </button>
+
+                                  <div className="flex-1">
+                                    <input
+                                      type="range"
+                                      min="0"
+                                      max={playingAudio === archive.filename ? audioDuration : 100}
+                                      value={playingAudio === archive.filename ? audioCurrentTime : 0}
+                                      onChange={handleSeek}
+                                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                      disabled={playingAudio !== archive.filename}
+                                    />
+                                  </div>
+
+                                  <div className="text-xs text-gray-400 whitespace-nowrap">
+                                    {formatTime(playingAudio === archive.filename ? audioCurrentTime : 0)} / {formatTime(playingAudio === archive.filename ? audioDuration : 0)}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Transcript */}
+                              {archive.has_transcription && transcription && selectedArchive === archive.filename && (
+                                <div className="bg-gray-900 rounded-lg p-3">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center space-x-2">
+                                      <FileText className="h-4 w-4 text-green-400" />
+                                      <span className="text-sm font-medium text-white">
+                                        Transcript
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      {/* Word wrap toggle */}
+                                      <label className="flex items-center space-x-1 text-xs text-gray-300 cursor-pointer hover:text-gray-100 transition-colors">
+                                        <input
+                                          type="checkbox"
+                                          checked={wordWrapEnabled}
+                                          onChange={(e) => setWordWrapEnabled(e.target.checked)}
+                                          className="w-3 h-3 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-1"
+                                        />
+                                        <span>Wrap</span>
+                                      </label>
+
+                                      {/* Auto-scroll toggle */}
+                                      <label className="flex items-center space-x-1 text-xs text-gray-300 cursor-pointer hover:text-gray-100 transition-colors">
+                                        <input
+                                          type="checkbox"
+                                          checked={autoScrollEnabled}
+                                          onChange={(e) => setAutoScrollEnabled(e.target.checked)}
+                                          className="w-3 h-3 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 focus:ring-1"
+                                        />
+                                        <ScrollText className={`h-3 w-3 ${autoScrollEnabled ? 'text-blue-400' : 'text-gray-500'}`} />
+                                      </label>
+
+                                      <button
+                                        onClick={() => downloadFile(archive.filename, 'txt')}
+                                        className="flex items-center space-x-1 text-green-400 hover:text-green-300 text-xs"
+                                      >
+                                        <Download className="h-3 w-3" />
+                                        <span>TXT</span>
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  <div
+                                    ref={transcriptContainerRef}
+                                    className="space-y-2 max-h-64 overflow-y-auto"
+                                  >
+                                    {transcription.segments && transcription.segments.length > 0 ? (
+                                      transcription.segments.map((segment, idx) => {
+                                        const isActive = playingAudio === archive.filename &&
+                                          audioCurrentTime >= segment.start &&
+                                          audioCurrentTime <= segment.end
+
+                                        return (
+                                          <div
+                                            key={idx}
+                                            ref={isActive ? activeSegmentRef : null}
+                                            onClick={() => handleTranscriptClick(segment.start, archive.filename)}
+                                            className={`p-2 rounded cursor-pointer hover:bg-gray-800 transition-colors ${
+                                              isActive
+                                                ? 'bg-blue-900 bg-opacity-30 border-l-4 border-blue-400'
+                                                : ''
+                                            }`}
+                                            title="Click to jump to this timestamp"
+                                          >
+                                            <div className="text-xs text-blue-400 mb-1">
+                                              [{formatTime(segment.start)} - {formatTime(segment.end)}]
+                                            </div>
+                                            <div className={`text-xs text-gray-300 ${wordWrapEnabled ? 'break-words' : 'whitespace-nowrap overflow-x-auto'}`}>
+                                              {segment.text}
+                                            </div>
+                                          </div>
+                                        )
+                                      })
+                                    ) : (
+                                      <div className={`text-xs text-gray-300 ${wordWrapEnabled ? 'break-words' : 'whitespace-pre-wrap'}`}>
+                                        {transcription.text}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Loading Transcript */}
+                              {archive.has_transcription && (!transcription || selectedArchive !== archive.filename) && (
+                                <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm">
+                                  Loading transcript...
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
                   {/* Pagination Controls */}
                   {totalPages > 1 && (
                     <div className="flex flex-col md:flex-row items-center justify-between mt-4 px-2 md:px-4 gap-3">
