@@ -8,6 +8,7 @@ import { HomePage } from './pages/HomePage'
 import { LiveTrackingPage } from './pages/LiveTrackingPage'
 import { HistoricalAnalysisPage } from './pages/HistoricalAnalysisPage'
 import { PatternAnalysisPage } from './pages/PatternAnalysisPage'
+import { TemporalAnalysisPage } from './pages/TemporalAnalysisPage'
 import { CostAnalysisPage } from './pages/CostAnalysisPage'
 import { LegalDocumentsPage } from './pages/LegalDocumentsPage'
 import { DataSourcesPage } from './pages/DataSourcesPage'
@@ -48,6 +49,7 @@ function App() {
                 <Route path="/live" element={<LiveTrackingPage />} />
                 <Route path="/historical" element={<HistoricalAnalysisPage />} />
                 <Route path="/patterns" element={<PatternAnalysisPage />} />
+                <Route path="/temporal" element={<TemporalAnalysisPage />} />
                 <Route path="/costs" element={<CostAnalysisPage />} />
                 <Route path="/legal" element={<LegalDocumentsPage />} />
                 <Route path="/data-sources" element={<DataSourcesPage />} />
@@ -72,6 +74,7 @@ function App() {
                 <Route path="/live" element={<LiveTrackingPage />} />
                 <Route path="/historical" element={<HistoricalAnalysisPage />} />
                 <Route path="/patterns" element={<PatternAnalysisPage />} />
+                <Route path="/temporal" element={<TemporalAnalysisPage />} />
                 <Route path="/costs" element={<CostAnalysisPage />} />
                 <Route path="/legal" element={<LegalDocumentsPage />} />
                 <Route path="/data-sources" element={<DataSourcesPage />} />

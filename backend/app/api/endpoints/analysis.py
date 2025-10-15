@@ -29,6 +29,7 @@ router = APIRouter()
 # - GET /costs - Cost analysis (used by CostAnalysis page)
 # - GET /costs/summary - Quick cost summary
 # - GET /flight-pattern-analysis/{flight_id} - Individual flight analysis
+# - GET /time-patterns - Temporal pattern analysis (will be used by TemporalAnalysisPage)
 
 # ============================================================================
 # PLACEHOLDER ENDPOINTS - Not implemented, not used by frontend
@@ -39,7 +40,6 @@ router = APIRouter()
 # - GET /patterns/{id} - Get pattern analysis by ID (not implemented)
 # - POST /surveillance - Surveillance report (not implemented)
 # - POST /areas - Geographic area analysis (partial implementation)
-# - GET /time-patterns - Time pattern analysis (not implemented)
 # - POST /compare - Comparative analysis (not implemented)
 # - POST /export/{type} - Export functionality (not implemented)
 # - GET /alerts/active - Real-time alerts (not implemented)
@@ -722,12 +722,13 @@ def analyze_time_patterns(
     ),
 ) -> TimeAnalysis:
     """
-    [PLACEHOLDER] Analyze temporal patterns in helicopter flights
+    [PRODUCTION] Analyze temporal patterns in helicopter flights
 
-    This endpoint is not implemented. It returns placeholder data.
+    This endpoint uses real flight data from the database.
+    Returns flight activity patterns grouped by hour, day, week, or month.
     """
 
-    # Set default date range
+    # Set default date range based on analysis type
     if not end_date:
         end_date = datetime.now(timezone.utc)
     if not start_date:
@@ -740,19 +741,153 @@ def analyze_time_patterns(
         else:  # monthly
             start_date = end_date - timedelta(days=365)  # 12 months
 
-    # TODO: Implement temporal analysis
-    analysis = TimeAnalysis(
-        analysis_type=analysis_type,
-        time_periods=[],
-        flight_counts=[],
-        flight_hours=[],
-        cost_estimates=[],
-        peak_activity_periods=[],
-        unusual_activity_periods=[],
-        surveillance_likelihood_by_period={},
+    # Get flight data
+    from app.crud.flights import flight_log_crud
+    from app.models import Aircraft
+    import statistics
+
+    # Build query
+    query = db.query(FlightLog).filter(
+        and_(
+            FlightLog.departure_time >= start_date,
+            FlightLog.departure_time <= end_date,
+        )
     )
 
-    return analysis
+    # Apply aircraft filter if provided
+    if aircraft_filter:
+        query = query.join(Aircraft).filter(Aircraft.registration.in_(aircraft_filter))
+
+    flights = query.order_by(FlightLog.departure_time).all()
+
+    if not flights:
+        # Return empty analysis if no data
+        return TimeAnalysis(
+            analysis_type=analysis_type,
+            time_periods=[],
+            flight_counts=[],
+            flight_hours=[],
+            cost_estimates=[],
+            peak_activity_periods=[],
+            unusual_activity_periods=[],
+            surveillance_likelihood_by_period={},
+        )
+
+    # Group flights by time period
+    from collections import defaultdict
+    period_data = defaultdict(lambda: {"flights": [], "surveillance": []})
+
+    for flight in flights:
+        if not flight.departure_time:
+            continue
+
+        # Determine period key based on analysis type
+        if analysis_type == "hourly":
+            period_key = flight.departure_time.strftime("%H:00")
+        elif analysis_type == "daily":
+            period_key = flight.departure_time.strftime("%m/%d")
+        elif analysis_type == "weekly":
+            week_num = flight.departure_time.isocalendar()[1]
+            year = flight.departure_time.year
+            period_key = f"Week {week_num} ({year})"
+        else:  # monthly
+            period_key = flight.departure_time.strftime("%b %Y")
+
+        period_data[period_key]["flights"].append(flight)
+
+        # Track surveillance flights
+        is_surveillance = (
+            flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5
+        )
+        if is_surveillance:
+            period_data[period_key]["surveillance"].append(flight)
+
+    # Build time periods list and calculate metrics
+    time_periods = []
+    flight_counts = []
+    flight_hours = []
+    cost_estimates = []
+    surveillance_by_period = {}
+
+    # Sort periods appropriately
+    if analysis_type == "hourly":
+        sorted_periods = sorted(period_data.keys(), key=lambda x: int(x.split(":")[0]))
+    else:
+        sorted_periods = list(period_data.keys())
+
+    for period in sorted_periods:
+        data = period_data[period]
+        flights_in_period = data["flights"]
+        surveillance_in_period = data["surveillance"]
+
+        # Calculate metrics
+        total_hours = sum(
+            (f.flight_duration_minutes or 0) / 60 for f in flights_in_period
+        )
+        total_cost = sum(f.estimated_cost or 0 for f in flights_in_period)
+        surveillance_ratio = (
+            len(surveillance_in_period) / len(flights_in_period)
+            if flights_in_period
+            else 0
+        )
+
+        time_periods.append(period)
+        flight_counts.append(len(flights_in_period))
+        flight_hours.append(round(total_hours, 2))
+        cost_estimates.append(round(total_cost, 2))
+        surveillance_by_period[period] = round(surveillance_ratio, 3)
+
+    # Identify peak activity periods (>2 std dev from mean)
+    peak_activity_periods = []
+    if len(flight_counts) > 2:
+        mean_count = statistics.mean(flight_counts)
+        try:
+            std_dev = statistics.stdev(flight_counts)
+            threshold = mean_count + (2 * std_dev)
+
+            for i, count in enumerate(flight_counts):
+                if count > threshold:
+                    peak_activity_periods.append(time_periods[i])
+        except statistics.StatisticsError:
+            # Not enough variance in data
+            pass
+
+    # Identify unusual activity periods (low activity or high surveillance)
+    unusual_activity_periods = []
+    for i, period in enumerate(time_periods):
+        count = flight_counts[i]
+        surveillance_ratio = surveillance_by_period.get(period, 0)
+
+        # Unusually low activity (< 50% of mean)
+        if len(flight_counts) > 2:
+            mean_count = statistics.mean(flight_counts)
+            if 0 < count < (mean_count * 0.5):
+                unusual_activity_periods.append({
+                    "period": period,
+                    "reason": "Low activity",
+                    "flight_count": count,
+                    "description": f"Only {count} flights, {int((1 - count/mean_count) * 100)}% below average"
+                })
+
+        # Unusually high surveillance ratio (>75%)
+        if surveillance_ratio > 0.75 and count >= 3:
+            unusual_activity_periods.append({
+                "period": period,
+                "reason": "High surveillance ratio",
+                "surveillance_ratio": surveillance_ratio,
+                "description": f"{int(surveillance_ratio * 100)}% surveillance flights in this period"
+            })
+
+    return TimeAnalysis(
+        analysis_type=analysis_type,
+        time_periods=time_periods,
+        flight_counts=flight_counts,
+        flight_hours=flight_hours,
+        cost_estimates=cost_estimates,
+        peak_activity_periods=peak_activity_periods,
+        unusual_activity_periods=unusual_activity_periods,
+        surveillance_likelihood_by_period=surveillance_by_period,
+    )
 
 
 # Real-time Alert endpoints
