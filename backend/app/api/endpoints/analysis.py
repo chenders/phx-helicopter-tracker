@@ -556,11 +556,6 @@ def get_cost_analysis(
     phoenix_population = 1600000
     cost_per_resident = total_cost / phoenix_population if phoenix_population > 0 else 0
 
-    # Alternative funding calculations
-    police_officer_salary = 65000  # Annual
-    student_scholarship = 12000  # Annual
-    mental_health_program = 85000  # Annual program cost
-
     period_days = (end_date - start_date).days
     annual_multiplier = 365 / period_days if period_days > 0 else 1
     annual_surveillance_cost = surveillance_cost * annual_multiplier
