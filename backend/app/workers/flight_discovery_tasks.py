@@ -614,8 +614,17 @@ async def _download_tracks_async(batch_size: int) -> Dict[str, Any]:
                     coordinates = [(pos.latitude, pos.longitude) for pos in positions]
 
                     # Initialize elevation service and get elevations
+                    # Close any existing connections first to avoid event loop issues in forked workers
+                    try:
+                        await elevation_service.close()
+                    except:
+                        pass  # Ignore errors closing stale connections
+
                     await elevation_service.initialize()
                     elevations = await elevation_service.get_elevations_batch(coordinates)
+
+                    # Close connections after batch to avoid event loop issues
+                    await elevation_service.close()
 
                     # Variables to track altitude stats (both MSL and AGL)
                     agl_altitudes = []

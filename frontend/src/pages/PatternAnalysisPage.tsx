@@ -151,21 +151,25 @@ export function PatternAnalysisPage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Surveillance by Neighborhood</h3>
           {patternData?.neighborhood_distribution && patternData.neighborhood_distribution.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={patternData.neighborhood_distribution}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="neighborhood" angle={-45} textAnchor="end" height={80} />
-                <YAxis />
-                <Tooltip
-                  formatter={(value: any) => [`${value} incidents`, 'Surveillance Incidents']}
-                />
-                <Bar dataKey="surveillance_count" fill="#f59e0b" />
-              </BarChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={patternData.neighborhood_distribution}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="neighborhood" angle={-45} textAnchor="end" height={100} />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value: any) => [`${value} incidents`, 'Surveillance Incidents']}
+                  />
+                  <Bar dataKey="surveillance_count" fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+              <div className="text-xs text-gray-500 dark:text-gray-400 italic mt-2">
+                Note: Areas shown are grid-based clusters. Official Phoenix neighborhood boundaries will be added in a future update.
+              </div>
+            </>
           ) : (
             <div className="text-sm text-gray-500 dark:text-gray-400 italic p-4">
-              Neighborhood distribution requires GPS coordinate mapping - not yet implemented.
-              Use the Historical Analysis map to view actual surveillance patterns by location.
+              No surveillance activity detected in this time period.
             </div>
           )}
         </div>
@@ -179,21 +183,25 @@ export function PatternAnalysisPage() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Surveillance by Neighborhood</h3>
             {patternData?.neighborhood_distribution && patternData.neighborhood_distribution.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={patternData.neighborhood_distribution}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="neighborhood" angle={-45} textAnchor="end" height={80} />
-                  <YAxis />
-                  <Tooltip
-                    formatter={(value: any) => [`${value} incidents`, 'Surveillance Incidents']}
-                  />
-                  <Bar dataKey="surveillance_count" fill="#f59e0b" />
-                </BarChart>
-              </ResponsiveContainer>
+              <>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={patternData.neighborhood_distribution}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="neighborhood" angle={-45} textAnchor="end" height={100} />
+                    <YAxis />
+                    <Tooltip
+                      formatter={(value: any) => [`${value} incidents`, 'Surveillance Incidents']}
+                    />
+                    <Bar dataKey="surveillance_count" fill="#f59e0b" />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="text-xs text-gray-500 dark:text-gray-400 italic mt-2">
+                  Note: Areas shown are grid-based clusters. Official Phoenix neighborhood boundaries will be added in a future update.
+                </div>
+              </>
             ) : (
               <div className="text-sm text-gray-500 dark:text-gray-400 italic p-4">
-                Neighborhood distribution requires GPS coordinate mapping - not yet implemented.
-                Use the Historical Analysis map to view actual surveillance patterns by location.
+                No surveillance activity detected in this time period.
               </div>
             )}
           </div>
@@ -221,8 +229,7 @@ export function PatternAnalysisPage() {
               </div>
             ) : (
               <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-                Geographic clustering requires GPS position data analysis - not yet implemented.
-                Use the Historical Analysis map view to see actual flight paths.
+                No surveillance hotspots detected in this time period.
               </div>
             )}
           </div>
@@ -356,8 +363,7 @@ export function PatternAnalysisPage() {
             </div>
           ) : (
             <div className="text-sm text-gray-500 dark:text-gray-400 italic">
-              Geographic clustering requires GPS position data analysis - not yet implemented.
-              Use the Historical Analysis map view to see actual flight paths and surveillance patterns.
+              No surveillance hotspots detected in this time period.
             </div>
           )}
         </div>

@@ -39,21 +39,43 @@ class ElevationService:
 
     async def initialize(self):
         """Initialize Redis connection and HTTP session"""
+        try:
+            # Check if existing connections are still valid
+            if self.redis_client:
+                try:
+                    await self.redis_client.ping()
+                except:
+                    # Connection is stale, close and recreate
+                    await self.close()
+        except:
+            pass
+
         if not self.redis_client:
             self.redis_client = await redis.from_url(
                 f"redis://redis:6379",
                 encoding="utf-8",
                 decode_responses=True
             )
-        if not self.session:
+        if not self.session or self.session.closed:
             self.session = aiohttp.ClientSession()
 
     async def close(self):
         """Close connections"""
         if self.session:
-            await self.session.close()
+            try:
+                await self.session.close()
+            except Exception as e:
+                logger.warning(f"Error closing HTTP session: {e}")
+            finally:
+                self.session = None
+
         if self.redis_client:
-            await self.redis_client.close()
+            try:
+                await self.redis_client.close()
+            except Exception as e:
+                logger.warning(f"Error closing Redis client: {e}")
+            finally:
+                self.redis_client = None
 
     def _get_cache_key(self, lat: float, lon: float) -> str:
         """Generate cache key for coordinates (rounded to 4 decimal places)"""
