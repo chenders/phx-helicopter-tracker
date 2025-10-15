@@ -117,15 +117,15 @@ celery_app.conf.update(
             "task": "analyze_phoenix_pd_fleet_status",
             "schedule": 3600.0,  # Every hour - track 24/7 coverage claims
         },
-        # Radio archive tasks - TEMPORARILY DISABLED
-        # "download-radio-archives": {
-        #     "task": "download_broadcastify_archives",
-        #     "schedule": 3600.0,  # Every hour
-        #     "kwargs": {
-        #         "max_downloads": 5,
-        #         "days_back": 2,
-        #     },
-        # },
+        # Radio archive download - downloads latest MP3 archives from Broadcastify
+        "download-radio-archives": {
+            "task": "download_broadcastify_archives",
+            "schedule": 3600.0,  # Every hour
+            "kwargs": {
+                "max_downloads": 5,
+                "days_back": 2,
+            },
+        },
         # REMOVED - Using only transcribe-radio-archives-single below to avoid conflicts
         # Aircraft registry sync
         "sync-aircraft-registry": {
