@@ -67,8 +67,8 @@ def get_pattern_analysis(
         # Low altitude operations (if we had altitude data)
         # Multiple passes over same area (if we had route data)
 
-    # Identify surveillance hotspots
-    surveillance_hotspots = 5  # Placeholder - would need geographic data
+    # Count surveillance hotspots from actual data
+    surveillance_hotspots = surveillance_flights
 
     # Generate daily activity data
     daily_activity = []
@@ -109,25 +109,8 @@ def get_pattern_analysis(
             {"hour": f"{hour:02d}:00", "count": len(hour_flights)}
         )
 
-    # Generate neighborhood distribution (simulated)
-    neighborhoods = [
-        "Maryvale",
-        "South Phoenix",
-        "Central Phoenix",
-        "North Phoenix",
-        "Ahwatukee",
-    ]
+    # Neighborhood distribution removed - was simulated data
     neighborhood_distribution = []
-    for neighborhood in neighborhoods:
-        # Simulate surveillance count with bias towards certain neighborhoods
-        if neighborhood in ["Maryvale", "South Phoenix"]:
-            count = random.randint(15, 25)  # Higher surveillance in these areas
-        else:
-            count = random.randint(5, 12)
-
-        neighborhood_distribution.append(
-            {"neighborhood": neighborhood, "surveillance_count": count}
-        )
 
     # Generate violation types
     violation_types = [
@@ -136,17 +119,21 @@ def get_pattern_analysis(
         {"name": "Repeated Passes", "count": constitutional_violations * 0.15},
     ]
 
-    # Calculate additional metrics
-    discriminatory_ratio = (
-        1.8  # Placeholder - would calculate from actual geographic data
-    )
+    # Calculate additional metrics from actual data
     excessive_hovering_events = sum(
         1
         for f in flights
         if f.flight_duration_minutes and f.flight_duration_minutes > 90
     )
-    low_altitude_violations = random.randint(10, 20)  # Placeholder
-    systematic_patrol_routes = 12  # Placeholder
+    low_altitude_violations = sum(
+        1
+        for f in flights
+        if f.min_altitude_feet and f.min_altitude_feet < 400
+    )
+    # Note: discriminatory_ratio and systematic_patrol_routes would require
+    # geographic clustering and pattern matching which we don't have implemented
+    discriminatory_ratio = 0
+    systematic_patrol_routes = 0
 
     return {
         "constitutional_violations": constitutional_violations,
@@ -170,52 +157,7 @@ def get_surveillance_hotspots(
     db: Session = Depends(get_db),
 ) -> List[Dict[str, Any]]:
     """
-    Get top surveillance hotspot locations
+    Get top surveillance hotspot locations - REMOVED: was simulated data
+    To implement properly, would need geographic clustering of flight_positions
     """
-    # Simulated hotspot data - in production would use actual geographic clustering
-    hotspots = [
-        {
-            "location": "Maryvale (35th Ave & Indian School)",
-            "event_count": 42,
-            "surveillance_intensity": 0.85,
-            "demographic_info": "73% Hispanic, Median Income $35k",
-            "constitutional_risk": "High Risk",
-        },
-        {
-            "location": "South Phoenix (Central & Baseline)",
-            "event_count": 38,
-            "surveillance_intensity": 0.78,
-            "demographic_info": "65% Hispanic, 28% Black, Median Income $32k",
-            "constitutional_risk": "High Risk",
-        },
-        {
-            "location": "West Phoenix (43rd Ave & McDowell)",
-            "event_count": 35,
-            "surveillance_intensity": 0.72,
-            "demographic_info": "68% Hispanic, Median Income $38k",
-            "constitutional_risk": "Moderate Risk",
-        },
-        {
-            "location": "Central Phoenix (7th St & Van Buren)",
-            "event_count": 28,
-            "surveillance_intensity": 0.65,
-            "demographic_info": "Mixed Demographics, Median Income $42k",
-            "constitutional_risk": "Moderate Risk",
-        },
-        {
-            "location": "North Phoenix (19th Ave & Dunlap)",
-            "event_count": 22,
-            "surveillance_intensity": 0.48,
-            "demographic_info": "52% White, Median Income $55k",
-            "constitutional_risk": "Low Risk",
-        },
-        {
-            "location": "Ahwatukee (48th St & Ray)",
-            "event_count": 12,
-            "surveillance_intensity": 0.25,
-            "demographic_info": "65% White, Median Income $78k",
-            "constitutional_risk": "Low Risk",
-        },
-    ]
-
-    return hotspots
+    return []

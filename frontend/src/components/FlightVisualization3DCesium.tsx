@@ -19,6 +19,15 @@ interface FlightPosition {
   altitude_agl_feet?: number;
 }
 
+interface HoverLocation {
+  latitude: number;
+  longitude: number;
+  duration_minutes: number;
+  start_time: string;
+  end_time: string;
+  position_count: number;
+}
+
 interface FlightVisualization3DCesiumProps {
   positions: FlightPosition[];
   currentPositionIndex?: number;
@@ -28,13 +37,15 @@ interface FlightVisualization3DCesiumProps {
     lng: number;
     radius: number;
   };
+  hoverLocations?: HoverLocation[];
 }
 
 export const FlightVisualization3DCesium: React.FC<FlightVisualization3DCesiumProps> = ({
   positions,
   currentPositionIndex = 0,
   isPlaying = false,
-  searchContext
+  searchContext,
+  hoverLocations = []
 }) => {
   const cesiumContainerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<any>(null);
@@ -206,53 +217,81 @@ export const FlightVisualization3DCesium: React.FC<FlightVisualization3DCesiumPr
           }
         });
 
-        // Add hover location markers
-        positions.forEach((pos, idx) => {
-          if (pos.is_hovering) {
+        // Add hover location markers using calculated centroids from pattern detection
+        if (hoverLocations && hoverLocations.length > 0) {
+          console.log(`Adding ${hoverLocations.length} hover location visualizations`);
+
+          hoverLocations.forEach((hoverLoc, idx) => {
+            // Calculate radius based on duration (longer hover = larger radius)
+            // Base radius: 50m, add 10m per minute of hovering, max 200m
+            const radiusMeters = Math.min(50 + (hoverLoc.duration_minutes * 10), 200);
+
+            // Position at centroid of hover cluster
             const hoverPosition = Cesium.Cartesian3.fromDegrees(
-              pos.longitude,
-              pos.latitude,
-              pos.altitude_feet * 0.3048
+              hoverLoc.longitude,
+              hoverLoc.latitude,
+              0 // Ground level
             );
 
-            // Add hover circle on ground
+            // Add cylinder from ground to high altitude for better visibility
             viewer.entities.add({
-              name: `Hover ${idx}`,
+              name: `Hover Cylinder ${idx + 1}`,
               position: hoverPosition,
-              ellipse: {
-                semiMinorAxis: 150,
-                semiMajorAxis: 150,
-                height: 0,
-                material: Cesium.Color.RED.withAlpha(0.3),
+              cylinder: {
+                length: 4572, // 15000 feet in meters
+                topRadius: radiusMeters,
+                bottomRadius: radiusMeters,
+                material: Cesium.Color.RED.withAlpha(0.15),
                 outline: true,
-                outlineColor: Cesium.Color.RED.withAlpha(0.6)
+                outlineColor: Cesium.Color.RED.withAlpha(0.4),
+                heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND
               }
             });
 
-            // Add hover marker
+            // Add ground circle at hover centroid
             viewer.entities.add({
-              name: `Hover Point ${idx}`,
+              name: `Hover Ground Circle ${idx + 1}`,
+              position: hoverPosition,
+              ellipse: {
+                semiMinorAxis: radiusMeters,
+                semiMajorAxis: radiusMeters,
+                height: 0,
+                material: Cesium.Color.RED.withAlpha(0.3),
+                outline: true,
+                outlineColor: Cesium.Color.RED.withAlpha(0.7),
+                heightReference: Cesium.HeightReference.CLAMP_TO_GROUND
+              }
+            });
+
+            // Add hover marker point
+            viewer.entities.add({
+              name: `Hover Point ${idx + 1}`,
               position: hoverPosition,
               point: {
-                pixelSize: 10,
+                pixelSize: 12,
                 color: Cesium.Color.ORANGE,
                 outlineColor: Cesium.Color.WHITE,
                 outlineWidth: 2,
-                heightReference: Cesium.HeightReference.NONE
+                heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND
               },
               label: {
-                text: `H${idx + 1}`,
-                font: '12px sans-serif',
+                text: `HOVER ${idx + 1}\n${hoverLoc.duration_minutes.toFixed(1)} min`,
+                font: '12px sans-serif bold',
                 fillColor: Cesium.Color.WHITE,
                 outlineColor: Cesium.Color.BLACK,
                 outlineWidth: 2,
                 style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                pixelOffset: new Cesium.Cartesian2(0, -15),
-                heightReference: Cesium.HeightReference.NONE
+                pixelOffset: new Cesium.Cartesian2(0, -20),
+                heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+                showBackground: true,
+                backgroundColor: Cesium.Color.RED.withAlpha(0.7),
+                backgroundPadding: new Cesium.Cartesian2(7, 5)
               }
             });
-          }
-        });
+          });
+
+          console.log(`Added ${hoverLocations.length * 3} hover visualization entities`);
+        }
 
         // Add helicopter marker that moves during playback
         const aircraft = viewer.entities.add({

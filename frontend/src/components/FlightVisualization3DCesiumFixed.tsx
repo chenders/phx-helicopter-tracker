@@ -40,6 +40,15 @@ export interface HudData {
   isWithinSearchRadius: boolean;
 }
 
+interface HoverLocationData {
+  latitude: number;
+  longitude: number;
+  duration_minutes: number;
+  start_time?: string;
+  end_time?: string;
+  position_count?: number;
+}
+
 interface FlightVisualization3DCesiumFixedProps {
   positions: FlightPosition[];
   currentPositionIndex?: number;
@@ -54,6 +63,7 @@ interface FlightVisualization3DCesiumFixedProps {
     lng: number;
     radius: number;
   };
+  hoverLocations?: HoverLocationData[];
 }
 
 // Helper function to convert heading degrees to cardinal direction
@@ -83,6 +93,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   onAnimationStateChange,
   onHudDataChange,
   searchContext,
+  hoverLocations = [],
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cesiumContainerRef = useRef<HTMLDivElement | null>(null);
@@ -103,7 +114,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   const [tileLoadProgress, setTileLoadProgress] = useState(0);
   const isInitializingRef = useRef(false);
   const hasInitializedRef = useRef(false);
-  const [isControlsExpanded, setIsControlsExpanded] = useState(true); // Controls panel state
+  const [isControlsExpanded, setIsControlsExpanded] = useState(false); // Controls panel state - collapsed by default
+  const [cameraPitchMode, setCameraPitchMode] = useState<'auto' | 'level' | 'moderate' | 'steep'>('auto'); // Camera pitch control
+  const cameraPitchModeRef = useRef<'auto' | 'level' | 'moderate' | 'steep'>('auto'); // Ref for accessing in callbacks
   const [hudData, setHudData] = useState({
     speed: 0,
     altitude: 0,
@@ -116,6 +129,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<
     isWithinSearchRadius: false,
   });
   const [totalTimeInRadius, setTotalTimeInRadius] = useState(0); // Total time spent in search radius in seconds
+
+  // Keep camera pitch mode ref in sync with state
+  useEffect(() => {
+    cameraPitchModeRef.current = cameraPitchMode;
+    console.log(`Camera pitch mode changed to: ${cameraPitchMode}`);
+  }, [cameraPitchMode]);
 
   // Clean up function
   const cleanup = useCallback(() => {
@@ -1019,6 +1038,84 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           viewer.searchMarker = searchMarker;
         }
 
+        // Add hover location markers with vertical light beams
+        if (hoverLocations && hoverLocations.length > 0) {
+          console.log(`Adding ${hoverLocations.length} hover location visualizations`);
+
+          hoverLocations.forEach((hoverLoc, idx) => {
+            // Calculate radius based on duration (longer hover = larger radius)
+            // Base radius: 50m, add 10m per minute of hovering, max 200m
+            const radiusMeters = Math.min(50 + (hoverLoc.duration_minutes * 10), 200);
+
+            // Create a cylinder that extends from ground to high altitude (15000 feet = ~4572 meters)
+            const cylinderHeight = 4572; // meters
+
+            // Add translucent cylinder (the "light beam")
+            viewer.entities.add({
+              name: `Hover Beam ${idx + 1}`,
+              position: Cesium.Cartesian3.fromDegrees(
+                hoverLoc.longitude,
+                hoverLoc.latitude,
+                cylinderHeight / 2 // Position at center of cylinder height
+              ),
+              cylinder: {
+                length: cylinderHeight,
+                topRadius: radiusMeters,
+                bottomRadius: radiusMeters,
+                material: Cesium.Color.ORANGE.withAlpha(0.3),
+                outline: true,
+                outlineColor: Cesium.Color.RED.withAlpha(0.6),
+                outlineWidth: 2,
+                heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+              },
+            });
+
+            // Add ground marker - opaque circle showing surveillance area
+            viewer.entities.add({
+              name: `Hover Area ${idx + 1}`,
+              position: Cesium.Cartesian3.fromDegrees(
+                hoverLoc.longitude,
+                hoverLoc.latitude,
+                0
+              ),
+              ellipse: {
+                semiMinorAxis: radiusMeters,
+                semiMajorAxis: radiusMeters,
+                material: Cesium.Color.RED.withAlpha(0.5),
+                outline: true,
+                outlineColor: Cesium.Color.DARKRED,
+                outlineWidth: 3,
+                heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+              },
+            });
+
+            // Add label showing duration
+            viewer.entities.add({
+              name: `Hover Label ${idx + 1}`,
+              position: Cesium.Cartesian3.fromDegrees(
+                hoverLoc.longitude,
+                hoverLoc.latitude,
+                100 // 100m above ground for visibility
+              ),
+              label: {
+                text: `HOVER\n${hoverLoc.duration_minutes.toFixed(1)} min`,
+                font: 'bold 16px sans-serif',
+                fillColor: Cesium.Color.WHITE,
+                outlineColor: Cesium.Color.RED,
+                outlineWidth: 3,
+                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                verticalOrigin: Cesium.VerticalOrigin.CENTER,
+                horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                pixelOffset: new Cesium.Cartesian2(0, 0),
+                disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
+              },
+            });
+          });
+
+          console.log(`Added ${hoverLocations.length * 3} hover visualization entities`);
+        }
+
         // Start with first-person pilot view
         const cameraStartPos = displayPositions[0];
         // Use reasonable altitude to prevent rendering artifacts
@@ -1712,11 +1809,53 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             const elapsedSeconds = Cesium.JulianDate.secondsDifference(currentTime, startTime);
             const positionIndex = Math.floor((elapsedSeconds / 5));
 
-            // Check if within search radius and adjust camera/speed
-            let cameraPitch = Cesium.Math.toRadians(-15); // Default: look down slightly
+            // Check if within hover area or search radius and adjust camera/speed
+            let cameraPitch = Cesium.Math.toRadians(-5); // Default: mostly level with slight downward tilt for horizon visibility
             let isWithinSearchRadius = false;
+            let isInHoverArea = false;
 
-            if (searchContext && positionIndex >= 0 && positionIndex < positions.length) {
+            // Get current camera pitch mode from ref (for stable closure)
+            const currentPitchMode = cameraPitchModeRef.current;
+
+            // Determine camera pitch based on mode
+            if (currentPitchMode === 'level') {
+              cameraPitch = Cesium.Math.toRadians(-5); // Level view
+            } else if (currentPitchMode === 'moderate') {
+              cameraPitch = Cesium.Math.toRadians(-40); // Moderate downward angle
+            } else if (currentPitchMode === 'steep') {
+              cameraPitch = Cesium.Math.toRadians(-50); // Steep downward angle
+            }
+            // else 'auto' mode - will be set based on hover/search detection below
+
+            // Check if current position is within a hover location time range
+            if (currentPitchMode === 'auto' && hoverLocations && hoverLocations.length > 0 && positionIndex >= 0 && positionIndex < positions.length) {
+              const currentPos = positions[positionIndex];
+              const currentPosTime = new Date(currentPos.timestamp).getTime();
+
+              for (const hoverLoc of hoverLocations) {
+                const hoverStartTime = new Date(hoverLoc.start_time).getTime();
+                const hoverEndTime = new Date(hoverLoc.end_time).getTime();
+
+                if (currentPosTime >= hoverStartTime && currentPosTime <= hoverEndTime) {
+                  isInHoverArea = true;
+                  cameraPitch = Cesium.Math.toRadians(-50); // Look down very steeply in hover areas
+
+                  // Slow down to 5x speed when in hover area (compromise between visibility and patience)
+                  // This is much slower than normal (playbackSpeed * 50) but not painfully slow like 1x
+                  const normalSpeed = playbackSpeed * 50;
+                  const hoverSpeed = playbackSpeed * 5; // 10x slower than normal
+
+                  if (Math.abs(viewer.clock.multiplier - hoverSpeed) > 0.1) {
+                    viewer.clock.multiplier = hoverSpeed;
+                    console.log(`Entering hover area - slowing to ${hoverSpeed.toFixed(1)}x to show ${hoverLoc.duration_minutes.toFixed(1)} min hover`);
+                  }
+                  break;
+                }
+              }
+            }
+
+            // Check search radius (only if not in hover area - hover takes priority, and only in auto mode)
+            if (currentPitchMode === 'auto' && !isInHoverArea && searchContext && positionIndex >= 0 && positionIndex < positions.length) {
               const currentPos = positions[positionIndex];
 
               // Calculate distance from search location
@@ -1738,16 +1877,20 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                 cameraPitch = Cesium.Math.toRadians(-40); // Look down steeply (40 degrees)
 
                 // Slow down to 1/10th speed when in search radius
-                if (viewer.clock.multiplier === playbackSpeed * 50) {
-                  viewer.clock.multiplier = (playbackSpeed * 50) / 10;
+                const slowSpeed = (playbackSpeed * 50) / 10;
+                if (Math.abs(viewer.clock.multiplier - slowSpeed) > 0.1) {
+                  viewer.clock.multiplier = slowSpeed;
                   console.log("Entering search radius - slowing down 10x and looking down");
                 }
-              } else {
-                // Speed back up when outside search radius
-                if (viewer.clock.multiplier === (playbackSpeed * 50) / 10) {
-                  viewer.clock.multiplier = playbackSpeed * 50;
-                  console.log("Exiting search radius - resuming normal speed");
-                }
+              }
+            }
+
+            // If not in any special area, return to normal speed
+            if (!isInHoverArea && !isWithinSearchRadius) {
+              const normalSpeed = playbackSpeed * 50;
+              if (Math.abs(viewer.clock.multiplier - normalSpeed) > 0.1) {
+                viewer.clock.multiplier = normalSpeed;
+                console.log("Returning to normal speed");
               }
             }
 
@@ -2028,6 +2171,27 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               {/* Controls List - Collapsible */}
               {isControlsExpanded && (
                 <div className="px-4 py-3 space-y-2 text-white text-xs border-t border-white/20">
+                  {/* Camera Pitch Mode Selector */}
+                  <div className="pb-2 border-b border-white/10">
+                    <label className="text-gray-400 mb-1.5 font-semibold block">Camera Pitch:</label>
+                    <select
+                      value={cameraPitchMode}
+                      onChange={(e) => setCameraPitchMode(e.target.value as 'auto' | 'level' | 'moderate' | 'steep')}
+                      className="w-full px-2 py-1 bg-white/10 text-white rounded border border-white/20 focus:outline-none focus:border-blue-400 text-xs"
+                    >
+                      <option value="auto" className="bg-gray-800">Auto (context-based)</option>
+                      <option value="level" className="bg-gray-800">Level (-5°)</option>
+                      <option value="moderate" className="bg-gray-800">Moderate (-40°)</option>
+                      <option value="steep" className="bg-gray-800">Steep (-50°)</option>
+                    </select>
+                    <div className="text-[10px] text-gray-400 mt-1 italic">
+                      {cameraPitchMode === 'auto' && 'Adjusts angle based on hover/search areas'}
+                      {cameraPitchMode === 'level' && 'Nearly level view, good for normal flight'}
+                      {cameraPitchMode === 'moderate' && 'Looking down moderately'}
+                      {cameraPitchMode === 'steep' && 'Looking down steeply for observation'}
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     <div className="flex items-start gap-2">
                       <span className="text-blue-400 font-mono min-w-[80px]">Left Click</span>
@@ -2112,7 +2276,62 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                     }}
                   />
 
-                  {/* Closest point marker */}
+                  {/* Hover location markers - Red dots */}
+                  {hoverLocations && hoverLocations.map((hoverLoc, idx) => {
+                    // Find position indices that match this hover location's time range
+                    const hoverStartTime = new Date(hoverLoc.start_time).getTime();
+                    const hoverEndTime = new Date(hoverLoc.end_time).getTime();
+
+                    // Find all positions within this hover time range
+                    const hoverPositionIndices: number[] = [];
+                    positions.forEach((pos, posIdx) => {
+                      const posTime = new Date(pos.timestamp).getTime();
+                      if (posTime >= hoverStartTime && posTime <= hoverEndTime) {
+                        hoverPositionIndices.push(posIdx);
+                      }
+                    });
+
+                    // Use the middle position of the hover range for the marker
+                    if (hoverPositionIndices.length > 0) {
+                      const middleIdx = hoverPositionIndices[Math.floor(hoverPositionIndices.length / 2)];
+                      return (
+                        <div
+                          key={`hover-${idx}`}
+                          className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 bg-red-500 rounded-full shadow-md cursor-pointer hover:scale-150 transition-transform"
+                          style={{
+                            left: `${(middleIdx / (positions.length - 1)) * 100}%`,
+                            transform: "translateX(-50%) translateY(-50%)",
+                            zIndex: 15,
+                          }}
+                          title={`Hover location: ${hoverLoc.duration_minutes.toFixed(1)} min`}
+                          onClick={() => handleSliderChange((middleIdx / (positions.length - 1)) * 100)}
+                        />
+                      );
+                    }
+                    return null;
+                  })}
+
+                  {/* Low altitude markers - Yellow dots */}
+                  {positions.map((pos, idx) => {
+                    if (pos.altitude_feet < 500 && pos.over_private_property) {
+                      return (
+                        <div
+                          key={`low-alt-${idx}`}
+                          className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-yellow-500 rounded-full shadow-sm cursor-pointer hover:scale-150 transition-transform"
+                          style={{
+                            left: `${(idx / (positions.length - 1)) * 100}%`,
+                            transform: "translateX(-50%) translateY(-50%)",
+                            zIndex: 12,
+                          }}
+                          title={`Low altitude: ${pos.altitude_feet} ft over residential`}
+                          onClick={() => handleSliderChange((idx / (positions.length - 1)) * 100)}
+                        />
+                      );
+                    }
+                    return null;
+                  })}
+
+                  {/* Closest point marker - Orange dot */}
                   {searchContext && closestPointIndex !== null && (
                     <div
                       className="absolute top-1/2 -translate-y-1/2 w-2 h-2 bg-orange-500 rounded-full shadow-sm pointer-events-none"
@@ -2132,6 +2351,28 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                 <span className="text-xs text-gray-600 dark:text-gray-300 font-mono whitespace-nowrap flex-shrink-0">
                   {Math.floor((sliderPosition / 100) * (positions.length - 1)) + 1}/{positions.length}
                 </span>
+              </div>
+
+              {/* Timeline Legend */}
+              <div className="flex items-center gap-3 mt-2 text-xs text-gray-600 dark:text-gray-400 px-1">
+                {hoverLocations && hoverLocations.length > 0 && (
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
+                    <span>Hover locations</span>
+                  </div>
+                )}
+                {positions.some(p => p.altitude_feet < 500 && p.over_private_property) && (
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                    <span>Low altitude</span>
+                  </div>
+                )}
+                {searchContext && closestPointIndex !== null && (
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                    <span>Search location</span>
+                  </div>
+                )}
               </div>
             </div>
           )}

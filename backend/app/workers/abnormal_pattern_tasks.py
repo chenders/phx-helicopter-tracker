@@ -424,33 +424,47 @@ def identify_sky_art_segments(positions: List[Dict], window_size: int = 100,
 
 def detect_hovering_patterns(positions: List[Dict]) -> List[Dict[str, Any]]:
     """
-    Detect extended hovering in one location
+    Detect extended hovering in one location using proper geographic distance
     """
     hovering_events = []
-    
+
     if len(positions) < 2:
         return hovering_events
-    
-    # Group positions by proximity (hovering radius ~0.1 nm)
-    hover_threshold = 0.1  # nautical miles
+
+    # Helper function to calculate haversine distance in meters
+    def haversine_distance(lat1, lon1, lat2, lon2):
+        """Calculate the great circle distance between two points in meters"""
+        R = 6371000  # Earth radius in meters
+        lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat/2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        return R * c
+
+    # Group positions by proximity (hovering radius ~185 meters = 0.1 nautical miles)
+    hover_threshold_meters = 185  # 0.1 nautical miles
     current_hover = {"positions": [], "start_time": None, "end_time": None}
-    
+
     for i, pos in enumerate(positions):
         if not current_hover["positions"]:
             current_hover["positions"].append(pos)
             current_hover["start_time"] = pos.get("timestamp")
             continue
-        
+
         # Check if still hovering (close to average position)
         avg_lat = np.mean([p.get("latitude", 0) for p in current_hover["positions"]])
         avg_lon = np.mean([p.get("longitude", 0) for p in current_hover["positions"]])
-        
-        distance = euclidean(
-            (pos.get("latitude", 0), pos.get("longitude", 0)),
-            (avg_lat, avg_lon)
+
+        # Use proper haversine distance in meters
+        distance_meters = haversine_distance(
+            pos.get("latitude", 0),
+            pos.get("longitude", 0),
+            avg_lat,
+            avg_lon
         )
-        
-        if distance < hover_threshold:
+
+        if distance_meters < hover_threshold_meters:
             current_hover["positions"].append(pos)
             current_hover["end_time"] = pos.get("timestamp")
         else:

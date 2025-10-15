@@ -37,26 +37,58 @@ interface SummaryStats {
 }
 
 export function DataQualityPage() {
-  const [timeSeriesData, setTimeSeriesData] = useState<DiscrepancyData[]>([])
-  const [worstCases, setWorstCases] = useState<FlightDiscrepancy[]>([])
-  const [summary, setSummary] = useState<SummaryStats | null>(null)
-  const [loading, setLoading] = useState(true)
+  // Try to restore data from sessionStorage on mount
+  const [timeSeriesData, setTimeSeriesData] = useState<DiscrepancyData[]>(() => {
+    const cached = sessionStorage.getItem('dataQuality_timeSeries')
+    return cached ? JSON.parse(cached) : []
+  })
+  const [worstCases, setWorstCases] = useState<FlightDiscrepancy[]>(() => {
+    const cached = sessionStorage.getItem('dataQuality_worstCases')
+    return cached ? JSON.parse(cached) : []
+  })
+  const [summary, setSummary] = useState<SummaryStats | null>(() => {
+    const cached = sessionStorage.getItem('dataQuality_summary')
+    return cached ? JSON.parse(cached) : null
+  })
+  const [loading, setLoading] = useState(() => {
+    // Only show loading if we don't have cached data
+    return !sessionStorage.getItem('dataQuality_summary')
+  })
+  const [initialLoadComplete, setInitialLoadComplete] = useState(() => {
+    return !!sessionStorage.getItem('dataQuality_summary')
+  })
 
   useEffect(() => {
-    fetchDataQuality()
+    // Only fetch if we haven't loaded data yet
+    if (!initialLoadComplete) {
+      fetchDataQuality()
+    }
   }, [])
 
-  const fetchDataQuality = async () => {
+  const fetchDataQuality = async (showLoadingSpinner = true) => {
     try {
-      setLoading(true)
+      if (showLoadingSpinner) {
+        setLoading(true)
+      }
       const response = await axios.get('/api/v1/flights/data-quality-metrics')
+
+      // Update state
       setTimeSeriesData(response.data.time_series)
       setWorstCases(response.data.worst_cases)
       setSummary(response.data.summary)
+      setInitialLoadComplete(true)
+
+      // Cache in sessionStorage to survive remounts during screenshots
+      sessionStorage.setItem('dataQuality_timeSeries', JSON.stringify(response.data.time_series))
+      sessionStorage.setItem('dataQuality_worstCases', JSON.stringify(response.data.worst_cases))
+      sessionStorage.setItem('dataQuality_summary', JSON.stringify(response.data.summary))
     } catch (error) {
       console.error('Error fetching data quality metrics:', error)
+      setInitialLoadComplete(true)
     } finally {
-      setLoading(false)
+      if (showLoadingSpinner) {
+        setLoading(false)
+      }
     }
   }
 
@@ -67,7 +99,7 @@ export function DataQualityPage() {
     return '#ef4444' // red
   }
 
-  if (loading) {
+  if (loading && !initialLoadComplete) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>

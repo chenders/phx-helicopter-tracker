@@ -1,0 +1,231 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - complementary [ref=e5]:
+    - generic [ref=e7]:
+      - link "🚁 Phoenix PD Helicopter Tracker" [ref=e8] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e9] [cursor=pointer]: 🚁
+        - generic [ref=e10] [cursor=pointer]:
+          - heading "Phoenix PD" [level=1] [ref=e11] [cursor=pointer]
+          - paragraph [ref=e12] [cursor=pointer]: Helicopter Tracker
+      - button "Collapse sidebar" [ref=e13] [cursor=pointer]:
+        - img [ref=e14] [cursor=pointer]
+    - navigation [ref=e16]:
+      - link "🏠 Dashboard" [ref=e17] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e18] [cursor=pointer]: 🏠
+        - generic [ref=e19] [cursor=pointer]: Dashboard
+      - link "🔎 Flight Search" [ref=e20] [cursor=pointer]:
+        - /url: /search
+        - generic [ref=e21] [cursor=pointer]: 🔎
+        - generic [ref=e22] [cursor=pointer]: Flight Search
+      - link "📡 Live Tracking" [ref=e23] [cursor=pointer]:
+        - /url: /live
+        - generic [ref=e24] [cursor=pointer]: 📡
+        - generic [ref=e25] [cursor=pointer]: Live Tracking
+      - link "📊 Historical" [ref=e26] [cursor=pointer]:
+        - /url: /historical
+        - generic [ref=e27] [cursor=pointer]: 📊
+        - generic [ref=e28] [cursor=pointer]: Historical
+      - link "🔍 Patterns" [ref=e29] [cursor=pointer]:
+        - /url: /patterns
+        - generic [ref=e30] [cursor=pointer]: 🔍
+        - generic [ref=e31] [cursor=pointer]: Patterns
+      - link "⚠️ Abnormal Patterns" [ref=e32] [cursor=pointer]:
+        - /url: /abnormal
+        - generic [ref=e33] [cursor=pointer]: ⚠️
+        - generic [ref=e34] [cursor=pointer]: Abnormal Patterns
+      - link "💰 Cost Analysis" [ref=e35] [cursor=pointer]:
+        - /url: /costs
+        - generic [ref=e36] [cursor=pointer]: 💰
+        - generic [ref=e37] [cursor=pointer]: Cost Analysis
+      - link "⚖️ Legal Docs" [ref=e38] [cursor=pointer]:
+        - /url: /legal
+        - generic [ref=e39] [cursor=pointer]: ⚖️
+        - generic [ref=e40] [cursor=pointer]: Legal Docs
+      - link "📻 Radio Archives" [ref=e41] [cursor=pointer]:
+        - /url: /radio
+        - generic [ref=e42] [cursor=pointer]: 📻
+        - generic [ref=e43] [cursor=pointer]: Radio Archives
+      - button "⚡ System ▶" [ref=e45] [cursor=pointer]:
+        - generic [ref=e46] [cursor=pointer]:
+          - generic [ref=e47] [cursor=pointer]: ⚡
+          - generic [ref=e48] [cursor=pointer]: System
+        - generic [ref=e49] [cursor=pointer]: ▶
+  - banner [ref=e50]:
+    - generic [ref=e51]:
+      - generic [ref=e52]:
+        - generic [ref=e53]: "Status:"
+        - generic [ref=e54]: Online
+      - generic [ref=e57]:
+        - generic [ref=e58]: "Data:"
+        - generic [ref=e59]: Live
+    - button "Theme selector" [ref=e61] [cursor=pointer]:
+      - generic [ref=e62] [cursor=pointer]: 🌑️
+      - generic [ref=e63] [cursor=pointer]: Darker
+      - img [ref=e64] [cursor=pointer]
+  - main [ref=e66]:
+    - generic [ref=e67]:
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - button "Back" [ref=e70] [cursor=pointer]:
+            - img [ref=e71] [cursor=pointer]
+            - text: Back
+          - generic [ref=e73]:
+            - button "Start Animation" [ref=e74] [cursor=pointer]:
+              - img [ref=e76] [cursor=pointer]
+              - generic [ref=e78] [cursor=pointer]: Start Animation
+            - generic [ref=e79]:
+              - generic [ref=e80]: "Speed:"
+              - combobox [ref=e81]:
+                - option "0.5x" [selected]
+                - option "1x"
+                - option "2x"
+                - option "3x"
+                - option "5x"
+                - option "10x"
+        - 'button "Flight fr24_complete_3ca1f5d5 7 • N623FB Sunday, October 12, 2025 • Start: 11:43 AM" [ref=e82] [cursor=pointer]':
+          - generic [ref=e83] [cursor=pointer]:
+            - img [ref=e84] [cursor=pointer]
+            - generic [ref=e86] [cursor=pointer]:
+              - heading "Flight fr24_complete_3ca1f5d5" [level=1] [ref=e87] [cursor=pointer]
+              - paragraph [ref=e88] [cursor=pointer]: 7 • N623FB
+              - paragraph [ref=e89] [cursor=pointer]: "Sunday, October 12, 2025 • Start: 11:43 AM"
+          - img [ref=e90] [cursor=pointer]
+        - generic [ref=e93]:
+          - img [ref=e94]
+          - generic [ref=e96]:
+            - heading "Data Quality Issue Detected" [level=4] [ref=e97]
+            - paragraph [ref=e98]:
+              - text: The position data time span differs significantly from the recorded flight duration. This may indicate incomplete or inaccurate flight metadata from FlightRadar24.
+              - link "View all data quality issues →" [ref=e99] [cursor=pointer]:
+                - /url: /data-quality
+            - generic [ref=e100]:
+              - generic [ref=e101]:
+                - generic [ref=e102]: Recorded Duration
+                - generic [ref=e103]: 36 min
+              - generic [ref=e104]:
+                - generic [ref=e105]: Position Data Span
+                - generic [ref=e106]: 63 min
+              - generic [ref=e107]:
+                - generic [ref=e108]: Discrepancy
+                - generic [ref=e109]: +27 min
+              - generic [ref=e110]:
+                - generic [ref=e111]: Discrepancy %
+                - generic [ref=e112]: 74%
+      - generic [ref=e113]:
+        - generic [ref=e114]:
+          - heading "Flight Path" [level=2] [ref=e115]
+          - button "3D View" [ref=e117] [cursor=pointer]:
+            - img [ref=e118] [cursor=pointer]
+            - text: 3D View
+        - generic [ref=e120]:
+          - generic [ref=e121]:
+            - generic [ref=e123]:
+              - generic [ref=e128]:
+                - link "Cesium ion" [ref=e131] [cursor=pointer]:
+                  - /url: https://cesium.com/
+                  - img "Cesium ion" [ref=e132] [cursor=pointer]
+                - generic [ref=e133]:
+                  - link "Upgrade for commercial use." [ref=e135] [cursor=pointer]:
+                    - /url: https://cesium.com/pricing/
+                  - generic [ref=e136]: •
+                  - img "Google" [ref=e138]
+                - generic [ref=e139] [cursor=pointer]: Data attribution
+              - generic [ref=e140]:
+                - searchbox "Enter an address or landmark..." [ref=e143]
+                - button "View Home" [ref=e147] [cursor=pointer]
+                - button "3D" [ref=e151] [cursor=pointer]
+                - button "Bing Maps Aerial" [ref=e158] [cursor=pointer]:
+                  - img [ref=e159] [cursor=pointer]
+            - button "🎮 Camera Controls ▶" [ref=e162] [cursor=pointer]:
+              - generic [ref=e164] [cursor=pointer]: 🎮 Camera Controls
+              - generic [ref=e165] [cursor=pointer]: ▶
+          - generic [ref=e166]:
+            - generic [ref=e167]:
+              - slider [ref=e169] [cursor=pointer]: "0"
+              - generic [ref=e172]: 1/1721
+            - generic [ref=e176]: Hover locations
+      - generic [ref=e177]:
+        - generic [ref=e178]:
+          - heading "Flight Timeline" [level=2] [ref=e179]
+          - generic [ref=e180]:
+            - generic [ref=e181]:
+              - img [ref=e182]
+              - generic [ref=e185]:
+                - generic [ref=e186]: Departure
+                - generic [ref=e187]: 11:43:00 AM
+                - generic [ref=e188]: KDVT
+            - generic [ref=e189]:
+              - img [ref=e190]
+              - generic [ref=e192]:
+                - generic [ref=e193]: Flight Time
+                - generic [ref=e194]: 36.36666666666667 minutes
+                - generic [ref=e195]: 1721 position reports
+            - generic [ref=e196]:
+              - img [ref=e197]
+              - generic [ref=e200]:
+                - generic [ref=e201]: Arrival
+                - generic [ref=e202]: 12:19:02 PM
+                - generic [ref=e203]: Unknown Airport
+          - generic [ref=e204]:
+            - heading "Altitude Profile" [level=3] [ref=e205]
+            - generic [ref=e206]:
+              - generic [ref=e207]:
+                - generic [ref=e208]: MSL (Mean Sea Level)
+                - generic [ref=e209]:
+                  - generic [ref=e210]:
+                    - generic [ref=e211]: Maximum
+                    - generic [ref=e212]: 2,275 ft
+                  - generic [ref=e213]:
+                    - generic [ref=e214]: Average
+                    - generic [ref=e215]: 2,019 ft
+                  - generic [ref=e216]:
+                    - generic [ref=e217]: Minimum
+                    - generic [ref=e218]: 0 ft
+              - generic [ref=e219]:
+                - generic [ref=e220]: AGL (Above Ground Level)
+                - generic [ref=e221]:
+                  - generic [ref=e222]:
+                    - generic [ref=e223]: Maximum
+                    - generic [ref=e224]: 1,189 ft
+                  - generic [ref=e225]:
+                    - generic [ref=e226]: Average
+                    - generic [ref=e227]: 927 ft
+                  - generic [ref=e228]:
+                    - generic [ref=e229]: Minimum
+                    - generic [ref=e230]: 0 ft
+          - button "Download Flight Data" [ref=e232] [cursor=pointer]:
+            - img [ref=e233] [cursor=pointer]
+            - text: Download Flight Data
+        - generic [ref=e236]:
+          - heading "Surveillance Analysis" [level=2] [ref=e237]
+          - generic [ref=e238]:
+            - generic [ref=e239]: Detected Patterns
+            - generic [ref=e241]: excessive hovering
+          - generic [ref=e242]:
+            - generic [ref=e243]:
+              - img [ref=e244]
+              - text: Hover Locations (Pattern Detection)
+            - generic [ref=e247]: 2 locations
+            - generic [ref=e248]: "Total hover time: 41.2 minutes"
+            - generic [ref=e249]:
+              - generic [ref=e250]:
+                - generic [ref=e251]: Location 1
+                - generic [ref=e252]: "Coordinates: 33.6003, -112.1149"
+                - generic [ref=e253]: "Duration: 22.7 minutes (620 positions)"
+                - generic [ref=e254]: 11:42:40 AM - 12:05:22 PM
+              - generic [ref=e255]:
+                - generic [ref=e256]: Location 2
+                - generic [ref=e257]: "Coordinates: 33.4798, -111.9917"
+                - generic [ref=e258]: "Duration: 18.5 minutes (507 positions)"
+                - generic [ref=e259]: 12:05:24 PM - 12:23:56 PM
+          - generic [ref=e260]:
+            - generic [ref=e261]:
+              - img [ref=e262]
+              - text: Low Altitude Over Residential (Position Flags)
+            - generic [ref=e265]: 0 segments
+            - generic [ref=e266]: "Note: Position-level flags may not be populated. See hover locations above for actual pattern detection."
+```

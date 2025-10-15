@@ -1288,6 +1288,7 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
               lng: searchContext.lng,
               radius: searchContext.radius || 1000
             } : undefined}
+            hoverLocations={patterns?.hover_locations || []}
           />
         ) : (
           <GoogleMap

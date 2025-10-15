@@ -150,17 +150,24 @@ export function PatternAnalysisPage() {
         {/* Geographic Distribution */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Surveillance by Neighborhood</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={patternData?.neighborhood_distribution || []}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="neighborhood" angle={-45} textAnchor="end" height={80} />
-              <YAxis />
-              <Tooltip 
-                formatter={(value: any) => [`${value} incidents`, 'Surveillance Incidents']}
-              />
-              <Bar dataKey="surveillance_count" fill="#f59e0b" />
-            </BarChart>
-          </ResponsiveContainer>
+          {patternData?.neighborhood_distribution && patternData.neighborhood_distribution.length > 0 ? (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={patternData.neighborhood_distribution}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="neighborhood" angle={-45} textAnchor="end" height={80} />
+                <YAxis />
+                <Tooltip
+                  formatter={(value: any) => [`${value} incidents`, 'Surveillance Incidents']}
+                />
+                <Bar dataKey="surveillance_count" fill="#f59e0b" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="text-sm text-gray-500 dark:text-gray-400 italic p-4">
+              Neighborhood distribution requires GPS coordinate mapping - not yet implemented.
+              Use the Historical Analysis map to view actual surveillance patterns by location.
+            </div>
+          )}
         </div>
 
         </div>
@@ -171,39 +178,53 @@ export function PatternAnalysisPage() {
           {/* Geographic Distribution */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Surveillance by Neighborhood</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={patternData?.neighborhood_distribution || []}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="neighborhood" angle={-45} textAnchor="end" height={80} />
-                <YAxis />
-                <Tooltip 
-                  formatter={(value: any) => [`${value} incidents`, 'Surveillance Incidents']}
-                />
-                <Bar dataKey="surveillance_count" fill="#f59e0b" />
-              </BarChart>
-            </ResponsiveContainer>
+            {patternData?.neighborhood_distribution && patternData.neighborhood_distribution.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={patternData.neighborhood_distribution}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="neighborhood" angle={-45} textAnchor="end" height={80} />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value: any) => [`${value} incidents`, 'Surveillance Incidents']}
+                  />
+                  <Bar dataKey="surveillance_count" fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="text-sm text-gray-500 dark:text-gray-400 italic p-4">
+                Neighborhood distribution requires GPS coordinate mapping - not yet implemented.
+                Use the Historical Analysis map to view actual surveillance patterns by location.
+              </div>
+            )}
           </div>
 
-          {/* Surveillance Hotspots Map Placeholder */}
+          {/* Geographic Hotspots */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Hotspot Locations</h3>
-            <div className="space-y-3">
-              {hotspots?.slice(0, 5).map((hotspot: any, index: number) => (
-                <div key={hotspot.location} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
-                  <div>
-                    <div className="font-medium text-gray-900 dark:text-gray-100">{hotspot.location}</div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      {hotspot.event_count} surveillance events
+            {hotspots && hotspots.length > 0 ? (
+              <div className="space-y-3">
+                {hotspots.slice(0, 5).map((hotspot: any, index: number) => (
+                  <div key={hotspot.location} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-gray-100">{hotspot.location}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {hotspot.event_count} surveillance events
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-medium text-red-600">
+                        {hotspot.constitutional_risk}
+                      </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-red-600">
-                      {hotspot.constitutional_risk}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500 dark:text-gray-400 italic">
+                Geographic clustering requires GPS position data analysis - not yet implemented.
+                Use the Historical Analysis map view to see actual flight paths.
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -309,42 +330,51 @@ export function PatternAnalysisPage() {
         {/* Surveillance Hotspots */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Top Surveillance Hotspots</h3>
-          <div className="space-y-3">
-            {hotspots?.slice(0, 5).map((hotspot: any, index: number) => (
-              <div key={hotspot.location} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
-                <div>
-                  <div className="font-medium text-gray-900 dark:text-gray-100">{hotspot.location}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">
-                    {hotspot.event_count} surveillance events
+          {hotspots && hotspots.length > 0 ? (
+            <div className="space-y-3">
+              {hotspots.slice(0, 5).map((hotspot: any, index: number) => (
+                <div key={hotspot.location} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded">
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-gray-100">{hotspot.location}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                      {hotspot.event_count} surveillance events
+                    </div>
+                    <div className="text-sm text-orange-600">
+                      Surveillance Score: {(hotspot.surveillance_intensity * 100).toFixed(1)}%
+                    </div>
                   </div>
-                  <div className="text-sm text-orange-600">
-                    Surveillance Score: {(hotspot.surveillance_intensity * 100).toFixed(1)}%
+                  <div className="text-right">
+                    <div className="text-sm text-gray-500">
+                      Demographics: {hotspot.demographic_info}
+                    </div>
+                    <div className="text-sm font-medium text-red-600">
+                      {hotspot.constitutional_risk}
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm text-gray-500">
-                    Demographics: {hotspot.demographic_info}
-                  </div>
-                  <div className="text-sm font-medium text-red-600">
-                    {hotspot.constitutional_risk}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-sm text-gray-500 dark:text-gray-400 italic">
+              Geographic clustering requires GPS position data analysis - not yet implemented.
+              Use the Historical Analysis map view to see actual flight paths and surveillance patterns.
+            </div>
+          )}
         </div>
 
         {/* Pattern Insights */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Key Pattern Insights</h3>
           <div className="space-y-4">
-            <div className="p-4 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/30 rounded">
-              <h4 className="font-semibold text-red-800 dark:text-red-300">Discriminatory Surveillance</h4>
-              <p className="text-sm text-red-700 dark:text-red-200 mt-1">
-                Analysis shows {((patternData?.discriminatory_ratio || 0) * 100).toFixed(1)}% higher surveillance
-                rates in minority communities compared to affluent areas, indicating potential civil rights violations.
-              </p>
-            </div>
+            {(patternData?.discriminatory_ratio || 0) > 0 && (
+              <div className="p-4 border-l-4 border-red-500 bg-red-50 dark:bg-red-900/30 rounded">
+                <h4 className="font-semibold text-red-800 dark:text-red-300">Discriminatory Surveillance</h4>
+                <p className="text-sm text-red-700 dark:text-red-200 mt-1">
+                  Analysis shows {((patternData?.discriminatory_ratio || 0) * 100).toFixed(1)}% higher surveillance
+                  rates in minority communities compared to affluent areas, indicating potential civil rights violations.
+                </p>
+              </div>
+            )}
 
             <div className="p-4 border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/30 rounded">
               <h4 className="font-semibold text-orange-800 dark:text-orange-300">Excessive Hovering</h4>
@@ -362,13 +392,15 @@ export function PatternAnalysisPage() {
               </p>
             </div>
 
-            <div className="p-4 border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/30 rounded">
-              <h4 className="font-semibold text-purple-800 dark:text-purple-300">Systematic Patterns</h4>
-              <p className="text-sm text-purple-700 dark:text-purple-200 mt-1">
-                Regular surveillance routes detected with {patternData?.systematic_patrol_routes || 0} 
-                repeated patterns indicating systematic rather than incident-responsive deployment.
-              </p>
-            </div>
+            {(patternData?.systematic_patrol_routes || 0) > 0 && (
+              <div className="p-4 border-l-4 border-purple-500 bg-purple-50 dark:bg-purple-900/30 rounded">
+                <h4 className="font-semibold text-purple-800 dark:text-purple-300">Systematic Patterns</h4>
+                <p className="text-sm text-purple-700 dark:text-purple-200 mt-1">
+                  Regular surveillance routes detected with {patternData?.systematic_patrol_routes || 0}
+                  repeated patterns indicating systematic rather than incident-responsive deployment.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

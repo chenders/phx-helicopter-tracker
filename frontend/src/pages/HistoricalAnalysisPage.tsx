@@ -291,7 +291,7 @@ export function HistoricalAnalysisPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Historical Flight Analysis</h1>
         <p className="text-gray-600 dark:text-gray-300">
           Comprehensive analysis of Phoenix PD helicopter surveillance patterns over time,
-          imported from FlightRadar24 Gold subscription data and other public sources.
+          based on actual flight tracking data from FlightRadar24 API.
         </p>
       </div>
 
@@ -950,8 +950,12 @@ export function HistoricalAnalysisPage() {
           <div>
             <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Data Sources</h3>
             <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
-              <li>• FlightRadar24 Gold: {historicalData?.sources?.flightradar24 || 0} flights</li>
-              <li>• Public Records: {historicalData?.sources?.public_records || 0} documents</li>
+              {historicalData?.sources && Object.entries(historicalData.sources).map(([source, count]) => (
+                <li key={source}>• {source.replace('_', ' ')}: {count} flights</li>
+              ))}
+              {(!historicalData?.sources || Object.keys(historicalData.sources).length === 0) && (
+                <li>• No source data available</li>
+              )}
             </ul>
           </div>
 
