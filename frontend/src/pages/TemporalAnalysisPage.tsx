@@ -229,7 +229,7 @@ export function TemporalAnalysisPage() {
             ))}
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-            These periods show significantly higher activity than average (>2 standard deviations from mean).
+            These periods show significantly higher activity than average (&gt;2 standard deviations from mean).
           </p>
         </div>
       )}
@@ -285,7 +285,7 @@ export function TemporalAnalysisPage() {
               over residential areas heighten privacy concerns
             </li>
             <li>
-              • <strong>High Surveillance Ratios:</strong> Periods with >75% surveillance flights
+              • <strong>High Surveillance Ratios:</strong> Periods with &gt;75% surveillance flights
               suggest non-emergency operations
             </li>
             <li>
