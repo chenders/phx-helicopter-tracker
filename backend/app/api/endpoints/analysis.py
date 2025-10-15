@@ -181,15 +181,24 @@ def get_pattern_analysis(
     # Count actual surveillance events
     surveillance_hotspots = len(surveillance_flights)
 
-    # Calculate average hover duration
+    # Calculate average hover duration from actual abnormal pattern data
+    from app.models.abnormal_patterns import AbnormalPattern
+
     hover_durations = []
-    for flight in surveillance_flights:
-        if flight.hover_locations and flight.arrival_time and flight.departure_time:
-            # Estimate hover time as 20% of flight time for surveillance flights
-            flight_duration = (
-                flight.arrival_time - flight.departure_time
-            ).total_seconds() / 60
-            hover_durations.append(flight_duration * 0.2)
+    if surveillance_flights:
+        flight_ids = [f.id for f in surveillance_flights]
+        hover_patterns = db.query(AbnormalPattern).filter(
+            AbnormalPattern.flight_log_id.in_(flight_ids),
+            AbnormalPattern.pattern_type == "excessive_hovering"
+        ).all()
+
+        for pattern in hover_patterns:
+            if pattern.detection_metadata and isinstance(pattern.detection_metadata, dict):
+                hovers = pattern.detection_metadata.get('hovering', [])
+                if isinstance(hovers, list):
+                    for hover in hovers:
+                        if isinstance(hover, dict) and 'duration_minutes' in hover:
+                            hover_durations.append(hover['duration_minutes'])
 
     avg_hover_duration = (
         int(sum(hover_durations) / len(hover_durations)) if hover_durations else 0
@@ -257,21 +266,20 @@ def get_pattern_analysis(
     # Neighborhood distribution removed - was simulated data
     neighborhood_distribution = []
 
-    # Violation types breakdown
+    # Violation types breakdown - count actual violations from flight data
     violation_types = []
     if constitutional_violations > 0:
-        violation_types = [
-            {"name": "Hovering", "count": int(constitutional_violations * 0.4)},
-            {"name": "Low Altitude", "count": int(constitutional_violations * 0.3)},
-            {
-                "name": "Extended Surveillance",
-                "count": int(constitutional_violations * 0.2),
-            },
-            {
-                "name": "Night Surveillance",
-                "count": int(constitutional_violations * 0.1),
-            },
-        ]
+        hovering_count = len([f for f in surveillance_flights if f.hover_locations and f.privacy_concern_level and f.privacy_concern_level >= 4])
+        low_altitude_count = len([f for f in surveillance_flights if f.min_altitude_feet and f.min_altitude_feet < 400 and f.privacy_concern_level and f.privacy_concern_level >= 4])
+        night_count = len([f for f in surveillance_flights if f.departure_time and (f.departure_time.hour >= 22 or f.departure_time.hour <= 6) and f.privacy_concern_level and f.privacy_concern_level >= 4])
+
+        # Only include types with actual violations
+        if hovering_count > 0:
+            violation_types.append({"name": "Hovering", "count": hovering_count})
+        if low_altitude_count > 0:
+            violation_types.append({"name": "Low Altitude", "count": low_altitude_count})
+        if night_count > 0:
+            violation_types.append({"name": "Night Surveillance", "count": night_count})
 
     # Calculate additional metrics from real data
     excessive_hovering = len([f for f in flights if f.hover_locations])
@@ -457,8 +465,35 @@ def get_cost_analysis(
     # Calculate additional metrics
     hourly_rate = 2160  # Phoenix PD estimated cost per hour
 
-    # Estimate surveillance vs legitimate operations (based on our analysis showing ~59% surveillance)
-    surveillance_ratio = 0.59
+    # Calculate actual surveillance ratio from database
+    flights = flight_log_crud.get_by_date_range(
+        db, start_date=start_date, end_date=end_date
+    )
+
+    # Get abnormal patterns to identify surveillance flights
+    from app.models.abnormal_patterns import AbnormalPattern
+    patterns_map = {}
+    if flights:
+        flight_ids = [f.id for f in flights]
+        patterns = db.query(AbnormalPattern).filter(
+            AbnormalPattern.flight_log_id.in_(flight_ids),
+            AbnormalPattern.pattern_type != "normal"
+        ).all()
+        for pattern in patterns:
+            if pattern.flight_log_id not in patterns_map:
+                patterns_map[pattern.flight_log_id] = []
+            patterns_map[pattern.flight_log_id].append(pattern)
+
+    # Identify surveillance flights
+    surveillance_flights = [
+        f for f in flights
+        if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5) or
+           (f.id in patterns_map)
+    ]
+
+    # Calculate actual surveillance ratio from the data
+    surveillance_ratio = len(surveillance_flights) / len(flights) if flights else 0
+
     total_cost = summary.get("total_cost", 0)
     surveillance_cost = total_cost * surveillance_ratio
     legitimate_cost = total_cost * (1 - surveillance_ratio)
@@ -540,24 +575,10 @@ def get_cost_analysis(
         "aircraft_costs": aircraft_costs,
         "legitimate_operations_cost": legitimate_cost,
         "surveillance_cost": surveillance_cost,
-        "administrative_cost": total_cost * 0.1,  # Estimate 10% admin
-        "training_maintenance_cost": total_cost
-        * 0.15,  # Estimate 15% training/maintenance
         "hourly_rate": hourly_rate,
-        "hourly_breakdown": {
-            "fuel": 540,
-            "personnel": 120,
-            "equipment": 800,
-            "maintenance": 400,
-            "overhead": 300,
-        },
         "total_cost": total_cost,
         "annual_surveillance_cost": annual_surveillance_cost,
-        "national_avg_hourly": 1800,
         "surveillance_ratio": surveillance_ratio,
-        "national_avg_surveillance_ratio": 0.35,  # National average estimate
-        "national_avg_annual": annual_surveillance_cost
-        * 0.8,  # Phoenix 20% above average
     }
 
 
