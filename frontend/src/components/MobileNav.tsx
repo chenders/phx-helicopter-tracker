@@ -23,6 +23,7 @@ export const MobileNav = ({ isOpen, setIsOpen }: MobileNavProps) => {
     { path: '/costs', label: 'Cost Analysis', icon: '💰' },
     { path: '/legal', label: 'Legal Docs', icon: '⚖️' },
     { path: '/radio', label: 'Radio Archives', icon: '📻' },
+    { path: '/radio-analysis', label: 'Radio Analysis', icon: '📊' },
   ]
 
   const systemItems = [

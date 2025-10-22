@@ -8,6 +8,7 @@ from .legal import LegalDocument, ConstitutionalAnalysis, LegalPrecedent
 from .task_history import TaskHistory, TaskEvent, TaskMetrics
 from .system_issues import SystemIssue
 from .system_logs import SystemLog
+from .radio import RadioArchive, RadioTranscription, RadioSegment, RadioKeyword, FlightRadioCorrelation
 
 __all__ = [
     "Base",
@@ -24,4 +25,9 @@ __all__ = [
     "TaskMetrics",
     "SystemIssue",
     "SystemLog",
+    "RadioArchive",
+    "RadioTranscription",
+    "RadioSegment",
+    "RadioKeyword",
+    "FlightRadioCorrelation",
 ]

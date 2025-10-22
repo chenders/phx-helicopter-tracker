@@ -14,6 +14,7 @@ import { LegalDocumentsPage } from './pages/LegalDocumentsPage'
 import { DataSourcesPage } from './pages/DataSourcesPage'
 import { TaskMonitoringPage } from './pages/TaskMonitoringPage'
 import { RadioPage } from './pages/RadioPage'
+import { RadioAnalysisPage } from './pages/RadioAnalysisPage'
 import AbnormalPatternsPage from './pages/AbnormalPatternsPage'
 import { FlightSearchPage } from './pages/FlightSearchPage'
 import { FlightDetailPage } from './pages/FlightDetailPage'
@@ -55,6 +56,7 @@ function App() {
                 <Route path="/data-sources" element={<DataSourcesPage />} />
                 <Route path="/tasks" element={<TaskMonitoringPage />} />
                 <Route path="/radio" element={<RadioPage />} />
+                <Route path="/radio-analysis" element={<RadioAnalysisPage />} />
                 <Route path="/abnormal" element={<AbnormalPatternsPage />} />
                 <Route path="/search" element={<FlightSearchPage />} />
                 <Route path="/flight/:flightId" element={<FlightDetailPage />} />
@@ -80,6 +82,7 @@ function App() {
                 <Route path="/data-sources" element={<DataSourcesPage />} />
                 <Route path="/tasks" element={<TaskMonitoringPage />} />
                 <Route path="/radio" element={<RadioPage />} />
+                <Route path="/radio-analysis" element={<RadioAnalysisPage />} />
                 <Route path="/abnormal" element={<AbnormalPatternsPage />} />
                 <Route path="/search" element={<FlightSearchPage />} />
                 <Route path="/flight/:flightId" element={<FlightDetailPage />} />
