@@ -286,13 +286,6 @@ export function FlightDetailPage() {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false) // Collapsed by default
   const [is3DAnimating, setIs3DAnimating] = useState(false) // Track 3D animation state
   const [hudData, setHudData] = useState<HudData | null>(null) // HUD data from 3D visualization
-  const [hasDataQualityIssue, setHasDataQualityIssue] = useState(false)
-  const [dataQualityInfo, setDataQualityInfo] = useState<{
-    recordedDuration: number;
-    actualSpan: number;
-    discrepancy: number;
-    discrepancyPct: number;
-  } | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const animationRef = useRef<number | null>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
@@ -453,27 +446,6 @@ export function FlightDetailPage() {
       // Load abnormal patterns
       const patternsResponse = await axios.get(`/api/v1/flights/${flightId}/patterns`)
       setPatterns(patternsResponse.data)
-
-      // Check for data quality issues
-      if (flightResponse.data.flight_duration_minutes && positionsResponse.data.length > 1) {
-        const timestamps = positionsResponse.data.map((p: any) => new Date(p.timestamp).getTime())
-        const minTime = Math.min(...timestamps)
-        const maxTime = Math.max(...timestamps)
-        const actualSpanMinutes = (maxTime - minTime) / (1000 * 60)
-        const recordedDuration = flightResponse.data.flight_duration_minutes
-        const discrepancy = actualSpanMinutes - recordedDuration
-        const discrepancyPct = Math.abs(discrepancy) / recordedDuration
-
-        if (discrepancyPct > 0.20) { // 20% threshold
-          setHasDataQualityIssue(true)
-          setDataQualityInfo({
-            recordedDuration,
-            actualSpan: actualSpanMinutes,
-            discrepancy,
-            discrepancyPct: discrepancyPct * 100
-          })
-        }
-      }
 
       // Load radio segments for the flight time period
       if (flightResponse.data.departure_time && flightResponse.data.arrival_time) {
@@ -943,52 +915,6 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
           )}
         </button>
 
-        {/* Data Quality Warning Banner */}
-        {hasDataQualityIssue && dataQualityInfo && (
-          <div className="bg-orange-50 dark:bg-orange-900/20 border-l-4 border-orange-500 p-4 mt-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <h4 className="text-sm font-semibold text-orange-800 dark:text-orange-300 mb-1">
-                  Data Quality Issue Detected
-                </h4>
-                <p className="text-sm text-orange-700 dark:text-orange-400 mb-2">
-                  The position data time span differs significantly from the recorded flight duration.
-                  This may indicate incomplete or inaccurate flight metadata from FlightRadar24.{' '}
-                  <Link to="/data-quality" className="underline hover:text-orange-800 dark:hover:text-orange-300 font-medium">
-                    View all data quality issues →
-                  </Link>
-                </p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs mt-3">
-                  <div className="bg-white/50 dark:bg-black/20 rounded px-2 py-1.5">
-                    <div className="text-gray-600 dark:text-gray-400">Recorded Duration</div>
-                    <div className="font-semibold text-orange-900 dark:text-orange-200">
-                      {Math.round(dataQualityInfo.recordedDuration)} min
-                    </div>
-                  </div>
-                  <div className="bg-white/50 dark:bg-black/20 rounded px-2 py-1.5">
-                    <div className="text-gray-600 dark:text-gray-400">Position Data Span</div>
-                    <div className="font-semibold text-orange-900 dark:text-orange-200">
-                      {Math.round(dataQualityInfo.actualSpan)} min
-                    </div>
-                  </div>
-                  <div className="bg-white/50 dark:bg-black/20 rounded px-2 py-1.5">
-                    <div className="text-gray-600 dark:text-gray-400">Discrepancy</div>
-                    <div className="font-semibold text-orange-900 dark:text-orange-200">
-                      {dataQualityInfo.discrepancy > 0 ? '+' : ''}{Math.round(dataQualityInfo.discrepancy)} min
-                    </div>
-                  </div>
-                  <div className="bg-white/50 dark:bg-black/20 rounded px-2 py-1.5">
-                    <div className="text-gray-600 dark:text-gray-400">Discrepancy %</div>
-                    <div className="font-semibold text-orange-900 dark:text-orange-200">
-                      {Math.round(dataQualityInfo.discrepancyPct)}%
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Collapsible Content */}
         {isDetailsExpanded && (
