@@ -18,6 +18,7 @@ celery_app = Celery(
         "app.workers.radio_tasks_alternative",
         "app.workers.radio_tasks_faster_whisper",
         "app.workers.radio_analysis_tasks",
+        "app.workers.radio_import_tasks",
         "app.workers.flight_tracking_tasks",
         "app.workers.flight_discovery_tasks",
         "app.workers.abnormal_pattern_tasks",
@@ -52,6 +53,7 @@ celery_app.conf.update(
         'app.workers.data_import_tasks.*': {'queue': 'data_import'},
         'app.workers.radio_tasks.*': {'queue': 'radio'},
         'app.workers.radio_analysis_tasks.*': {'queue': 'analysis'},
+        'app.workers.radio_import_tasks.*': {'queue': 'data_import'},
         'app.workers.fr24_scheduler.*': {'queue': 'scheduler'},
         # TRANSCRIPTION TASKS - ONLY processed by dedicated GPU workers
         # DO NOT process these on the main server
