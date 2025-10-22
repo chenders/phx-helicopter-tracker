@@ -17,6 +17,7 @@ celery_app = Celery(
         "app.workers.radio_tasks",
         "app.workers.radio_tasks_alternative",
         "app.workers.radio_tasks_faster_whisper",
+        "app.workers.radio_analysis_tasks",
         "app.workers.flight_tracking_tasks",
         "app.workers.flight_discovery_tasks",
         "app.workers.abnormal_pattern_tasks",
@@ -50,6 +51,7 @@ celery_app.conf.update(
         'app.workers.legal_tasks.*': {'queue': 'legal'},
         'app.workers.data_import_tasks.*': {'queue': 'data_import'},
         'app.workers.radio_tasks.*': {'queue': 'radio'},
+        'app.workers.radio_analysis_tasks.*': {'queue': 'analysis'},
         'app.workers.fr24_scheduler.*': {'queue': 'scheduler'},
         # TRANSCRIPTION TASKS - ONLY processed by dedicated GPU workers
         # DO NOT process these on the main server
@@ -233,6 +235,28 @@ celery_app.conf.update(
             },
         },
         # REMOVED cleanup-old-radio-archives - we want to keep all radio archives permanently
+        # Radio transcription analysis - extract entities and correlate with flights
+        "extract-radio-entities": {
+            "task": "process_untranscribed_archives",
+            "schedule": 3600.0,  # Every hour - process new transcriptions
+            "kwargs": {
+                "batch_size": 10,  # Process 10 transcriptions per run
+            },
+            "options": {
+                "queue": "analysis",
+            },
+        },
+        "correlate-radio-with-flights": {
+            "task": "correlate_radio_with_flights",
+            "schedule": 86400.0,  # Daily - correlate radio mentions with flights
+            "kwargs": {
+                "days_back": 7,  # Analyze last 7 days
+                "time_window_minutes": 30,  # ±30 minute correlation window
+            },
+            "options": {
+                "queue": "analysis",
+            },
+        },
         # System monitoring and error detection
         "monitor-system-errors": {
             "task": "monitor_system_errors",
