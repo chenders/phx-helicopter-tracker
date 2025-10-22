@@ -471,6 +471,79 @@ async def get_high_urgency_segments(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/segments/during-flight")
+async def get_segments_during_flight(
+    start_time: datetime = Query(..., description="Flight start time"),
+    end_time: datetime = Query(..., description="Flight end time"),
+    include_audio_url: bool = Query(True, description="Include MP3 audio file URLs"),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Get radio segments that occurred during a specific flight time window
+
+    Returns segments with their audio files for playback during flight replay
+    """
+    try:
+        # Query segments within the time window
+        segments = (
+            db.query(
+                RadioSegment,
+                RadioArchive.filename,
+                RadioArchive.file_path,
+                RadioArchive.recording_start,
+                RadioArchive.duration_seconds,
+            )
+            .join(RadioTranscription, RadioSegment.transcription_id == RadioTranscription.id)
+            .join(RadioArchive, RadioTranscription.archive_id == RadioArchive.id)
+            .filter(
+                and_(
+                    RadioSegment.absolute_timestamp >= start_time,
+                    RadioSegment.absolute_timestamp <= end_time,
+                )
+            )
+            .order_by(RadioSegment.absolute_timestamp)
+            .all()
+        )
+
+        results = []
+        for segment, filename, file_path, recording_start, duration in segments:
+            result = {
+                "segment_id": segment.id,
+                "timestamp": segment.absolute_timestamp.isoformat() if segment.absolute_timestamp else None,
+                "start_time": segment.start_time,
+                "end_time": segment.end_time,
+                "text": segment.text,
+                "urgency_score": segment.urgency_score,
+                "tail_numbers": segment.tail_numbers,
+                "locations": segment.locations,
+                "incident_codes": segment.incident_codes,
+                "audio_file": {
+                    "filename": filename,
+                    "recording_start": recording_start.isoformat() if recording_start else None,
+                    "duration_seconds": duration,
+                }
+            }
+
+            if include_audio_url:
+                # Construct audio URL for the MP3 file
+                result["audio_file"]["audio_url"] = f"/api/v1/radio/archives/{filename}/audio"
+                # Also include the segment-specific start/end times for audio playback
+                result["audio_file"]["segment_start"] = segment.start_time
+                result["audio_file"]["segment_end"] = segment.end_time
+
+            results.append(result)
+
+        return {
+            "start_time": start_time.isoformat(),
+            "end_time": end_time.isoformat(),
+            "total_segments": len(results),
+            "segments": results,
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/stats")
 async def get_analysis_stats(
     db: Session = Depends(get_db),
