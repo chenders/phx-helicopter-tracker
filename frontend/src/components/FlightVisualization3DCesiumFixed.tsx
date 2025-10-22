@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import "../styles/slider.css";
+import {
+  createHolographicBillboard,
+  createProgressiveRevealLabel,
+  createPulsingHolographicMarker,
+  createHolographicBeam,
+  getTierHolographicColor,
+  HolographicColors,
+} from "../utils/holographicMaterials";
 
 declare global {
   interface Window {
@@ -114,7 +122,6 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   const [tileLoadProgress, setTileLoadProgress] = useState(0);
   const isInitializingRef = useRef(false);
   const hasInitializedRef = useRef(false);
-  const [isControlsExpanded, setIsControlsExpanded] = useState(false); // Controls panel state - collapsed by default
   const [cameraPitchMode, setCameraPitchMode] = useState<'auto' | 'level' | 'moderate' | 'steep'>('auto'); // Camera pitch control
   const cameraPitchModeRef = useRef<'auto' | 'level' | 'moderate' | 'steep'>('auto'); // Ref for accessing in callbacks
   const [hudData, setHudData] = useState({
@@ -357,6 +364,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           maximumRenderTimeChange: isMobile ? Infinity : 0.0,  // Reduce render frequency on mobile
         });
 
+        // Optimize scene appearance for daytime visibility with bright labels
+        viewer.scene.skyAtmosphere.show = true;
+        viewer.scene.fog.enabled = true;
+        viewer.scene.fog.density = 0.0001; // Very light fog for atmospheric depth
+        viewer.scene.fog.minimumBrightness = 0.8; // Keep things bright
+
         // Apply mobile-specific scene optimizations
         if (isMobile) {
           console.log("Applying mobile performance optimizations...");
@@ -366,10 +379,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           viewer.scene.globe.maximumScreenSpaceError = 4; // Default is 2
           // Disable shadows for better performance
           viewer.shadows = false;
-          // Reduce fog density to minimize far rendering
-          viewer.scene.fog.density = 0.0005; // Default is 0.0002
-          viewer.scene.fog.enabled = true;
-          viewer.scene.fog.minimumBrightness = 0.8;
+          // Increase fog density to minimize far rendering on mobile
+          viewer.scene.fog.density = 0.0005;
+          viewer.scene.fog.minimumBrightness = 0.15;
         }
 
         // Add 3D Buildings - skip heavy Google tiles on mobile
@@ -398,9 +410,48 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           }
         }
 
+        // Load Phoenix village boundaries and calculate centroids
+        let villageLabels: Array<{ name: string; lat: number; lng: number; tier: number; isArea: boolean }> = [];
+        try {
+          const villagesResponse = await fetch('/phoenix_villages.geojson');
+          const villagesData = await villagesResponse.json();
+
+          // Calculate centroid for each village polygon
+          villageLabels = villagesData.features.map((feature: any) => {
+            const coordinates = feature.geometry.coordinates[0]; // Get outer ring
+
+            // Calculate centroid using average of all points
+            let sumLat = 0;
+            let sumLng = 0;
+            let count = 0;
+
+            coordinates.forEach((coord: [number, number]) => {
+              sumLng += coord[0];
+              sumLat += coord[1];
+              count++;
+            });
+
+            return {
+              name: feature.properties.NAME,
+              lng: sumLng / count,
+              lat: sumLat / count,
+              tier: 0, // Villages are tier 0 (large area labels)
+              isArea: true,
+            };
+          });
+
+          console.log(`Loaded ${villageLabels.length} Phoenix village labels from geojson`);
+        } catch (error) {
+          console.warn('Failed to load Phoenix villages geojson:', error);
+        }
+
         // Add 3D floating labels for major Phoenix roads and landmarks
         // Categorized by importance for visual hierarchy
         const phoenixLabels = [
+          // Tier 0: Phoenix Villages (loaded dynamically from geojson)
+          ...villageLabels,
+
+          // Tier 0: Additional area landmarks
           // Tier 0: Large area landmarks (highest, represents regions)
           { name: "Phoenix Sky Harbor Airport", lat: 33.4343, lng: -112.0080, tier: 0, isArea: true },
           { name: "Downtown Phoenix", lat: 33.4484, lng: -112.0740, tier: 0, isArea: true },
@@ -500,93 +551,101 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           (isMobile ? ` (mobile mode - showing only tier 0-2)` : ` (desktop mode - showing all)`)
         );
 
-        labelsToShow.forEach(label => {
-          // Tier-based styling for visual hierarchy
-          // Tier 0 (Area landmarks): Gold, largest, highest elevation (represents regions)
-          // Tier 1 (Freeways): White, large, high visibility
+        labelsToShow.forEach((label, index) => {
+          // Tier-based styling for holographic visual hierarchy
+          // Tier 0 (Area landmarks): Brightest cyan glow, largest, highest elevation
+          // Tier 1 (Freeways): Cyan, large, high visibility
           // Tier 2 (Major arterials): Cyan, medium-large
           // Tier 3 (Major streets): Light blue, medium
-          // Tier 4 (Secondary streets): Light gray, smaller
-          // Tier 5 (Minor streets): Dark gray, smallest
+          // Tier 4 (Secondary streets): Dimmer cyan, smaller
+          // Tier 5 (Minor streets): Dim cyan, smallest
 
-          let fillColor, fontSize, maxDistance, minDistance, baseHeight;
+          let fontSize, maxDistance, minDistance, baseHeight, scale;
+          const color = getTierHolographicColor(label.tier);
 
           switch(label.tier) {
             case 0: // Area landmarks (Downtown, Mountains, Airport, etc.)
-              fillColor = Cesium.Color.GOLD;
-              fontSize = 26;
+              fontSize = 24;
               maxDistance = isMobile ? 15840 : 31680; // Mobile: 3 miles, Desktop: 6 miles
               minDistance = 0;
               baseHeight = 1000; // Very high - these represent areas, not points
+              scale = 1.2;
               break;
             case 1: // Major Freeways
-              fillColor = Cesium.Color.WHITE;
-              fontSize = 24;
+              fontSize = 22;
               maxDistance = isMobile ? 13200 : 26400; // Mobile: 2.5 miles, Desktop: 5 miles
               minDistance = 0;
               baseHeight = 600; // Higher for visibility from altitude
+              scale = 1.1;
               break;
             case 2: // Major arterials (both named and numbered)
-              fillColor = Cesium.Color.CYAN;
-              fontSize = 22;
+              fontSize = 20;
               maxDistance = isMobile ? 10560 : 21120; // Mobile: 2 miles, Desktop: 4 miles
               minDistance = 0;
               baseHeight = 500;
+              scale = 1.0;
               break;
             case 3: // Major streets
-              fillColor = Cesium.Color.LIGHTBLUE;
               fontSize = 18;
               maxDistance = 15840; // 3 miles
               minDistance = 0;
               baseHeight = 400;
+              scale = 0.9;
               break;
             case 4: // Secondary streets
-              fillColor = Cesium.Color.LIGHTGRAY;
               fontSize = 16;
               maxDistance = 10560; // 2 miles
               minDistance = 0;
               baseHeight = 350;
+              scale = 0.8;
               break;
             case 5: // Minor streets
-              fillColor = Cesium.Color.DARKGRAY;
               fontSize = 14;
               maxDistance = 7920; // 1.5 miles
               minDistance = 0;
               baseHeight = 300;
+              scale = 0.7;
               break;
             default:
-              fillColor = Cesium.Color.WHITE;
               fontSize = 18;
               maxDistance = 15840;
               minDistance = 0;
               baseHeight = 400;
+              scale = 1.0;
           }
 
           // Position labels at a height that's visible from typical helicopter altitudes (1000-2000 ft)
           const height = baseHeight;
+          const position = Cesium.Cartesian3.fromDegrees(label.lng, label.lat, height);
 
-          viewer.entities.add({
-            position: Cesium.Cartesian3.fromDegrees(label.lng, label.lat, height),
-            label: {
+          // Use progressive reveal for tier 0-2 labels (major landmarks and roads)
+          // Stagger the reveals for visual interest
+          if (label.tier <= 2 && !isMobile) {
+            createProgressiveRevealLabel(Cesium, viewer, {
+              position: position,
               text: label.name,
-              font: `bold ${fontSize}px sans-serif`,
-              fillColor: fillColor,
-              outlineColor: Cesium.Color.BLACK,
-              outlineWidth: 3,
-              style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-              verticalOrigin: Cesium.VerticalOrigin.CENTER,
-              horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-              pixelOffset: new Cesium.Cartesian2(0, 0),
-              disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always visible through terrain
-              eyeOffset: new Cesium.Cartesian3(0, 0, 0),
-              // Scale: larger when very close, normal at medium range
-              scaleByDistance: new Cesium.NearFarScalar(1000, 1.5, maxDistance * 0.7, 0.8),
-              // Fade out gradually at max distance (from camera)
-              translucencyByDistance: new Cesium.NearFarScalar(maxDistance * 0.7, 1.0, maxDistance, 0.0),
-              // Show within tier-specific distance FROM CAMERA (this updates as camera moves)
+              fontSize: fontSize,
+              color: color,
+              revealDuration: 800 + label.tier * 200, // Faster for more important labels
+              startDelay: index * 30, // Stagger by 30ms each
+              scale: scale,
               distanceDisplayCondition: new Cesium.DistanceDisplayCondition(minDistance, maxDistance),
-            }
-          });
+              scaleByDistance: new Cesium.NearFarScalar(1000, 1.5, maxDistance * 0.7, 0.8),
+              translucencyByDistance: new Cesium.NearFarScalar(maxDistance * 0.7, 1.0, maxDistance, 0.0),
+            });
+          } else {
+            // Use standard holographic billboard for minor labels (less animation overhead)
+            createHolographicBillboard(Cesium, viewer, {
+              position: position,
+              text: label.name,
+              fontSize: fontSize,
+              color: color,
+              scale: scale,
+              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(minDistance, maxDistance),
+              scaleByDistance: new Cesium.NearFarScalar(1000, 1.5, maxDistance * 0.7, 0.8),
+              translucencyByDistance: new Cesium.NearFarScalar(maxDistance * 0.7, 1.0, maxDistance, 0.0),
+            });
+          }
         });
 
         console.log("Labels added. Total entities:", viewer.entities.values.length);
@@ -615,7 +674,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         viewer.clock.startTime = start.clone();
         viewer.clock.stopTime = stop.clone();
         viewer.clock.currentTime = start.clone();
-        viewer.clock.clockRange = Cesium.ClockRange.LOOP_STOP; // Stop at end, don't loop
+        viewer.clock.clockRange = Cesium.ClockRange.UNBOUNDED; // Allow animation to progress past endpoints
+        viewer.clock.clockStep = Cesium.ClockStep.SYSTEM_CLOCK_MULTIPLIER; // Use system clock with multiplier
         // Speed up the playback speed 50x.
         viewer.clock.multiplier = 50;
         // Don't auto-start - let user start it
@@ -1038,82 +1098,65 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           viewer.searchMarker = searchMarker;
         }
 
-        // Add hover location markers with vertical light beams
+        // Add hover location markers with holographic vertical light beams
         if (hoverLocations && hoverLocations.length > 0) {
-          console.log(`Adding ${hoverLocations.length} hover location visualizations`);
+          console.log(`Adding ${hoverLocations.length} holographic hover location visualizations`);
 
           hoverLocations.forEach((hoverLoc, idx) => {
             // Calculate radius based on duration (longer hover = larger radius)
             // Base radius: 50m, add 10m per minute of hovering, max 200m
             const radiusMeters = Math.min(50 + (hoverLoc.duration_minutes * 10), 200);
 
-            // Create a cylinder that extends from ground to high altitude (15000 feet = ~4572 meters)
-            const cylinderHeight = 4572; // meters
-
-            // Add translucent cylinder (the "light beam")
-            viewer.entities.add({
-              name: `Hover Beam ${idx + 1}`,
-              position: Cesium.Cartesian3.fromDegrees(
-                hoverLoc.longitude,
-                hoverLoc.latitude,
-                cylinderHeight / 2 // Position at center of cylinder height
-              ),
-              cylinder: {
-                length: cylinderHeight,
-                topRadius: radiusMeters,
-                bottomRadius: radiusMeters,
-                material: Cesium.Color.ORANGE.withAlpha(0.3),
-                outline: true,
-                outlineColor: Cesium.Color.RED.withAlpha(0.6),
-                outlineWidth: 2,
-                heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-              },
+            // Create holographic beam (animated pulsing cylinder)
+            createHolographicBeam(Cesium, viewer, {
+              position: { longitude: hoverLoc.longitude, latitude: hoverLoc.latitude },
+              radius: radiusMeters,
+              height: 4572, // ~15,000 feet
+              color: HolographicColors.HOVER_ALERT,
+              pulseSpeed: 1.5,
             });
 
-            // Add ground marker - opaque circle showing surveillance area
+            // Add ground marker - holographic ellipse showing surveillance area
             viewer.entities.add({
               name: `Hover Area ${idx + 1}`,
               position: Cesium.Cartesian3.fromDegrees(
                 hoverLoc.longitude,
                 hoverLoc.latitude,
-                0
+                0 // Explicit height of 0
               ),
               ellipse: {
                 semiMinorAxis: radiusMeters,
                 semiMajorAxis: radiusMeters,
-                material: Cesium.Color.RED.withAlpha(0.5),
-                outline: true,
-                outlineColor: Cesium.Color.DARKRED,
-                outlineWidth: 3,
+                height: 0, // Required when using heightReference
+                material: new Cesium.Color(
+                  HolographicColors.HOVER_ALERT.r,
+                  HolographicColors.HOVER_ALERT.g,
+                  HolographicColors.HOVER_ALERT.b,
+                  0.4
+                ),
+                outline: false, // Disable outline to avoid terrain clamping warning
+                // outlineColor and outlineWidth removed since outline is disabled
                 heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
               },
             });
 
-            // Add label showing duration
-            viewer.entities.add({
-              name: `Hover Label ${idx + 1}`,
-              position: Cesium.Cartesian3.fromDegrees(
-                hoverLoc.longitude,
-                hoverLoc.latitude,
-                100 // 100m above ground for visibility
-              ),
-              label: {
-                text: `HOVER\n${hoverLoc.duration_minutes.toFixed(1)} min`,
-                font: 'bold 16px sans-serif',
-                fillColor: Cesium.Color.WHITE,
-                outlineColor: Cesium.Color.RED,
-                outlineWidth: 3,
-                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                verticalOrigin: Cesium.VerticalOrigin.CENTER,
-                horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
-                pixelOffset: new Cesium.Cartesian2(0, 0),
-                disableDepthTestDistance: Number.POSITIVE_INFINITY,
-                heightReference: Cesium.HeightReference.RELATIVE_TO_GROUND,
-              },
+            // Add holographic label showing duration
+            const labelPosition = Cesium.Cartesian3.fromDegrees(
+              hoverLoc.longitude,
+              hoverLoc.latitude,
+              100 // 100m above ground for visibility
+            );
+
+            createHolographicBillboard(Cesium, viewer, {
+              position: labelPosition,
+              text: `HOVER\n${hoverLoc.duration_minutes.toFixed(1)} min`,
+              fontSize: 18,
+              color: HolographicColors.HOVER_ALERT,
+              scale: 1.0,
             });
           });
 
-          console.log(`Added ${hoverLocations.length * 3} hover visualization entities`);
+          console.log(`Added ${hoverLocations.length} holographic hover visualization sets`);
         }
 
         // Start with first-person pilot view
@@ -1758,6 +1801,10 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         multiplier: viewer.clock.multiplier
       });
 
+      // CRITICAL: Ensure continuous rendering is enabled
+      viewer.scene.requestRenderMode = false; // Force continuous rendering
+      viewer.useDefaultRenderLoop = true; // Ensure default render loop is active
+
       // Use Cesium's built-in clock animation
       viewer.clock.shouldAnimate = true;
       viewer.clock.multiplier = playbackSpeed * 50; // Adjust multiplier based on playback speed
@@ -1765,6 +1812,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
       onAnimationStateChange?.(true);
 
       console.log("Clock animation started, multiplier:", viewer.clock.multiplier);
+      console.log("Render mode:", viewer.scene.requestRenderMode, "useDefaultRenderLoop:", viewer.useDefaultRenderLoop);
 
       // Debug: Monitor clock updates
       let frameCount = 0;
@@ -1838,19 +1886,32 @@ export const FlightVisualization3DCesiumFixed: React.FC<
 
                 if (currentPosTime >= hoverStartTime && currentPosTime <= hoverEndTime) {
                   isInHoverArea = true;
-                  cameraPitch = Cesium.Math.toRadians(-50); // Look down very steeply in hover areas
+                  cameraPitch = Cesium.Math.toRadians(-70); // Look straight down in hover areas (bird's eye view)
 
-                  // Slow down to 5x speed when in hover area (compromise between visibility and patience)
-                  // This is much slower than normal (playbackSpeed * 50) but not painfully slow like 1x
-                  const normalSpeed = playbackSpeed * 50;
-                  const hoverSpeed = playbackSpeed * 5; // 10x slower than normal
+                  // Slow down to 10x speed when in hover area
+                  const hoverSpeed = playbackSpeed * 10;
 
                   if (Math.abs(viewer.clock.multiplier - hoverSpeed) > 0.1) {
                     viewer.clock.multiplier = hoverSpeed;
                     console.log(`Entering hover area - slowing to ${hoverSpeed.toFixed(1)}x to show ${hoverLoc.duration_minutes.toFixed(1)} min hover`);
                   }
+
+                  // IMPORTANT: Store the center of hover location to lock camera heading
+                  if (!viewer._hoverCenterHeading) {
+                    // Calculate heading from current position to hover center
+                    const deltaLng = hoverLoc.longitude - currentPos.longitude;
+                    const deltaLat = hoverLoc.latitude - currentPos.latitude;
+                    viewer._hoverCenterHeading = Math.atan2(deltaLng, deltaLat);
+                    console.log("Locked camera heading for hover area");
+                  }
                   break;
                 }
+              }
+
+              // Clear the locked heading when leaving hover area
+              if (!isInHoverArea && viewer._hoverCenterHeading !== undefined) {
+                viewer._hoverCenterHeading = undefined;
+                console.log("Unlocked camera heading - exiting hover area");
               }
             }
 
@@ -1900,10 +1961,15 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             // - Sides: 120° per side with large windows
             // - Downward: 70° through floor bubble (excellent for observation)
 
+            // Use locked heading during hover, otherwise follow helicopter heading
+            const cameraHeading = (isInHoverArea && viewer._hoverCenterHeading !== undefined)
+              ? viewer._hoverCenterHeading
+              : hpr.heading;
+
             viewer.camera.setView({
               destination: position,
               orientation: {
-                heading: hpr.heading,
+                heading: cameraHeading, // Lock heading during hover to prevent spinning
                 pitch: cameraPitch, // Dynamic pitch based on location
                 roll: 0
               }
@@ -2150,98 +2216,6 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             </div>
           </div>
         )}
-
-        {/* Camera Controls Help Inset */}
-        {!isLoading && (
-          <div className="absolute top-4 left-4 z-40 w-72">
-            <div className="bg-black/80 backdrop-blur rounded-lg shadow-xl overflow-hidden">
-              {/* Header - Clickable to toggle */}
-              <button
-                onClick={() => setIsControlsExpanded(!isControlsExpanded)}
-                className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/10 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-white text-sm font-semibold">🎮 Camera Controls</span>
-                </div>
-                <span className="text-white text-xs">
-                  {isControlsExpanded ? '▼' : '▶'}
-                </span>
-              </button>
-
-              {/* Controls List - Collapsible */}
-              {isControlsExpanded && (
-                <div className="px-4 py-3 space-y-2 text-white text-xs border-t border-white/20">
-                  {/* Camera Pitch Mode Selector */}
-                  <div className="pb-2 border-b border-white/10">
-                    <label className="text-gray-400 mb-1.5 font-semibold block">Camera Pitch:</label>
-                    <select
-                      value={cameraPitchMode}
-                      onChange={(e) => setCameraPitchMode(e.target.value as 'auto' | 'level' | 'moderate' | 'steep')}
-                      className="w-full px-2 py-1 bg-white/10 text-white rounded border border-white/20 focus:outline-none focus:border-blue-400 text-xs"
-                    >
-                      <option value="auto" className="bg-gray-800">Auto (context-based)</option>
-                      <option value="level" className="bg-gray-800">Level (-5°)</option>
-                      <option value="moderate" className="bg-gray-800">Moderate (-40°)</option>
-                      <option value="steep" className="bg-gray-800">Steep (-50°)</option>
-                    </select>
-                    <div className="text-[10px] text-gray-400 mt-1 italic">
-                      {cameraPitchMode === 'auto' && 'Adjusts angle based on hover/search areas'}
-                      {cameraPitchMode === 'level' && 'Nearly level view, good for normal flight'}
-                      {cameraPitchMode === 'moderate' && 'Looking down moderately'}
-                      {cameraPitchMode === 'steep' && 'Looking down steeply for observation'}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex items-start gap-2">
-                      <span className="text-blue-400 font-mono min-w-[80px]">Left Click</span>
-                      <span className="text-gray-300">Pan camera</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-blue-400 font-mono min-w-[80px]">Right Click</span>
-                      <span className="text-gray-300">Rotate camera (tilt/heading)</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-blue-400 font-mono min-w-[80px]">Scroll</span>
-                      <span className="text-gray-300">Zoom in/out</span>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <span className="text-blue-400 font-mono min-w-[80px]">Middle Click</span>
-                      <span className="text-gray-300">Drag to rotate around point</span>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-white/10">
-                    <div className="text-gray-400 mb-1.5 font-semibold">Keyboard Shortcuts:</div>
-                    <div className="space-y-1.5">
-                      <div className="flex items-start gap-2">
-                        <span className="text-green-400 font-mono min-w-[80px]">Arrow Keys</span>
-                        <span className="text-gray-300">Pan camera</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="text-green-400 font-mono min-w-[80px]">+ / -</span>
-                        <span className="text-gray-300">Zoom in/out</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="text-green-400 font-mono min-w-[80px]">Shift + ↑↓</span>
-                        <span className="text-gray-300">Tilt camera</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="text-green-400 font-mono min-w-[80px]">Shift + ←→</span>
-                        <span className="text-gray-300">Rotate camera</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-white/10 text-gray-400 text-[10px] italic">
-                    Tip: Double-click terrain to fly there
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
       </div>
 
       {!isLoading && (
