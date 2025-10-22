@@ -82,6 +82,26 @@ interface RadioArchive {
   timeRange?: string
 }
 
+interface RadioSegment {
+  segment_id: number
+  timestamp: string
+  start_time: number
+  end_time: number
+  text: string
+  urgency_score: number | null
+  tail_numbers: string[] | null
+  locations: string[] | null
+  incident_codes: string[] | null
+  audio_file: {
+    filename: string
+    recording_start: string
+    duration_seconds: number
+    audio_url: string
+    segment_start: number
+    segment_end: number
+  }
+}
+
 interface HoverLocation {
   latitude: number
   longitude: number
@@ -252,6 +272,8 @@ export function FlightDetailPage() {
   const [flight, setFlight] = useState<FlightDetails | null>(null)
   const [positions, setPositions] = useState<FlightPosition[]>([])
   const [radioFiles, setRadioFiles] = useState<RadioArchive[]>([])
+  const [radioSegments, setRadioSegments] = useState<RadioSegment[]>([])
+  const [currentRadioSegment, setCurrentRadioSegment] = useState<RadioSegment | null>(null)
   const [patterns, setPatterns] = useState<FlightPatterns | null>(null)
   const [calculatedClosest, setCalculatedClosest] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -397,6 +419,25 @@ export function FlightDetailPage() {
     }
   }, [currentPositionIndex, isPlaying, use3DView, positions])
 
+  // Track current radio segment based on flight timestamp
+  useEffect(() => {
+    if (positions[currentPositionIndex] && radioSegments.length > 0) {
+      const currentFlightTime = new Date(positions[currentPositionIndex].timestamp).getTime()
+
+      // Find the radio segment that matches this timestamp
+      const matchingSegment = radioSegments.find(segment => {
+        const segmentTime = new Date(segment.timestamp).getTime()
+        // Match if flight time is within 30 seconds of segment time
+        return Math.abs(currentFlightTime - segmentTime) < 30000
+      })
+
+      if (matchingSegment && matchingSegment.segment_id !== currentRadioSegment?.segment_id) {
+        setCurrentRadioSegment(matchingSegment)
+        console.log('Radio segment active:', matchingSegment.text.substring(0, 50))
+      }
+    }
+  }, [currentPositionIndex, positions, radioSegments])
+
   const loadFlightDetails = async () => {
     try {
       setLoading(true)
@@ -434,22 +475,22 @@ export function FlightDetailPage() {
         }
       }
 
-      // Load radio archives for the time period
-      // NOTE: Temporarily disabled - the API endpoint doesn't support time filtering yet
-      // and returns all archives (100+) instead of just those during the flight
-      // TODO: Fix the /api/v1/radio/archives endpoint to properly filter by time
-      /*
+      // Load radio segments for the flight time period
       if (flightResponse.data.departure_time && flightResponse.data.arrival_time) {
-        const radioResponse = await axios.get('/api/v1/radio/archives', {
-          params: {
-            start_time: flightResponse.data.departure_time,
-            end_time: flightResponse.data.arrival_time,
-          }
-        })
-        setRadioFiles(radioResponse.data.archives || [])
+        try {
+          const radioResponse = await axios.get('/api/v1/radio-analysis/segments/during-flight', {
+            params: {
+              start_time: flightResponse.data.departure_time,
+              end_time: flightResponse.data.arrival_time,
+            }
+          })
+          setRadioSegments(radioResponse.data.segments || [])
+          console.log(`Loaded ${radioResponse.data.segments?.length || 0} radio segments for flight`)
+        } catch (error) {
+          console.error('Failed to load radio segments:', error)
+          setRadioSegments([])
+        }
       }
-      */
-      setRadioFiles([]) // Temporarily set to empty until API is fixed
     } catch (error) {
       console.error('Failed to load flight details:', error)
     } finally {
@@ -798,7 +839,17 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
             <ArrowLeft className="h-5 w-5" />
             Back
           </button>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Radio Segments Indicator */}
+            {radioSegments.length > 0 && (
+              <div className="flex items-center gap-2 bg-green-900/20 border border-green-500/30 px-3 py-2 rounded-lg">
+                <Radio className="h-4 w-4 text-green-400" />
+                <span className="text-sm font-medium text-green-300">
+                  {radioSegments.length} Radio Transmissions
+                </span>
+              </div>
+            )}
+
             <button
               onClick={() => {
                 if (is3DAnimating) {
@@ -1213,6 +1264,54 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
             )}
           </div>
         </div>
+
+        {/* Radio Communication Display - Show when radio segment is active */}
+        {currentRadioSegment && (isPlaying || is3DAnimating) && (
+          <div className="mb-4 bg-black/90 backdrop-blur border-2 border-green-500 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <Radio className="h-6 w-6 text-green-400 animate-pulse" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs font-mono text-green-300 bg-green-900/30 px-2 py-1 rounded">
+                    RADIO TRANSMISSION
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {new Date(currentRadioSegment.timestamp).toLocaleTimeString()}
+                  </span>
+                  {currentRadioSegment.urgency_score && currentRadioSegment.urgency_score > 0.5 && (
+                    <span className="text-xs font-semibold text-red-400 bg-red-900/30 px-2 py-1 rounded animate-pulse">
+                      HIGH URGENCY
+                    </span>
+                  )}
+                </div>
+                <div className="text-green-100 font-mono text-sm leading-relaxed">
+                  {currentRadioSegment.text}
+                </div>
+                {(currentRadioSegment.tail_numbers || currentRadioSegment.locations || currentRadioSegment.incident_codes) && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {currentRadioSegment.tail_numbers?.map((tail, idx) => (
+                      <span key={`tail-${idx}`} className="text-xs px-2 py-1 bg-yellow-900/40 text-yellow-200 rounded border border-yellow-500/30">
+                        ✈️ {tail}
+                      </span>
+                    ))}
+                    {currentRadioSegment.locations?.map((loc, idx) => (
+                      <span key={`loc-${idx}`} className="text-xs px-2 py-1 bg-blue-900/40 text-blue-200 rounded border border-blue-500/30">
+                        📍 {loc}
+                      </span>
+                    ))}
+                    {currentRadioSegment.incident_codes?.map((code, idx) => (
+                      <span key={`code-${idx}`} className="text-xs px-2 py-1 bg-red-900/40 text-red-200 rounded border border-red-500/30">
+                        🚨 {code}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* HUD Display - Only show when 3D view is active and animating */}
         {use3DView && hudData && (
