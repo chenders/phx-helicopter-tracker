@@ -11,6 +11,8 @@ import {
 import { HolographicStreetLabels } from "./HolographicStreetLabels";
 import { PHOENIX_LABELS } from "../data/phoenixStreetLabels";
 import { FlightHUD, FlightHUDData } from "./FlightHUD";
+import { RadioAudioIndicator } from "./RadioAudioIndicator";
+import { useRadioArchives } from "../hooks/useRadioArchives";
 
 declare global {
   interface Window {
@@ -140,6 +142,11 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   });
   const [totalTimeInRadius, setTotalTimeInRadius] = useState(0); // Total time spent in search radius in seconds
   const [cameraPosition, setCameraPosition] = useState<any>(null); // Cesium.Cartesian3 camera position for street labels
+
+  // Fetch radio archives for flight time range
+  const flightStartTime = positions.length > 0 ? positions[0].timestamp : undefined;
+  const flightEndTime = positions.length > 0 ? positions[positions.length - 1].timestamp : undefined;
+  const { archives: radioArchives } = useRadioArchives(flightStartTime, flightEndTime, positions.length > 0);
 
   // Keep camera pitch mode ref in sync with state
   useEffect(() => {
@@ -2393,6 +2400,30 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Radio Audio Indicators - Division-inspired audio availability display */}
+          {positions.length > 0 && radioArchives.length > 0 && (
+            <div className="bg-white/95 dark:bg-gray-800/95 backdrop-blur p-3 rounded-lg shadow-md">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                  Radio Communications
+                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  {radioArchives.length} archive{radioArchives.length !== 1 ? 's' : ''} available
+                </span>
+              </div>
+              <RadioAudioIndicator
+                archives={radioArchives}
+                currentTimestamp={positions[Math.floor(sliderPosition / 100 * (positions.length - 1))]?.timestamp}
+                isPlaying={isAnimating}
+                onPlayAudio={(filename, timestamp) => {
+                  console.log(`Playing audio: ${filename} at ${timestamp}`);
+                  // Open audio in new window for now
+                  window.open(`/api/v1/radio/archives/${filename}/audio`, '_blank');
+                }}
+              />
             </div>
           )}
         </>

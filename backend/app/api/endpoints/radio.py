@@ -2,15 +2,19 @@
 Radio archives API endpoints
 Provides access to police radio recordings and transcriptions
 """
-from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response, Depends
 from fastapi.responses import FileResponse
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
+from sqlalchemy.orm import Session
+from sqlalchemy import and_, or_
 import json
 import os
 import re
 
+from app.db.database import get_db
+from app.models.radio import RadioArchive, RadioTranscription
 from app.workers.radio_tasks import download_broadcastify_archives
 
 # Data path - use same as in radio_tasks.py
@@ -367,5 +371,60 @@ async def get_audio_file(filename: str, request: Request):
         
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/archives/by-timerange")
+async def get_archives_by_timerange(
+    start_time: datetime = Query(..., description="Start of time range (ISO format)"),
+    end_time: datetime = Query(..., description="End of time range (ISO format)"),
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """
+    Get radio archives that overlap with a specific time range
+    Used to find radio communications during a flight
+
+    Returns archives where:
+    - archive.recording_start <= end_time
+    - archive.recording_end >= start_time
+    """
+    try:
+        # Query archives that overlap with the time range
+        archives = db.query(RadioArchive).filter(
+            and_(
+                RadioArchive.recording_start <= end_time,
+                RadioArchive.recording_end >= start_time,
+                RadioArchive.transcribed == True  # Only return transcribed archives
+            )
+        ).order_by(RadioArchive.recording_start).all()
+
+        # Format response
+        result = []
+        for archive in archives:
+            archive_data = {
+                "id": archive.id,
+                "filename": archive.filename,
+                "recording_start": archive.recording_start.isoformat() if archive.recording_start else None,
+                "recording_end": archive.recording_end.isoformat() if archive.recording_end else None,
+                "duration_seconds": archive.duration_seconds,
+                "has_transcription": archive.transcribed,
+                "file_size_mb": round(archive.file_size_bytes / (1024 * 1024), 2) if archive.file_size_bytes else None,
+            }
+
+            # Add transcription info if available
+            if archive.transcription:
+                archive_data["transcription"] = {
+                    "id": archive.transcription.id,
+                    "model_name": archive.transcription.model_name,
+                    "full_text_preview": archive.transcription.full_text[:200] + "..." if len(archive.transcription.full_text) > 200 else archive.transcription.full_text,
+                    "language": archive.transcription.language,
+                    "confidence_score": archive.transcription.confidence_score,
+                    "entities_extracted": archive.transcription.entities_extracted,
+                }
+
+            result.append(archive_data)
+
+        return result
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
