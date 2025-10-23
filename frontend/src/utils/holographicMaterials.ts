@@ -12,28 +12,44 @@ declare global {
   }
 }
 
-// Color palette optimized for daytime satellite imagery visibility
-// High contrast colors with strong outlines for readability against varied backgrounds
+// Multi-Color Semantic Palette (Division-inspired, optimized for daytime satellite imagery)
+// Provides information hierarchy through color coding
 export const HolographicColors = {
-  // Primary: Deep Blue with strong contrast (like AR overlays in daylight)
-  PRIMARY: { r: 0.0, g: 0.4, b: 1.0 },         // #0066FF - Royal Blue
-  PRIMARY_GLOW: { r: 0.3, g: 0.6, b: 1.0 },    // #4D99FF - Light Blue for glow
+  // Flight Path & Movement (Cyan/Teal)
+  FLIGHT_PATH: { r: 0.0, g: 0.83, b: 1.0 },       // #00D4FF - Bright Cyan for flight trajectory
+  FLIGHT_PATH_GLOW: { r: 0.0, g: 1.0, b: 1.0 },   // #00FFFF - Cyan glow
+  FLIGHT_ACTIVE: { r: 0.0, g: 1.0, b: 0.8 },      // #00FFCC - Teal for active elements
 
-  // Secondary: Magenta for high visibility (stands out against green/brown terrain)
-  SECONDARY: { r: 1.0, g: 0.0, b: 0.8 },       // #FF00CC - Magenta
+  // Critical Data & Alerts (Red/Amber)
+  CRITICAL_ALERT: { r: 1.0, g: 0.27, b: 0.4 },    // #FF4466 - Red for critical alerts
+  WARNING: { r: 1.0, g: 0.67, b: 0.0 },           // #FFAA00 - Amber for warnings
+  DANGER: { r: 1.0, g: 0.0, b: 0.0 },             // #FF0000 - Pure Red for danger
 
-  // Warnings: Bright Orange/Red with high saturation
-  WARNING: { r: 1.0, g: 0.5, b: 0.0 },         // #FF8000 - Bright Orange
-  DANGER: { r: 1.0, g: 0.0, b: 0.0 },          // #FF0000 - Pure Red
+  // Location & Spatial Data (Green/Lime)
+  LOCATION_PRIMARY: { r: 0.0, g: 1.0, b: 0.53 },  // #00FF88 - Bright Green for locations
+  LOCATION_GLOW: { r: 0.0, g: 1.0, b: 0.4 },      // #00FF66 - Green glow
+  HOVER_LOCATION: { r: 0.53, g: 1.0, b: 0.0 },    // #88FF00 - Lime for hover spots
 
-  // Surveillance detection colors - need to pop against terrain
-  HOVER_ALERT: { r: 1.0, g: 0.4, b: 0.0 },     // #FF6600 - Bright Orange (highly visible)
-  LOW_ALT_WARNING: { r: 1.0, g: 0.6, b: 0.0 }, // #FF9900 - Bright Orange
+  // Radio Audio & Communications (Amber/Orange)
+  RADIO_AVAILABLE: { r: 1.0, g: 0.67, b: 0.0 },   // #FFAA00 - Amber for audio available
+  RADIO_ACTIVE: { r: 1.0, g: 0.5, b: 0.0 },       // #FF8000 - Orange for playing
+  RADIO_GLOW: { r: 1.0, g: 0.8, b: 0.2 },         // #FFCC33 - Warm glow
 
-  // Neutral/Background
-  BACKGROUND: { r: 0.05, g: 0.05, b: 0.08 },   // Dark blue-grey
+  // Supporting & Background Elements (Blue)
+  BACKGROUND_INFO: { r: 0.27, g: 0.4, b: 1.0 },   // #4466FF - Blue for supporting data
+  BACKGROUND_GLOW: { r: 0.4, g: 0.6, b: 1.0 },    // #66AAFF - Light blue glow
+
+  // Legacy compatibility (map to new semantic colors)
+  PRIMARY: { r: 0.0, g: 0.83, b: 1.0 },           // Maps to FLIGHT_PATH
+  PRIMARY_GLOW: { r: 0.0, g: 1.0, b: 1.0 },       // Maps to FLIGHT_PATH_GLOW
+  SECONDARY: { r: 0.0, g: 1.0, b: 0.53 },         // Maps to LOCATION_PRIMARY
+  HOVER_ALERT: { r: 0.53, g: 1.0, b: 0.0 },       // Maps to HOVER_LOCATION
+  LOW_ALT_WARNING: { r: 1.0, g: 0.67, b: 0.0 },   // Maps to WARNING
+
+  // Neutral
+  BACKGROUND: { r: 0.05, g: 0.05, b: 0.08 },      // Dark blue-grey
   WHITE: { r: 1.0, g: 1.0, b: 1.0 },
-  BLACK: { r: 0.0, g: 0.0, b: 0.0 },           // For strong outlines
+  BLACK: { r: 0.0, g: 0.0, b: 0.0 },              // For strong outlines
 };
 
 /**

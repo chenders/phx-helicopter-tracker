@@ -8,6 +8,9 @@ import {
   getTierHolographicColor,
   HolographicColors,
 } from "../utils/holographicMaterials";
+import { HolographicStreetLabels } from "./HolographicStreetLabels";
+import { PHOENIX_LABELS } from "../data/phoenixStreetLabels";
+import { FlightHUD, FlightHUDData } from "./FlightHUD";
 
 declare global {
   interface Window {
@@ -136,6 +139,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
     isWithinSearchRadius: false,
   });
   const [totalTimeInRadius, setTotalTimeInRadius] = useState(0); // Total time spent in search radius in seconds
+  const [cameraPosition, setCameraPosition] = useState<any>(null); // Cesium.Cartesian3 camera position for street labels
 
   // Keep camera pitch mode ref in sync with state
   useEffect(() => {
@@ -1191,6 +1195,17 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             roll: 0,
           },
         });
+
+        // Update camera position for street labels
+        setCameraPosition(viewer.camera.position.clone());
+
+        // Add camera move listener to update street labels
+        viewer.camera.moveEnd.addEventListener(() => {
+          if (mountedRef.current) {
+            setCameraPosition(viewer.camera.position.clone());
+          }
+        });
+
         // Don't auto-start animation - let user start it manually
         viewer.clock.shouldAnimate = false;
 
@@ -2204,7 +2219,26 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           </div>
         )}
 
-        {/* HUD Overlay - Only show time in radius countdown when within search radius */}
+        {/* Flight HUD - Division-inspired holographic display */}
+        {!isLoading && isAnimating && (
+          <FlightHUD
+            data={{
+              speed: hudData.speed,
+              altitude: hudData.altitude,
+              heading: hudData.heading,
+              groundElevation: hudData.groundElevation,
+              altitudeAGL: hudData.altitudeAGL,
+              distanceFromSearch: hudData.distanceFromSearch,
+              timeRemaining: hudData.timeRemaining,
+              timeToSearchRadius: hudData.timeToSearchRadius,
+              isWithinSearchRadius: hudData.isWithinSearchRadius,
+              timestamp: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))]?.timestamp,
+            }}
+            showSearchInfo={!!searchContext}
+          />
+        )}
+
+        {/* Surveillance Radius Alert - Show center alert when in radius */}
         {!isLoading && isAnimating && searchContext && hudData.isWithinSearchRadius && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
             <div className="bg-red-600/90 backdrop-blur text-white px-8 py-6 rounded-xl font-mono text-center border-4 border-red-400/50 shadow-2xl animate-pulse">
@@ -2215,6 +2249,17 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               <div className="text-xs mt-2 opacity-80">Time in radius this pass</div>
             </div>
           </div>
+        )}
+
+        {/* Holographic Street Labels - Division-inspired world-space labels */}
+        {!isLoading && viewerRef.current && cameraPosition && (
+          <HolographicStreetLabels
+            viewer={viewerRef.current}
+            cameraPosition={cameraPosition}
+            labels={PHOENIX_LABELS}
+            maxVisibleLabels={50}
+            progressiveReveal={true}
+          />
         )}
       </div>
 
