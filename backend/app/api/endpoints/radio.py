@@ -428,3 +428,67 @@ async def get_archives_by_timerange(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/activity/by-timerange")
+async def get_radio_activity_by_timerange(
+    start_time: datetime = Query(..., description="Start of time range (ISO format)"),
+    end_time: datetime = Query(..., description="End of time range (ISO format)"),
+    include_locations: bool = Query(True, description="Only include segments with location data"),
+    db: Session = Depends(get_db)
+) -> List[Dict[str, Any]]:
+    """
+    Get radio activity (segments with locations and urgency) for CAD visualization
+    
+    Returns radio segments within the time range that contain:
+    - Location mentions (street names, intersections)
+    - Urgency scores for color coding
+    - Incident codes for context
+    
+    Used to visualize where police activity was occurring during a flight
+    """
+    try:
+        from app.models.radio import RadioSegment, RadioTranscription, RadioArchive
+        
+        # Query segments within time range
+        query = db.query(RadioSegment).join(
+            RadioTranscription, RadioSegment.transcription_id == RadioTranscription.id
+        ).join(
+            RadioArchive, RadioTranscription.archive_id == RadioArchive.id
+        ).filter(
+            and_(
+                RadioSegment.absolute_timestamp >= start_time,
+                RadioSegment.absolute_timestamp <= end_time
+            )
+        )
+        
+        # Optionally filter to only segments with location data
+        if include_locations:
+            query = query.filter(RadioSegment.contains_location == True)
+        
+        segments = query.order_by(RadioSegment.absolute_timestamp).limit(500).all()
+        
+        # Format response
+        result = []
+        for segment in segments:
+            segment_data = {
+                "id": segment.id,
+                "timestamp": segment.absolute_timestamp.isoformat() if segment.absolute_timestamp else None,
+                "text": segment.text[:200] + "..." if len(segment.text) > 200 else segment.text,
+                "urgency_score": segment.urgency_score,
+                "locations": segment.locations if segment.locations else [],
+                "incident_codes": segment.incident_codes if segment.incident_codes else [],
+                "tail_numbers": segment.tail_numbers if segment.tail_numbers else [],
+                "contains_tail_number": segment.contains_tail_number,
+                "contains_location": segment.contains_location,
+                "contains_incident_code": segment.contains_incident_code,
+                "start_time": segment.start_time,
+                "duration_seconds": segment.duration_seconds,
+            }
+            
+            result.append(segment_data)
+        
+        return result
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
