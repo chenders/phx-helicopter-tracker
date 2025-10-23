@@ -223,7 +223,7 @@ celery_app.conf.update(
         # Radio transcription - processes untranscribed MP3 files
         "transcribe-radio-archives-single": {
             "task": "transcribe_phoenix_pd_archives_faster",
-            "schedule": 3600.0,  # Every 1 hour
+            "schedule": 1200.0,  # Every 20 minutes
             "kwargs": {
                 "batch_size": 5,  # Process 5 files at a time with faster-whisper
                 "model_name": "base",
