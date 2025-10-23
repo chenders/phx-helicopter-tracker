@@ -15,6 +15,7 @@ import { RadioAudioIndicator } from "./RadioAudioIndicator";
 import { useRadioArchives } from "../hooks/useRadioArchives";
 import { CADActivityPanel } from "./CADActivityPanel";
 import { useRadioActivity } from "../hooks/useRadioActivity";
+import { PhoenixMinimap } from "./PhoenixMinimap";
 
 declare global {
   interface Window {
@@ -2271,6 +2272,30 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             labels={PHOENIX_LABELS}
             maxVisibleLabels={50}
             progressiveReveal={true}
+          />
+        )}
+
+        {/* Phoenix Area Minimap - Division-inspired overview map */}
+        {!isLoading && positions.length > 0 && viewerRef.current && (
+          <PhoenixMinimap
+            viewer={viewerRef.current}
+            flightPath={positions.map(p => ({ latitude: p.latitude, longitude: p.longitude }))}
+            currentPosition={positions[Math.floor(sliderPosition / 100 * (positions.length - 1))] ? {
+              latitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].latitude,
+              longitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].longitude,
+            } : undefined}
+            className="absolute bottom-4 right-4 z-40"
+            size={200}
+            onClick={(latitude, longitude) => {
+              // Navigate camera to clicked location
+              if (viewerRef.current && window.Cesium) {
+                const Cesium = window.Cesium;
+                viewerRef.current.camera.flyTo({
+                  destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, 5000),
+                  duration: 1.5,
+                });
+              }
+            }}
           />
         )}
       </div>
