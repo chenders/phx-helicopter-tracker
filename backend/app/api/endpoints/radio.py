@@ -27,15 +27,17 @@ router = APIRouter()
 async def get_radio_archives(
     limit: int = Query(100, description="Maximum number of archives to return"),
     offset: int = Query(0, description="Number of archives to skip"),
-    has_transcription: Optional[bool] = Query(None, description="Filter by transcription status")
+    has_transcription: Optional[bool] = Query(None, description="Filter by transcription status"),
+    db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Get list of radio archives with metadata
+    Combines filesystem MP3 files with database transcription status
     """
     try:
         # Ensure directory exists
         RADIO_DATA_PATH.mkdir(parents=True, exist_ok=True)
-        
+
         # Get all MP3 files in the radio directory
         all_mp3_files = sorted(
             RADIO_DATA_PATH.glob("*.mp3"),
@@ -43,12 +45,19 @@ async def get_radio_archives(
             reverse=True
         )
 
+        # Query database for all transcriptions to create lookup map
+        db_archives = db.query(RadioArchive).filter(RadioArchive.transcribed == True).all()
+        db_transcription_map = {archive.filename: archive for archive in db_archives}
+
         # Apply transcription filter BEFORE pagination
         mp3_files = []
         for mp3_file in all_mp3_files:
+            # Check both filesystem and database for transcription
             json_file = mp3_file.with_suffix(".json")
             txt_file = mp3_file.with_suffix(".txt")
-            has_trans = json_file.exists() or txt_file.exists()
+            has_file_trans = json_file.exists() or txt_file.exists()
+            has_db_trans = mp3_file.name in db_transcription_map
+            has_trans = has_file_trans or has_db_trans
 
             # Skip if filtering by transcription status
             if has_transcription is not None and has_trans != has_transcription:
@@ -62,8 +71,10 @@ async def get_radio_archives(
             # Check for transcription files
             json_file = mp3_file.with_suffix(".json")
             txt_file = mp3_file.with_suffix(".txt")
-            has_trans = json_file.exists() or txt_file.exists()
-            
+            has_file_trans = json_file.exists() or txt_file.exists()
+            has_db_trans = mp3_file.name in db_transcription_map
+            has_trans = has_file_trans or has_db_trans
+
             # Get file metadata
             file_stat = mp3_file.stat()
             archive_info = {
@@ -74,8 +85,8 @@ async def get_radio_archives(
                 "transcription_json": json_file.name if json_file.exists() else None,
                 "transcription_text": txt_file.name if txt_file.exists() else None,
             }
-            
-            # If transcription exists, add some metadata
+
+            # If transcription exists in filesystem JSON, add metadata from there
             if json_file.exists():
                 try:
                     with open(json_file, 'r') as f:
@@ -86,16 +97,22 @@ async def get_radio_archives(
                             archive_info["transcription_time"] = trans_data["model_performance"].get("transcription_time_seconds")
                 except Exception:
                     pass
-            
+            # Otherwise, if in database, add metadata from there
+            elif has_db_trans:
+                db_archive = db_transcription_map[mp3_file.name]
+                if db_archive.transcription:
+                    archive_info["transcription_model"] = db_archive.transcription.model_name
+                    archive_info["transcribed_at"] = db_archive.transcription.created_at.isoformat() if db_archive.transcription.created_at else None
+
             archives.append(archive_info)
-        
+
         return {
             "total": len(mp3_files),
             "offset": offset,
             "limit": limit,
             "archives": archives
         }
-        
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -170,25 +187,26 @@ async def get_archive_stats() -> Dict[str, Any]:
 
 
 @router.get("/archives/{filename}/transcription")
-async def get_transcription(filename: str) -> Dict[str, Any]:
+async def get_transcription(filename: str, db: Session = Depends(get_db)) -> Dict[str, Any]:
     """
     Get transcription for a specific radio archive
+    Checks both filesystem and database for transcription
     """
     try:
         # Ensure filename ends with .mp3
         if not filename.endswith(".mp3"):
             filename += ".mp3"
-        
+
         mp3_file = RADIO_DATA_PATH / filename
         if not mp3_file.exists():
             raise HTTPException(status_code=404, detail="Archive not found")
-        
-        # Try to get JSON transcription first
+
+        # Try to get JSON transcription from filesystem first
         json_file = mp3_file.with_suffix(".json")
         if json_file.exists():
             with open(json_file, 'r') as f:
                 return json.load(f)
-        
+
         # Fall back to text file
         txt_file = mp3_file.with_suffix(".txt")
         if txt_file.exists():
@@ -198,9 +216,38 @@ async def get_transcription(filename: str) -> Dict[str, Any]:
                     "text": f.read(),
                     "segments": []
                 }
-        
+
+        # Finally, check database
+        db_archive = db.query(RadioArchive).filter(RadioArchive.filename == filename).first()
+        if db_archive and db_archive.transcription:
+            trans = db_archive.transcription
+
+            # Query segments for this transcription
+            from app.models.radio import RadioSegment
+            segments = db.query(RadioSegment).filter(
+                RadioSegment.transcription_id == trans.id
+            ).order_by(RadioSegment.start_time).all()
+
+            # Format response to match filesystem JSON structure
+            return {
+                "filename": filename,
+                "text": trans.full_text,
+                "model": trans.model_name,
+                "language": trans.language,
+                "transcribed_at": trans.created_at.isoformat() if trans.created_at else None,
+                "segments": [
+                    {
+                        "id": seg.id,
+                        "start": seg.start_time,
+                        "end": seg.start_time + seg.duration_seconds,
+                        "text": seg.text
+                    }
+                    for seg in segments
+                ]
+            }
+
         raise HTTPException(status_code=404, detail="Transcription not found")
-        
+
     except HTTPException:
         raise
     except Exception as e:
