@@ -13,6 +13,8 @@ import { PHOENIX_LABELS } from "../data/phoenixStreetLabels";
 import { FlightHUD, FlightHUDData } from "./FlightHUD";
 import { RadioAudioIndicator } from "./RadioAudioIndicator";
 import { useRadioArchives } from "../hooks/useRadioArchives";
+import { CADActivityPanel } from "./CADActivityPanel";
+import { useRadioActivity } from "../hooks/useRadioActivity";
 
 declare global {
   interface Window {
@@ -147,6 +149,9 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   const flightStartTime = positions.length > 0 ? positions[0].timestamp : undefined;
   const flightEndTime = positions.length > 0 ? positions[positions.length - 1].timestamp : undefined;
   const { archives: radioArchives } = useRadioArchives(flightStartTime, flightEndTime, positions.length > 0);
+
+  // Fetch radio activity (CAD calls) for flight time range
+  const { segments: radioActivity } = useRadioActivity(flightStartTime, flightEndTime, true, positions.length > 0);
 
   // Keep camera pitch mode ref in sync with state
   useEffect(() => {
@@ -2425,6 +2430,14 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                 }}
               />
             </div>
+          )}
+
+          {/* CAD Activity Panel - Division-inspired activity visualization */}
+          {positions.length > 0 && radioActivity.length > 0 && (
+            <CADActivityPanel
+              segments={radioActivity}
+              currentTimestamp={positions[Math.floor(sliderPosition / 100 * (positions.length - 1))]?.timestamp}
+            />
           )}
         </>
       )}
