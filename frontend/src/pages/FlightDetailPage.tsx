@@ -489,6 +489,44 @@ export function FlightDetailPage() {
     }
   }
 
+  const playRadioSegment = (segment: RadioSegment) => {
+    const audioId = `${segment.audio_file.filename}-${segment.segment_id}`;
+
+    if (playingAudio === audioId && audioRef.current) {
+      audioRef.current.pause()
+      setPlayingAudio(null)
+    } else {
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+
+      // Create audio element and seek to segment start time
+      const audio = new Audio(segment.audio_file.audio_url)
+      audioRef.current = audio
+
+      // When audio is loaded, seek to start time and play
+      audio.addEventListener('loadedmetadata', () => {
+        audio.currentTime = segment.segment_start
+        audio.play()
+        setPlayingAudio(audioId)
+
+        // Stop at segment end time
+        const checkTime = () => {
+          if (audio.currentTime >= segment.segment_end) {
+            audio.pause()
+            setPlayingAudio(null)
+            audio.removeEventListener('timeupdate', checkTime)
+          }
+        }
+        audio.addEventListener('timeupdate', checkTime)
+      })
+
+      audio.addEventListener('ended', () => {
+        setPlayingAudio(null)
+      })
+    }
+  }
+
   const getFlightPath = () => {
     return positions.map(pos => ({
       lat: pos.latitude,
@@ -987,28 +1025,12 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
                 <span className="text-blue-700 dark:text-blue-300">Altitude:</span>
                 <div>
                   {(searchContext.closestAltitudeAGL || calculatedClosest?.altitude_agl_feet) ? (
-                    <>
-                      <div className="font-medium text-blue-900 dark:text-blue-100">
-                        {(searchContext.closestAltitudeAGL || calculatedClosest.altitude_agl_feet).toLocaleString()} ft AGL
-                        <span className="text-xs font-normal text-blue-700 dark:text-blue-300 ml-1">
-                          (Above Ground Level)
-                        </span>
-                      </div>
-                      {(searchContext.closestAltitude || calculatedClosest?.altitude_feet) && (
-                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
-                          {(searchContext.closestAltitude || calculatedClosest.altitude_feet).toLocaleString()} ft MSL
-                          <span className="text-xs text-blue-500 dark:text-blue-300 ml-1">
-                            (Mean Sea Level)
-                          </span>
-                        </div>
-                      )}
-                    </>
+                    <div className="font-medium text-blue-900 dark:text-blue-100">
+                      {(searchContext.closestAltitudeAGL || calculatedClosest.altitude_agl_feet).toLocaleString()} ft AGL
+                    </div>
                   ) : (searchContext.closestAltitude || calculatedClosest?.altitude_feet) ? (
                     <div className="font-medium text-blue-900 dark:text-blue-100">
-                      {(searchContext.closestAltitude || calculatedClosest.altitude_feet).toLocaleString()} ft MSL
-                      <span className="text-xs font-normal text-blue-700 dark:text-blue-300 ml-1">
-                        (Mean Sea Level)
-                      </span>
+                      {(searchContext.closestAltitude || calculatedClosest.altitude_feet).toLocaleString()} ft
                     </div>
                   ) : (
                     <div className="font-medium text-blue-900 dark:text-blue-100">N/A</div>
@@ -1195,8 +1217,22 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
         {currentRadioSegment && (isPlaying || is3DAnimating) && (
           <div className="mb-4 bg-black/90 backdrop-blur border-2 border-green-500 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
+              <div className="flex-shrink-0 flex flex-col gap-2">
                 <Radio className="h-6 w-6 text-green-400 animate-pulse" />
+                {/* Play button for radio segment */}
+                {currentRadioSegment.audio_file && (
+                  <button
+                    onClick={() => playRadioSegment(currentRadioSegment)}
+                    className="p-2 bg-green-900/40 rounded-lg hover:bg-green-900/60 transition-colors border border-green-500/30"
+                    title="Play audio segment"
+                  >
+                    {playingAudio === `${currentRadioSegment.audio_file.filename}-${currentRadioSegment.segment_id}` ? (
+                      <Pause className="h-4 w-4 text-green-400" />
+                    ) : (
+                      <Play className="h-4 w-4 text-green-400" />
+                    )}
+                  </button>
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-2">
@@ -1239,64 +1275,6 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
           </div>
         )}
 
-        {/* HUD Display - Only show when 3D view is active and animating */}
-        {use3DView && hudData && (
-          <div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
-            {/* Speed */}
-            <div className="bg-black/70 backdrop-blur text-green-400 px-4 py-2 rounded-lg font-mono text-sm border border-green-500/30">
-              <div className="text-xs text-green-300/70 mb-1">GROUND SPEED</div>
-              <div className="text-2xl font-bold">
-                {Math.round(hudData.speed * 1.15078)} <span className="text-base">mph</span>
-                <span className="text-sm text-green-300/70 block">({Math.round(hudData.speed)}kts)</span>
-              </div>
-            </div>
-
-            {/* Altitude AGL */}
-            <div className="bg-black/70 backdrop-blur text-yellow-400 px-4 py-2 rounded-lg font-mono text-sm border border-yellow-500/30">
-              <div className="text-xs text-yellow-300/70 mb-1">ALTITUDE AGL</div>
-              <div className="text-2xl font-bold">
-                {hudData.altitudeAGL > 0 ? Math.round(hudData.altitudeAGL) : Math.round(hudData.altitude)} <span className="text-base">ft</span>
-              </div>
-            </div>
-
-            {/* Heading */}
-            <div className="bg-black/70 backdrop-blur text-purple-400 px-4 py-2 rounded-lg font-mono text-sm border border-purple-500/30">
-              <div className="text-xs text-purple-300/70 mb-1">HEADING</div>
-              <div className="text-2xl font-bold">
-                {Math.round((hudData.heading + 360) % 360)}° <span className="text-base">{getCardinalDirection(hudData.heading)}</span>
-              </div>
-            </div>
-
-            {/* Distance from Search Location */}
-            {searchContext.lat && searchContext.lng && hudData.distanceFromSearch >= 0 && (
-              <div className={`bg-black/70 backdrop-blur px-4 py-2 rounded-lg font-mono text-sm border ${
-                hudData.distanceFromSearch <= ((searchContext.radius || 1000) / 1609.34)
-                  ? 'text-red-400 border-red-500/50 animate-pulse'
-                  : 'text-orange-400 border-orange-500/30'
-              }`}>
-                <div className={`text-xs mb-1 flex items-center gap-2 ${
-                  hudData.distanceFromSearch <= ((searchContext.radius || 1000) / 1609.34)
-                    ? 'text-red-300/70'
-                    : 'text-orange-300/70'
-                }`}>
-                  {hudData.distanceFromSearch <= ((searchContext.radius || 1000) / 1609.34) && (
-                    <span className="text-red-500 text-lg">⚠</span>
-                  )}
-                  DISTANCE FROM SEARCH
-                </div>
-                <div className="text-2xl font-bold">
-                  {hudData.distanceFromSearch < 0.1 ?
-                    <>{Math.round(hudData.distanceFromSearch * 5280)} <span className="text-base">ft</span></> :
-                    <>{hudData.distanceFromSearch.toFixed(2)} <span className="text-base">mi</span></>
-                  }
-                  {hudData.distanceFromSearch <= ((searchContext.radius || 1000) / 1609.34) && (
-                    <div className="text-sm mt-1 text-red-300">WITHIN SEARCH RADIUS</div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {use3DView ? (
           <FlightVisualization3DCesium
@@ -1534,79 +1512,40 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
             </div>
           </div>
 
-          {/* Altitude Profile */}
-          <div className="mt-6">
-            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Altitude Profile
-            </h3>
-            <div className="space-y-3">
-              {/* MSL Altitudes if available */}
-              {(flight.max_altitude_feet !== null || flight.avg_altitude_feet !== null || flight.min_altitude_feet !== null) && (
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">MSL (Mean Sea Level)</div>
-                  <div className="space-y-1 pl-2">
-                    {flight.max_altitude_feet !== null && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Maximum</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {flight.max_altitude_feet.toLocaleString()} ft
-                        </span>
-                      </div>
-                    )}
-                    {flight.avg_altitude_feet !== null && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Average</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {Math.round(flight.avg_altitude_feet).toLocaleString()} ft
-                        </span>
-                      </div>
-                    )}
-                    {flight.min_altitude_feet !== null && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Minimum</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {flight.min_altitude_feet.toLocaleString()} ft
-                        </span>
-                      </div>
-                    )}
+          {/* Altitude Profile - AGL Only, Compact */}
+          {(flight.max_altitude_agl_feet !== null || flight.avg_altitude_agl_feet !== null || flight.min_altitude_agl_feet !== null) && (
+            <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded">
+              <h3 className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">
+                Altitude (AGL)
+              </h3>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                {flight.max_altitude_agl_feet !== null && (
+                  <div className="text-center">
+                    <div className="text-gray-500 dark:text-gray-400">Max</div>
+                    <div className="font-semibold text-gray-900 dark:text-white">
+                      {flight.max_altitude_agl_feet.toLocaleString()}ft
+                    </div>
                   </div>
-                </div>
-              )}
-
-              {/* AGL Altitudes if available */}
-              {(flight.max_altitude_agl_feet !== null || flight.avg_altitude_agl_feet !== null || flight.min_altitude_agl_feet !== null) && (
-                <div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">AGL (Above Ground Level)</div>
-                  <div className="space-y-1 pl-2">
-                    {flight.max_altitude_agl_feet !== null && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Maximum</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {flight.max_altitude_agl_feet.toLocaleString()} ft
-                        </span>
-                      </div>
-                    )}
-                    {flight.avg_altitude_agl_feet !== null && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Average</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {Math.round(flight.avg_altitude_agl_feet).toLocaleString()} ft
-                        </span>
-                      </div>
-                    )}
-                    {flight.min_altitude_agl_feet !== null && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Minimum</span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {flight.min_altitude_agl_feet.toLocaleString()} ft
-                        </span>
-                      </div>
-                    )}
+                )}
+                {flight.avg_altitude_agl_feet !== null && (
+                  <div className="text-center">
+                    <div className="text-gray-500 dark:text-gray-400">Avg</div>
+                    <div className="font-semibold text-gray-900 dark:text-white">
+                      {Math.round(flight.avg_altitude_agl_feet).toLocaleString()}ft
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+                {flight.min_altitude_agl_feet !== null && (
+                  <div className="text-center">
+                    <div className="text-gray-500 dark:text-gray-400">Min</div>
+                    <div className="font-semibold text-gray-900 dark:text-white">
+                      {flight.min_altitude_agl_feet.toLocaleString()}ft
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Download Data Button */}
           <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
