@@ -1,0 +1,230 @@
+================================================================================
+                    REFACTORING ARCHITECTURE DIAGRAM
+================================================================================
+
+CURRENT STATE (2,866 lines - MONOLITHIC):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                   FlightVisualization3DCesiumFixed.tsx                       │
+│                          (EVERYTHING MIXED)                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ • Cesium initialization (100 lines)                                         │
+│ • Label management (450 lines)                                              │
+│ • Camera animation (350 lines) ← MOST COMPLEX                              │
+│ • HUD calculations (80 lines)                                               │
+│ • UI rendering (500 lines)                                                  │
+│ • State management (scattered)                                              │
+│ • Search radius logic (scattered)                                           │
+│ • Flight data processing (scattered)                                        │
+│ • Utility functions (scattered)                                             │
+│ + Heavy dependencies, impossible to test                                    │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+FUTURE STATE (600-700 lines - MODULAR):
+┌─────────────────────────────────────────────────────────────────────────────┐
+│         FlightVisualization3DCesiumFixed.tsx (600-700 lines)                │
+│         Pure React component - handles rendering & orchestration            │
+├────────────────┬──────────────────┬──────────────────┬──────────────────────┤
+│                │                  │                  │                      │
+└────────────────┴──────────────────┴──────────────────┴──────────────────────┘
+        │                   │                   │                    │
+        ↓                   ↓                   ↓                    ↓
+   
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐
+│   Services/      │  │    Utils/        │  │  Components/     │  │   Data/      │
+│  (10 modules)    │  │ (7 modules)      │  │ (2 new modules)  │  │(1 config)    │
+├──────────────────┤  ├──────────────────┤  ├──────────────────┤  ├──────────────┤
+│ Animation:       │  │ cesiumLoader.ts  │  │ FlightTimeline   │  │ labels      │
+│ - controller     │  │ geoCalculations  │  │ .tsx             │  │ Config.ts   │
+│ - cameraLoop     │  │ labelDeclutter   │  │ Surveillance    │  │             │
+│ - viewer         │  │ labelFilter      │  │ RadiusAlert.tsx  │  │ (200 lines) │
+│ - tileset        │  │ labelSelection   │  │                  │  │             │
+│ Label:           │  │ searchRadius     │  │ (200 lines)      │  └──────────────┘
+│ - renderer       │  │ flightData       │  │                  │
+│ - viewport       │  │ Transform        │  │                  │
+│ HUD:             │  │                  │  │                  │
+│ - calculator     │  │ (350 lines)      │  │                  │
+│ Playback:        │  │                  │  │                  │
+│ - controller     │  │                  │  │                  │
+│ Villages:        │  │                  │  │                  │
+│ - loader         │  │                  │  │                  │
+│                  │  │                  │  │                  │
+│ (600 lines)      │  │                  │  │                  │
+└──────────────────┘  └──────────────────┘  └──────────────────┘  
+        │                   │                       │
+        └───────────┬───────┴───────┬───────────────┘
+                    │               │
+                [EXTRACTED]    [EXTRACTED]
+                 [LOGIC]         [COMPONENTS]
+                    │               │
+                    └───────┬───────┘
+                            │
+                    [REUSABLE MODULES]
+
+
+EXTRACTION PHASES:
+
+PHASE 1: UTILITIES (2-3 days)
+═════════════════════════════════════════════════════════════════════════════
+
+cesiumLoader.ts (30 lines)
+  └─ Functions: loadCesiumFromCDN(), configureCesiumIon()
+  └─ Type: Pure async functions, no dependencies
+  └─ Complexity: LOW
+
+geoCalculations.ts (40 lines)
+  └─ Functions: getDistanceFeet(), getDistanceMiles(), getCameraAltitudeFeet()
+  └─ Type: Pure math functions
+  └─ Complexity: MEDIUM
+  └─ Critical for: Label decluttering, HUD calculations
+
+labelDecluttering.ts (80 lines) ⭐ HIGHEST COMPLEXITY
+  └─ Functions: declutterLabels()
+  └─ Algorithm: Grid-based spatial grouping + tier filtering + distance culling
+  └─ Type: Pure function
+  └─ Complexity: HIGH
+  └─ Critical for: Label rendering system
+
+
+PHASE 2: CORE SERVICES (4-5 days)
+═════════════════════════════════════════════════════════════════════════════
+
+cesiumViewerFactory.ts (50 lines)
+  └─ Depends on: cesiumLoader.ts
+  └─ Creates: Cesium viewer with all configurations
+  └─ Complexity: MEDIUM
+
+tilesetLoader.ts (40 lines)
+  └─ Depends on: cesiumViewerFactory.ts
+  └─ Loads: Google 3D tiles or OSM buildings
+  └─ Complexity: MEDIUM
+
+villageDataLoader.ts (30 lines)
+  └─ Loads: Phoenix villages from GeoJSON
+  └─ Complexity: LOW
+
+labelViewportFilter.ts (50 lines)
+  └─ Depends on: geoCalculations.ts
+  └─ Filters: Labels based on viewport frustum
+  └─ Complexity: MEDIUM
+
+labelSelection.ts (40 lines)
+  └─ Depends on: geoCalculations.ts
+  └─ Selects: Priority labels (areas + streets)
+  └─ Complexity: MEDIUM
+
+labelRenderer.ts (50 lines)
+  └─ Creates: Cesium billboard entities
+  └─ Depends on: labelDecluttering.ts, holographicMaterials.ts
+  └─ Complexity: MEDIUM
+
+searchRadiusCalculations.ts (80 lines)
+  └─ Depends on: geoCalculations.ts
+  └─ Functions: Time in radius, closest point, distance calculations
+  └─ Complexity: MEDIUM
+  └─ Critical for: Legal/surveillance data
+
+animationController.ts (50 lines)
+  └─ Handles: Start/stop animation, clock setup
+  └─ Complexity: MEDIUM
+
+cameraAnimationLoop.ts (120 lines) ⭐⭐ MOST COMPLEX
+  └─ Main loop: Updates camera every animation frame
+  └─ Handles: Hover detection, search radius, speed adjustment
+  └─ Depends on: geoCalculations, searchRadius, positions
+  └─ Complexity: HIGH
+  └─ Extracted functions:
+      ├─ calculateCameraParameters() - Determine pitch/speed/heading
+      ├─ updateCameraPosition() - Apply camera settings
+      └─ regenerateLabels() - Update labels dynamically
+
+dynamicLabelUpdater.ts (50 lines)
+  └─ Updates: Labels during animation as helicopter moves
+  └─ Depends on: labelRenderer.ts
+  └─ Complexity: MEDIUM
+
+hudCalculator.ts (30 lines)
+  └─ Calculates: Speed, altitude, heading, distance from search
+  └─ Depends on: searchRadiusCalculations.ts
+  └─ Complexity: MEDIUM
+
+
+PHASE 3: UI & CLEANUP (2-3 days)
+═════════════════════════════════════════════════════════════════════════════
+
+FlightTimeline.tsx (150 lines)
+  └─ Extracted from: JSX lines 2666-2827
+  └─ Includes: Slider, markers, timeline controls
+  └─ Complexity: LOW
+
+SurveillanceRadiusAlert.tsx (50 lines)
+  └─ Extracted from: JSX lines 2608-2619
+  └─ Shows: Center-screen alert in search radius
+  └─ Complexity: LOW
+
+phoenixLabelsConfig.ts (200 lines)
+  └─ Extracted from: Lines 484-575
+  └─ Contains: All hardcoded label definitions
+  └─ Complexity: LOW
+
+
+DEPENDENCY FLOW:
+═════════════════════════════════════════════════════════════════════════════
+
+cesiumLoader.ts
+        ↓
+cesiumViewerFactory.ts ← [Phase 1]
+        ↓
+    ┌───┴───┬─────────┬────────┐
+    ↓       ↓         ↓        ↓
+tilesetLoader, villageLoader, labelRenderer
+                         ↓
+                labelDecluttering.ts
+                         ↓
+                geoCalculations.ts ← [Phase 1]
+                         ↓
+        ┌────────────────┼────────────────┐
+        ↓                ↓                ↓
+searchRadiusCalculations ← animationController
+        ↓
+    cameraAnimationLoop.ts ← [Phase 2]
+        ↓
+    hudCalculator.ts ← [Phase 2]
+
+
+TESTING PRIORITY:
+═════════════════════════════════════════════════════════════════════════════
+
+PRIORITY 1 (CRITICAL):
+  ✓ geoCalculations.ts - Distance formulas must be accurate
+  ✓ labelDecluttering.ts - Complex grid algorithm
+  ✓ searchRadiusCalculations.ts - Legal/surveillance data
+
+PRIORITY 2 (IMPORTANT):
+  ✓ cameraAnimationLoop.ts - Core animation behavior
+  ✓ hudCalculator.ts - Telemetry accuracy
+  ✓ labelSelection.ts - Label priority logic
+
+PRIORITY 3 (NICE TO HAVE):
+  ✓ cesiumViewerFactory.ts - Configuration
+  ✓ UI components - Presentation logic
+
+
+LINES OF CODE REDUCTION:
+═════════════════════════════════════════════════════════════════════════════
+
+Before:  2,866 lines (all in one file)
+After:   600-700 lines + 20 modules
+
+Breakdown:
+  Main component:      600-700 lines (↓75%)
+  Services:            ~600 lines
+  Utils:               ~350 lines
+  Components:          ~200 lines
+  Data:                ~200 lines
+  ─────────────────────────────
+  Total:               ~2,000 lines
+
+Result: 76-80% complexity reduction via modularization
+
+═════════════════════════════════════════════════════════════════════════════

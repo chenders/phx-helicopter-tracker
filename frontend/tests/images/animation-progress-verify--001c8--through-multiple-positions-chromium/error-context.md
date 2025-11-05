@@ -1,0 +1,198 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e4]:
+  - complementary [ref=e5]:
+    - generic [ref=e7]:
+      - link "🚁 Phoenix PD Helicopter Tracker" [ref=e8] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e9] [cursor=pointer]: 🚁
+        - generic [ref=e10] [cursor=pointer]:
+          - heading "Phoenix PD" [level=1] [ref=e11] [cursor=pointer]
+          - paragraph [ref=e12] [cursor=pointer]: Helicopter Tracker
+      - button "Collapse sidebar" [ref=e13] [cursor=pointer]:
+        - img [ref=e14] [cursor=pointer]
+    - navigation [ref=e16]:
+      - link "🏠 Dashboard" [ref=e17] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e18] [cursor=pointer]: 🏠
+        - generic [ref=e19] [cursor=pointer]: Dashboard
+      - link "🔎 Flight Search" [ref=e20] [cursor=pointer]:
+        - /url: /search
+        - generic [ref=e21] [cursor=pointer]: 🔎
+        - generic [ref=e22] [cursor=pointer]: Flight Search
+      - link "📡 Live Tracking" [ref=e23] [cursor=pointer]:
+        - /url: /live
+        - generic [ref=e24] [cursor=pointer]: 📡
+        - generic [ref=e25] [cursor=pointer]: Live Tracking
+      - link "📊 Historical" [ref=e26] [cursor=pointer]:
+        - /url: /historical
+        - generic [ref=e27] [cursor=pointer]: 📊
+        - generic [ref=e28] [cursor=pointer]: Historical
+      - link "🔍 Patterns" [ref=e29] [cursor=pointer]:
+        - /url: /patterns
+        - generic [ref=e30] [cursor=pointer]: 🔍
+        - generic [ref=e31] [cursor=pointer]: Patterns
+      - link "📈 Temporal Analysis" [ref=e32] [cursor=pointer]:
+        - /url: /temporal
+        - generic [ref=e33] [cursor=pointer]: 📈
+        - generic [ref=e34] [cursor=pointer]: Temporal Analysis
+      - link "⚠️ Abnormal Patterns" [ref=e35] [cursor=pointer]:
+        - /url: /abnormal
+        - generic [ref=e36] [cursor=pointer]: ⚠️
+        - generic [ref=e37] [cursor=pointer]: Abnormal Patterns
+      - link "💰 Cost Analysis" [ref=e38] [cursor=pointer]:
+        - /url: /costs
+        - generic [ref=e39] [cursor=pointer]: 💰
+        - generic [ref=e40] [cursor=pointer]: Cost Analysis
+      - link "⚖️ Legal Docs" [ref=e41] [cursor=pointer]:
+        - /url: /legal
+        - generic [ref=e42] [cursor=pointer]: ⚖️
+        - generic [ref=e43] [cursor=pointer]: Legal Docs
+      - link "📻 Radio Archives" [ref=e44] [cursor=pointer]:
+        - /url: /radio
+        - generic [ref=e45] [cursor=pointer]: 📻
+        - generic [ref=e46] [cursor=pointer]: Radio Archives
+      - link "📊 Radio Analysis" [ref=e47] [cursor=pointer]:
+        - /url: /radio-analysis
+        - generic [ref=e48] [cursor=pointer]: 📊
+        - generic [ref=e49] [cursor=pointer]: Radio Analysis
+      - button "⚡ System ▶" [ref=e51] [cursor=pointer]:
+        - generic [ref=e52] [cursor=pointer]:
+          - generic [ref=e53] [cursor=pointer]: ⚡
+          - generic [ref=e54] [cursor=pointer]: System
+        - generic [ref=e55] [cursor=pointer]: ▶
+  - banner [ref=e56]:
+    - generic [ref=e57]:
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - generic [ref=e60]: "Status:"
+          - generic [ref=e61]: Online
+        - generic [ref=e64]:
+          - generic [ref=e65]: "Data:"
+          - generic [ref=e66]: Live
+      - button "Theme selector" [ref=e68] [cursor=pointer]:
+        - generic [ref=e69] [cursor=pointer]: 🌑️
+        - generic [ref=e70] [cursor=pointer]: Darker
+        - img [ref=e71] [cursor=pointer]
+  - main [ref=e73]:
+    - generic [ref=e74]:
+      - generic [ref=e77]:
+        - generic [ref=e78]:
+          - img [ref=e80]
+          - generic [ref=e82]:
+            - generic [ref=e83]:
+              - heading "fr24_complete_3c88c783" [level=1] [ref=e84]
+              - generic [ref=e85]: "2"
+              - generic [ref=e86]: • N625FB
+            - generic [ref=e87]:
+              - generic [ref=e88]:
+                - img [ref=e89]
+                - text: Oct 5, 2025 10:01 PM
+              - generic [ref=e92]: •
+              - generic [ref=e93]: 42m
+              - generic [ref=e94]: •
+              - generic [ref=e95]: 153.54 mi
+        - generic [ref=e96]:
+          - button "Animate" [ref=e97] [cursor=pointer]:
+            - img [ref=e99] [cursor=pointer]
+            - generic [ref=e101] [cursor=pointer]: Animate
+          - generic [ref=e102]:
+            - img [ref=e103]
+            - combobox [ref=e106] [cursor=pointer]:
+              - option "0.5x" [selected]
+              - option "1x"
+              - option "2x"
+              - option "3x"
+              - option "5x"
+              - option "10x"
+        - button [ref=e107] [cursor=pointer]:
+          - img [ref=e108] [cursor=pointer]
+          - img [ref=e110] [cursor=pointer]
+      - generic [ref=e112]:
+        - generic [ref=e113]:
+          - heading "Flight Path" [level=2] [ref=e114]
+          - button "3D View" [ref=e116] [cursor=pointer]:
+            - img [ref=e117] [cursor=pointer]
+            - text: 3D View
+        - generic [ref=e119]:
+          - generic [ref=e120]:
+            - generic [ref=e122]:
+              - generic [ref=e127]:
+                - link "Cesium ion" [ref=e130] [cursor=pointer]:
+                  - /url: https://cesium.com/
+                  - img "Cesium ion" [ref=e131] [cursor=pointer]
+                - generic [ref=e132]:
+                  - link "Upgrade for commercial use." [ref=e134] [cursor=pointer]:
+                    - /url: https://cesium.com/pricing/
+                  - generic [ref=e135]: •
+                  - img "Google" [ref=e137]
+                - generic [ref=e138] [cursor=pointer]: Data attribution
+              - generic [ref=e139]:
+                - searchbox "Enter an address or landmark..." [ref=e142]
+                - button "View Home" [ref=e146] [cursor=pointer]
+                - button "3D" [ref=e150] [cursor=pointer]
+                - button "Bing Maps Aerial" [ref=e157] [cursor=pointer]:
+                  - img [ref=e158] [cursor=pointer]
+            - generic [ref=e161]: Phoenix Metro
+          - generic [ref=e162]:
+            - generic [ref=e163]:
+              - slider [ref=e165] [cursor=pointer]: "0"
+              - generic [ref=e166]: 1/2472
+            - generic [ref=e169] [cursor=pointer]:
+              - checkbox "Look down" [ref=e170] [cursor=pointer]
+              - generic [ref=e171] [cursor=pointer]: Look down
+      - generic [ref=e172]:
+        - generic [ref=e173]:
+          - heading "Flight Timeline" [level=2] [ref=e174]
+          - generic [ref=e175]:
+            - generic [ref=e176]:
+              - img [ref=e177]
+              - generic [ref=e180]:
+                - generic [ref=e181]: Departure
+                - generic [ref=e182]: 10:01:09 PM
+                - generic [ref=e183]: KDVT
+            - generic [ref=e184]:
+              - img [ref=e185]
+              - generic [ref=e187]:
+                - generic [ref=e188]: Flight Time
+                - generic [ref=e189]: 41.53333333333333 minutes
+                - generic [ref=e190]: 2472 position reports
+            - generic [ref=e191]:
+              - img [ref=e192]
+              - generic [ref=e195]:
+                - generic [ref=e196]: Arrival
+                - generic [ref=e197]: 10:40:05 PM
+                - generic [ref=e198]: KDVT
+          - generic [ref=e199]:
+            - heading "Altitude (AGL)" [level=3] [ref=e200]
+            - generic [ref=e201]:
+              - generic [ref=e202]:
+                - generic [ref=e203]: Max
+                - generic [ref=e204]: 1,289ft
+              - generic [ref=e205]:
+                - generic [ref=e206]: Avg
+                - generic [ref=e207]: 920ft
+              - generic [ref=e208]:
+                - generic [ref=e209]: Min
+                - generic [ref=e210]: 0ft
+          - button "Download Flight Data" [ref=e212] [cursor=pointer]:
+            - img [ref=e213] [cursor=pointer]
+            - text: Download Flight Data
+        - generic [ref=e216]:
+          - heading "Surveillance Analysis" [level=2] [ref=e217]
+          - generic [ref=e218]:
+            - generic [ref=e219]: Detected Patterns
+            - generic [ref=e221]: normal
+          - generic [ref=e222]:
+            - generic [ref=e223]:
+              - img [ref=e224]
+              - text: Hover Locations (Pattern Detection)
+            - generic [ref=e227]: 0 locations
+          - generic [ref=e228]:
+            - generic [ref=e229]:
+              - img [ref=e230]
+              - text: Low Altitude Over Residential (Position Flags)
+            - generic [ref=e233]: 0 segments
+            - generic [ref=e234]: "Note: Position-level flags may not be populated. See hover locations above for actual pattern detection."
+```
