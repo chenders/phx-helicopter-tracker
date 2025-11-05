@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS aircraft (
     make VARCHAR(50),
     model VARCHAR(50),
     year_manufactured INTEGER,
+    operator VARCHAR(100),
     is_phoenix_pd BOOLEAN DEFAULT FALSE,
     unit_designation VARCHAR(20),
     has_flir BOOLEAN DEFAULT FALSE,
@@ -249,14 +250,17 @@ CREATE TABLE IF NOT EXISTS task_metrics (
     updated_at TIMESTAMP WITH TIME ZONE
 );
 
--- Insert sample Phoenix PD aircraft data
+-- Insert sample Phoenix PD aircraft data (all known aircraft)
 INSERT INTO aircraft (registration, make, model, year_manufactured, is_phoenix_pd, has_flir, has_spotlight, has_loudspeaker)
 VALUES
     ('N624FB', 'Airbus', 'AS350B3', 2010, TRUE, TRUE, TRUE, TRUE),
     ('N625FB', 'Airbus', 'AS350B3', 2011, TRUE, TRUE, TRUE, TRUE),
     ('N626FB', 'Airbus', 'H125', 2020, TRUE, TRUE, TRUE, TRUE),
     ('N627FB', 'Airbus', 'H125', 2021, TRUE, TRUE, TRUE, TRUE),
-    ('N628FB', 'Leonardo', 'A109E', 2018, TRUE, TRUE, TRUE, TRUE)
+    ('N628FB', 'Leonardo', 'A109E', 2018, TRUE, TRUE, TRUE, TRUE),
+    ('N621FB', 'Airbus', 'H125', NULL, TRUE, FALSE, FALSE, FALSE),
+    ('N623FB', 'Airbus', 'H125', NULL, TRUE, FALSE, FALSE, FALSE),
+    ('N622FB', 'Airbus', 'H125', NULL, TRUE, FALSE, FALSE, FALSE)
 ON CONFLICT (registration) DO NOTHING;
 
 -- Create indexes for performance
