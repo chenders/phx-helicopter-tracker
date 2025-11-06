@@ -16,6 +16,28 @@ import { useRadioArchives } from "../hooks/useRadioArchives";
 import { CADActivityPanel } from "./CADActivityPanel";
 import { useRadioActivity } from "../hooks/useRadioActivity";
 import { PhoenixMinimap } from "./PhoenixMinimap";
+import { ScreenSpaceLabels } from "./ScreenSpaceLabels";
+import {
+  isMobileDevice,
+  getCardinalDirection,
+  formatTime,
+  getDistanceFeet,
+  getDistanceMiles,
+  knotsToMph,
+  metersToFeet,
+} from "../utils/flightUtils";
+import {
+  FlightPosition,
+  HudData,
+  HoverLocationData,
+} from "../types/flight";
+import {
+  CAMERA_CONFIG,
+  ANIMATION_CONFIG,
+  DISTANCE_CONFIG,
+  CONVERSION_CONSTANTS,
+  MOBILE_BREAKPOINT,
+} from "../config/cesiumConfig";
 
 declare global {
   interface Window {
@@ -23,47 +45,8 @@ declare global {
   }
 }
 
-// Mobile device detection utility
-const isMobileDevice = (): boolean => {
-  // Check if touch-capable AND small screen
-  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  const isSmallScreen = window.innerWidth <= 768; // Typical mobile breakpoint
-  return isTouchDevice && isSmallScreen;
-};
-
-interface FlightPosition {
-  latitude: number;
-  longitude: number;
-  altitude_feet: number;
-  timestamp: string;
-  is_hovering?: boolean;
-  hover_duration_seconds?: number;
-  track_degrees?: number;
-  ground_speed_knots?: number;
-  ground_elevation_feet?: number;
-  altitude_agl_feet?: number;
-}
-
-export interface HudData {
-  speed: number;
-  altitude: number;
-  heading: number;
-  groundElevation: number;
-  altitudeAGL: number;
-  distanceFromSearch: number;
-  timeRemaining: number;
-  timeToSearchRadius: number;
-  isWithinSearchRadius: boolean;
-}
-
-interface HoverLocationData {
-  latitude: number;
-  longitude: number;
-  duration_minutes: number;
-  start_time?: string;
-  end_time?: string;
-  position_count?: number;
-}
+// Re-export HudData for backward compatibility
+export type { HudData } from "../types/flight";
 
 interface FlightVisualization3DCesiumFixedProps {
   positions: FlightPosition[];
@@ -82,28 +65,13 @@ interface FlightVisualization3DCesiumFixedProps {
   hoverLocations?: HoverLocationData[];
 }
 
-// Helper function to convert heading degrees to cardinal direction
-export const getCardinalDirection = (degrees: number): string => {
-  const normalized = ((degrees % 360) + 360) % 360; // Normalize to 0-360
-  const directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
-  const index = Math.round(normalized / 22.5) % 16;
-  return directions[index];
-};
-
-// Helper function to format time in MM:SS format
-export const formatTime = (seconds: number): string => {
-  const mins = Math.floor(Math.abs(seconds) / 60);
-  const secs = Math.floor(Math.abs(seconds) % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
-
 export const FlightVisualization3DCesiumFixed: React.FC<
   FlightVisualization3DCesiumFixedProps
 > = ({
   positions,
   currentPositionIndex = 0,
   isPlaying = false,
-  playbackSpeed = 0.5,
+  playbackSpeed = ANIMATION_CONFIG.DEFAULT_SPEED,
   onStartAnimationRef,
   onStopAnimationRef,
   onAnimationStateChange,
@@ -132,6 +100,10 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   const hasInitializedRef = useRef(false);
   const [cameraPitchMode, setCameraPitchMode] = useState<'auto' | 'level' | 'moderate' | 'steep'>('auto'); // Camera pitch control
   const cameraPitchModeRef = useRef<'auto' | 'level' | 'moderate' | 'steep'>('auto'); // Ref for accessing in callbacks
+  const [enableSlowdownInRadius, setEnableSlowdownInRadius] = useState(true); // Toggle for slow-down in search radius
+  const enableSlowdownInRadiusRef = useRef(true); // Ref for accessing in callbacks
+  const [lookDownView, setLookDownView] = useState(false); // Toggle for camera looking nearly straight down
+  const lookDownViewRef = useRef(false); // Ref for accessing in callbacks
   const [hudData, setHudData] = useState({
     speed: 0,
     altitude: 0,
@@ -159,6 +131,18 @@ export const FlightVisualization3DCesiumFixed: React.FC<
     cameraPitchModeRef.current = cameraPitchMode;
     console.log(`Camera pitch mode changed to: ${cameraPitchMode}`);
   }, [cameraPitchMode]);
+
+  // Keep slow-down ref in sync with state
+  useEffect(() => {
+    enableSlowdownInRadiusRef.current = enableSlowdownInRadius;
+    console.log(`Search radius slow-down: ${enableSlowdownInRadius ? 'enabled' : 'disabled'}`);
+  }, [enableSlowdownInRadius]);
+
+  // Keep look-down view ref in sync with state
+  useEffect(() => {
+    lookDownViewRef.current = lookDownView;
+    console.log(`Look-down view: ${lookDownView ? 'enabled' : 'disabled'}`);
+  }, [lookDownView]);
 
   // Clean up function
   const cleanup = useCallback(() => {
@@ -505,7 +489,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           { name: "Dunlap Ave", lat: 33.5650, lng: -112.0740, tier: 3 },
           { name: "Northern Ave", lat: 33.5570, lng: -112.0740, tier: 3 },
           { name: "Glendale Ave", lat: 33.5390, lng: -112.0740, tier: 3 },
-          { name: "Bethany Home Rd", lat: 33.5210, lng: -112.0740, tier: 3 },
+          { name: "Bethany Home Rd", lat: 33.5210, lng: -112.0740, tier: 3, alwaysShow: true },
           { name: "Indian School Rd", lat: 33.4950, lng: -112.0740, tier: 3 },
           { name: "Thomas Rd", lat: 33.4800, lng: -112.0740, tier: 3 },
           { name: "McDowell Rd", lat: 33.4650, lng: -112.0740, tier: 3 },
@@ -557,115 +541,306 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           { name: "107th Ave", lat: 33.4484, lng: -112.2580, tier: 5 },
         ];
 
-        // Filter labels for mobile - only show critical labels (tier 0-2)
-        const labelsToShow = isMobile
-          ? phoenixLabels.filter(label => label.tier <= 2)
-          : phoenixLabels;
+        // ========================================
+        // SMART LABEL MANAGEMENT SYSTEM
+        // ========================================
 
-        // Test if labels are being added
+        // Helper: Get camera altitude in feet
+        const getCameraAltitudeFeet = () => {
+          if (!viewer || !viewer.camera) return 5000;
+          const cameraPosition = viewer.camera.positionCartographic;
+          return metersToFeet(cameraPosition.height);
+        };
+
+        // Helper: Grid-based spatial decluttering with distance-based culling
+        // Note: Using imported getDistanceFeet() from flightUtils
+        const declutterLabels = (labels: any[], gridSize: number = 0.01) => {
+          // MUCH smaller grid: 0.01 degrees ~= 0.7 miles for tighter control
+          const grid = new Map<string, any[]>();
+
+          labels.forEach(label => {
+            const cellLat = Math.floor(label.lat / gridSize) * gridSize;
+            const cellLng = Math.floor(label.lng / gridSize) * gridSize;
+            const cellKey = `${cellLat},${cellLng}`;
+
+            if (!grid.has(cellKey)) {
+              grid.set(cellKey, []);
+            }
+            grid.get(cellKey)!.push(label);
+          });
+
+          // MUCH stricter limits - only 1-2 labels per small cell
+          const result: any[] = [];
+          grid.forEach((cellLabels) => {
+            // Sort by tier (lower tier = higher priority)
+            cellLabels.sort((a, b) => a.tier - b.tier);
+
+            // Very strict limits per cell
+            const tierLimits = {
+              0: 1,  // Max 1 area label per cell
+              1: 1,  // Max 1 freeway label per cell
+              2: 1,  // Max 1 major arterial per cell
+              3: 2,  // Max 2 major streets per cell
+              4: 1,  // Max 1 secondary street per cell
+              5: 1   // Max 1 minor street per cell
+            };
+
+            const tierCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
+            cellLabels.forEach(label => {
+              const tier = label.tier as 0|1|2|3|4|5;
+              if (tierCounts[tier] < tierLimits[tier]) {
+                result.push(label);
+                tierCounts[tier]++;
+              }
+            });
+          });
+
+          // SECOND PASS: Distance-based culling
+          // Remove labels that are too close to each other (in screen/world space)
+          const finalResult: any[] = [];
+          const minDistanceFeet = {
+            0: 8000,  // Area labels must be 1.5+ miles apart
+            1: 10000, // Freeways must be 2+ miles apart
+            2: 5000,  // Major arterials 1 mile apart
+            3: 3000,  // Major streets 0.6 miles apart
+            4: 2000,  // Secondary streets 0.4 miles apart
+            5: 1500   // Minor streets 0.3 miles apart
+          };
+
+          result.forEach(label => {
+            let tooClose = false;
+            for (const existing of finalResult) {
+              const distance = getDistanceFeet(label.lat, label.lng, existing.lat, existing.lng);
+              const minDist = Math.max(
+                minDistanceFeet[label.tier as 0|1|2|3|4|5] || 2000,
+                minDistanceFeet[existing.tier as 0|1|2|3|4|5] || 2000
+              );
+
+              if (distance < minDist) {
+                // If lower tier (more important), replace the existing one
+                if (label.tier < existing.tier) {
+                  const index = finalResult.indexOf(existing);
+                  finalResult.splice(index, 1);
+                  break;
+                } else {
+                  tooClose = true;
+                  break;
+                }
+              }
+            }
+
+            if (!tooClose) {
+              finalResult.push(label);
+            }
+          });
+
+          return finalResult;
+        };
+
+        // Dynamic tier filtering based on camera altitude
+        const getMaxTierForAltitude = (altitudeFeet: number) => {
+          if (altitudeFeet > 8000) return 0;      // Very high: only areas
+          if (altitudeFeet > 5000) return 1;      // High: areas + freeways
+          if (altitudeFeet > 3000) return 2;      // Medium-high: + major arterials
+          if (altitudeFeet > 1500) return 3;      // Medium: + major streets
+          if (altitudeFeet > 800) return 4;       // Low: + secondary streets
+          return 5;                               // Very low: all streets
+        };
+
+        // IMPORTANT: Use helicopter's starting altitude, NOT camera altitude
+        // Camera starts at space altitude (52 million feet) before being positioned
+        // Use the first flight position's altitude for label creation
+        const helicopterStartAltitude = Math.max(positions[0]?.altitude_feet || 1550, 1000);
+        const initialAltitude = helicopterStartAltitude;
+        const maxTier = isMobile ? 2 : getMaxTierForAltitude(initialAltitude);
+
+        // NEW: View-frustum-aware label system with intelligent culling
+        // Step 1: Get viewport bounds to filter only visible labels
+        const getLabelsInViewFrustum = () => {
+          try {
+            const viewRectangle = viewer.camera.computeViewRectangle(viewer.scene.globe.ellipsoid);
+            if (!viewRectangle) {
+              // Fallback: use camera position with radius
+              const cameraPos = viewer.camera.positionCartographic;
+              const cameraLat = Cesium.Math.toDegrees(cameraPos.latitude);
+              const cameraLng = Cesium.Math.toDegrees(cameraPos.longitude);
+              const radiusDegrees = 0.3; // ~20 miles at Phoenix latitude
+
+              return phoenixLabels.filter(label => {
+                const latDiff = Math.abs(label.lat - cameraLat);
+                const lngDiff = Math.abs(label.lng - cameraLng);
+                return latDiff <= radiusDegrees && lngDiff <= radiusDegrees;
+              });
+            }
+
+            // Add 10% buffer around viewport to avoid sudden pop-in
+            const buffer = 0.1;
+            const west = Cesium.Math.toDegrees(viewRectangle.west) - buffer;
+            const east = Cesium.Math.toDegrees(viewRectangle.east) + buffer;
+            const south = Cesium.Math.toDegrees(viewRectangle.south) - buffer;
+            const north = Cesium.Math.toDegrees(viewRectangle.north) + buffer;
+
+            return phoenixLabels.filter(label => {
+              return label.lng >= west && label.lng <= east &&
+                     label.lat >= south && label.lat <= north;
+            });
+          } catch (error) {
+            console.warn('View frustum culling failed, showing all labels:', error);
+            return phoenixLabels;
+          }
+        };
+
+        // Step 2: Filter labels to viewport only
+        let labelsInView = getLabelsInViewFrustum();
+
+        // FALLBACK: If no labels in viewport, use distance-based filtering
+        if (labelsInView.length === 0) {
+          const cameraPos = viewer.camera.positionCartographic;
+          const cameraLat = Cesium.Math.toDegrees(cameraPos.latitude);
+          const cameraLng = Cesium.Math.toDegrees(cameraPos.longitude);
+
+          // Get all labels within 10 miles as fallback
+          labelsInView = phoenixLabels.filter(label => {
+            const distance = getDistanceFeet(cameraLat, cameraLng, label.lat, label.lng);
+            return distance <= 52800; // 10 miles in feet
+          });
+
+          console.warn(`View frustum empty, using distance fallback: ${labelsInView.length} labels within 10 miles`);
+        }
+
+        // Step 3: Prioritize major streets (tier 1-3) over areas
+        // User wants: major streets every 1-5 miles, occasional area labels
+        const cameraPos = viewer.camera.positionCartographic;
+        const cameraLat = Cesium.Math.toDegrees(cameraPos.latitude);
+        const cameraLng = Cesium.Math.toDegrees(cameraPos.longitude);
+
+        // Calculate distances and prioritize streets
+        const labelsWithDistance = labelsInView.map(label => {
+          const distance = getDistanceFeet(cameraLat, cameraLng, label.lat, label.lng);
+          return { ...label, distance };
+        });
+
+        // Split by type: areas vs streets
+        const areaLabels = labelsWithDistance.filter(l => l.tier === 0); // Cities/neighborhoods
+        const streetLabels = labelsWithDistance.filter(l => l.tier >= 1 && l.tier <= 3); // Freeways, major arterials, major streets
+
+        // Take closest 1-2 area labels for context ("Entering Glendale")
+        const selectedAreas = areaLabels
+          .sort((a, b) => a.distance - b.distance)
+          .slice(0, 2);
+
+        // Take 10-15 major streets to ensure coverage
+        const selectedStreets = streetLabels
+          .sort((a, b) => a.distance - b.distance)
+          .slice(0, 15);
+
         console.log(
-          `Adding ${labelsToShow.length} 3D floating labels for Phoenix roads and landmarks` +
-          (isMobile ? ` (mobile mode - showing only tier 0-2)` : ` (desktop mode - showing all)`)
+          `Before decluttering: ${selectedAreas.length} areas, ${selectedStreets.length} streets ` +
+          `from ${labelsInView.length} in viewport. Camera alt: ${Math.round(initialAltitude)}ft`
         );
 
-        labelsToShow.forEach((label, index) => {
-          // Tier-based styling for holographic visual hierarchy
-          // Tier 0 (Area landmarks): Brightest cyan glow, largest, highest elevation
-          // Tier 1 (Freeways): Cyan, large, high visibility
-          // Tier 2 (Major arterials): Cyan, medium-large
-          // Tier 3 (Major streets): Light blue, medium
-          // Tier 4 (Secondary streets): Dimmer cyan, smaller
-          // Tier 5 (Minor streets): Dim cyan, smallest
+        // Combine but DON'T apply decluttering if we have very few labels
+        const combinedLabels = [...selectedAreas, ...selectedStreets];
 
+        // Only apply decluttering if we have more than 12 labels
+        let finalLabels;
+        if (combinedLabels.length > 12) {
+          const declutteredLabels = declutterLabels(combinedLabels);
+          finalLabels = declutteredLabels.slice(0, 15); // Allow up to 15 labels
+        } else {
+          finalLabels = combinedLabels; // Keep all if we have 12 or fewer
+        }
+
+        console.log(
+          `3D world labels: ${finalLabels.length} labels to show ` +
+          `(final: ${finalLabels.filter(l => l.tier === 0).length} areas, ` +
+          `${finalLabels.filter(l => l.tier >= 1).length} streets)`
+        );
+
+        // Store all labels for potential future use
+        (window as any).phoenixLabelsData = phoenixLabels;
+
+        // Step 5: Create labels with improved positioning and eyeOffset to prevent stacking
+        finalLabels.forEach((label, index) => {
+          // Tier-based styling for holographic visual hierarchy
           let fontSize, maxDistance, minDistance, baseHeight, scale;
           const color = getTierHolographicColor(label.tier);
 
           switch(label.tier) {
-            case 0: // Area landmarks (Downtown, Mountains, Airport, etc.)
+            case 0: // Area landmarks
               fontSize = 24;
-              maxDistance = isMobile ? 15840 : 31680; // Mobile: 3 miles, Desktop: 6 miles
-              minDistance = 0;
-              baseHeight = 1000; // Very high - these represent areas, not points
+              maxDistance = isMobile ? 15840 : 31680; // 3-6 miles
+              minDistance = 0; // Always show when in viewport
+              baseHeight = 400; // REDUCED from 1000ft - don't float so high
               scale = 1.2;
               break;
             case 1: // Major Freeways
               fontSize = 22;
-              maxDistance = isMobile ? 13200 : 26400; // Mobile: 2.5 miles, Desktop: 5 miles
+              maxDistance = isMobile ? 13200 : 26400; // 2.5-5 miles
               minDistance = 0;
-              baseHeight = 600; // Higher for visibility from altitude
+              baseHeight = 300; // REDUCED from 600ft
               scale = 1.1;
               break;
-            case 2: // Major arterials (both named and numbered)
+            case 2: // Major arterials
               fontSize = 20;
-              maxDistance = isMobile ? 10560 : 21120; // Mobile: 2 miles, Desktop: 4 miles
+              maxDistance = isMobile ? 10560 : 21120; // 2-4 miles
               minDistance = 0;
-              baseHeight = 500;
+              baseHeight = 250; // REDUCED from 500ft
               scale = 1.0;
               break;
             case 3: // Major streets
               fontSize = 18;
               maxDistance = 15840; // 3 miles
               minDistance = 0;
-              baseHeight = 400;
+              baseHeight = 200; // REDUCED from 400ft
               scale = 0.9;
               break;
             case 4: // Secondary streets
               fontSize = 16;
               maxDistance = 10560; // 2 miles
               minDistance = 0;
-              baseHeight = 350;
+              baseHeight = 150; // REDUCED from 350ft
               scale = 0.8;
               break;
             case 5: // Minor streets
               fontSize = 14;
               maxDistance = 7920; // 1.5 miles
               minDistance = 0;
-              baseHeight = 300;
+              baseHeight = 100; // REDUCED from 300ft
               scale = 0.7;
               break;
             default:
               fontSize = 18;
               maxDistance = 15840;
               minDistance = 0;
-              baseHeight = 400;
+              baseHeight = 200;
               scale = 1.0;
           }
 
-          // Position labels at a height that's visible from typical helicopter altitudes (1000-2000 ft)
-          const height = baseHeight;
-          const position = Cesium.Cartesian3.fromDegrees(label.lng, label.lat, height);
+          // Position at reduced height above ground
+          const position = Cesium.Cartesian3.fromDegrees(label.lng, label.lat, baseHeight);
 
-          // Use progressive reveal for tier 0-2 labels (major landmarks and roads)
-          // Stagger the reveals for visual interest
-          if (label.tier <= 2 && !isMobile) {
-            createProgressiveRevealLabel(Cesium, viewer, {
-              position: position,
-              text: label.name,
-              fontSize: fontSize,
-              color: color,
-              revealDuration: 800 + label.tier * 200, // Faster for more important labels
-              startDelay: index * 30, // Stagger by 30ms each
-              scale: scale,
-              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(minDistance, maxDistance),
-              scaleByDistance: new Cesium.NearFarScalar(1000, 1.5, maxDistance * 0.7, 0.8),
-              translucencyByDistance: new Cesium.NearFarScalar(maxDistance * 0.7, 1.0, maxDistance, 0.0),
-            });
-          } else {
-            // Use standard holographic billboard for minor labels (less animation overhead)
-            createHolographicBillboard(Cesium, viewer, {
-              position: position,
-              text: label.name,
-              fontSize: fontSize,
-              color: color,
-              scale: scale,
-              distanceDisplayCondition: new Cesium.DistanceDisplayCondition(minDistance, maxDistance),
-              scaleByDistance: new Cesium.NearFarScalar(1000, 1.5, maxDistance * 0.7, 0.8),
-              translucencyByDistance: new Cesium.NearFarScalar(maxDistance * 0.7, 1.0, maxDistance, 0.0),
-            });
-          }
+          // Use eyeOffset to vertically separate labels and prevent stacking
+          // Stagger labels vertically based on their index
+          const eyeOffsetY = (index % 5) * 40 - 80; // Spread labels: -80, -40, 0, 40, 80 pixels
+          const pixelOffset = new Cesium.Cartesian2(0, eyeOffsetY);
+
+          // Standard holographic billboard for all labels (no progressive reveal to reduce complexity)
+          createHolographicBillboard(Cesium, viewer, {
+            position: position,
+            text: label.name,
+            fontSize: fontSize,
+            color: color,
+            scale: scale,
+            pixelOffset: pixelOffset,
+            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(minDistance, maxDistance),
+            scaleByDistance: new Cesium.NearFarScalar(1000, 1.5, maxDistance * 0.7, 0.8),
+            translucencyByDistance: new Cesium.NearFarScalar(maxDistance * 0.7, 1.0, maxDistance, 0.0),
+          });
         });
 
-        console.log("Labels added. Total entities:", viewer.entities.values.length);
+        console.log("3D world labels created. Total entities:", viewer.entities.values.length);
 
         // Mark tiles as ready since we're using OSM buildings
         setTilesReady(true);
@@ -1833,6 +2008,16 @@ export const FlightVisualization3DCesiumFixed: React.FC<
       viewer.scene.requestRenderMode = false; // Force continuous rendering
       viewer.useDefaultRenderLoop = true; // Ensure default render loop is active
 
+      // IMPORTANT: Disable camera controls during first-person animation
+      // This prevents the user from zooming out to extreme altitudes (52 million feet!)
+      // which makes labels invisible due to perspective distortion
+      viewer.scene.screenSpaceCameraController.enableRotate = false;
+      viewer.scene.screenSpaceCameraController.enableZoom = false;
+      viewer.scene.screenSpaceCameraController.enableLook = false;
+      viewer.scene.screenSpaceCameraController.enableTilt = false;
+      viewer.scene.screenSpaceCameraController.enableTranslate = false;
+      console.log("Camera controls disabled for first-person animation mode");
+
       // Use Cesium's built-in clock animation
       viewer.clock.shouldAnimate = true;
       viewer.clock.multiplier = playbackSpeed * 50; // Adjust multiplier based on playback speed
@@ -1963,13 +2148,17 @@ export const FlightVisualization3DCesiumFixed: React.FC<
 
               if (distanceInMiles <= searchRadiusMiles) {
                 isWithinSearchRadius = true;
-                cameraPitch = Cesium.Math.toRadians(-40); // Look down steeply (40 degrees)
 
-                // Slow down to 1/10th speed when in search radius
-                const slowSpeed = (playbackSpeed * 50) / 10;
-                if (Math.abs(viewer.clock.multiplier - slowSpeed) > 0.1) {
-                  viewer.clock.multiplier = slowSpeed;
-                  console.log("Entering search radius - slowing down 10x and looking down");
+                // Only change camera angle when slow-down is enabled
+                if (enableSlowdownInRadiusRef.current) {
+                  cameraPitch = Cesium.Math.toRadians(-40); // Look down steeply (40 degrees)
+
+                  // Slow down to 1/10th speed when in search radius
+                  const slowSpeed = (playbackSpeed * 50) / 10;
+                  if (Math.abs(viewer.clock.multiplier - slowSpeed) > 0.1) {
+                    viewer.clock.multiplier = slowSpeed;
+                    console.log("Entering search radius - slowing down 10x and looking down");
+                  }
                 }
               }
             }
@@ -1994,11 +2183,16 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               ? viewer._hoverCenterHeading
               : hpr.heading;
 
+            // Override camera pitch if look-down view is enabled
+            if (lookDownViewRef.current) {
+              cameraPitch = Cesium.Math.toRadians(-75); // Nearly straight down (75 degrees)
+            }
+
             viewer.camera.setView({
               destination: position,
               orientation: {
                 heading: cameraHeading, // Lock heading during hover to prevent spinning
-                pitch: cameraPitch, // Dynamic pitch based on location
+                pitch: cameraPitch, // Dynamic pitch based on location or look-down override
                 roll: 0
               }
             });
@@ -2012,6 +2206,120 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             const totalSeconds = Cesium.JulianDate.secondsDifference(stopTime, startTime);
             const percentage = (elapsedSeconds / totalSeconds) * 100;
             setSliderPosition(Math.min(100, Math.max(0, percentage)));
+
+            // DYNAMIC LABEL UPDATES: Regenerate labels as helicopter moves
+            // Track last label update position to avoid excessive updates
+            if (!viewer._lastLabelUpdatePos) {
+              viewer._lastLabelUpdatePos = { lat: 0, lng: 0 };
+              viewer._labelUpdateFrameCount = 0;
+            }
+
+            // Check if we should update labels (every 60 frames AND moved > 1.5 miles)
+            viewer._labelUpdateFrameCount++;
+            if (viewer._labelUpdateFrameCount > 60 && positionIndex >= 0 && positionIndex < positions.length) {
+              const currentPos = positions[positionIndex];
+              const carto = Cesium.Ellipsoid.WGS84.cartesianToCartographic(position);
+              const currentLat = Cesium.Math.toDegrees(carto.latitude);
+              const currentLng = Cesium.Math.toDegrees(carto.longitude);
+
+              // Calculate distance moved since last label update
+              const R = 3959; // Earth radius in miles
+              const dLat = (currentLat - viewer._lastLabelUpdatePos.lat) * Math.PI / 180;
+              const dLng = (currentLng - viewer._lastLabelUpdatePos.lng) * Math.PI / 180;
+              const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                       Math.cos(viewer._lastLabelUpdatePos.lat * Math.PI / 180) * Math.cos(currentLat * Math.PI / 180) *
+                       Math.sin(dLng/2) * Math.sin(dLng/2);
+              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+              const distanceMoved = R * c;
+
+              // Update labels if moved > 1.5 miles
+              if (distanceMoved > 1.5 && window.phoenixLabelsData) {
+                console.log(`Helicopter moved ${distanceMoved.toFixed(2)} miles - regenerating labels`);
+
+                // Remove all existing label entities (keep helicopter)
+                const entitiesToRemove = [];
+                for (let i = 0; i < viewer.entities.values.length; i++) {
+                  const entity = viewer.entities.values[i];
+                  if (entity !== viewer.helicopterEntity && entity.billboard) {
+                    entitiesToRemove.push(entity);
+                  }
+                }
+                entitiesToRemove.forEach(e => viewer.entities.remove(e));
+
+                // Regenerate labels centered on current helicopter position
+                const phoenixLabels = window.phoenixLabelsData;
+                const getDistanceFeet = (lat1, lng1, lat2, lng2) => {
+                  const R = 20925721; // Earth radius in feet
+                  const dLat = (lat2 - lat1) * Math.PI / 180;
+                  const dLng = (lng2 - lng1) * Math.PI / 180;
+                  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                           Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                           Math.sin(dLng/2) * Math.sin(dLng/2);
+                  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                  return R * c;
+                };
+
+                // Get labels within 10 miles of current position
+                const nearbyLabels = phoenixLabels
+                  .map(label => ({
+                    ...label,
+                    distance: getDistanceFeet(currentLat, currentLng, label.lat, label.lng)
+                  }))
+                  .filter(label => label.distance <= 52800) // 10 miles
+                  .sort((a, b) => a.distance - b.distance);
+
+                // Prioritize: 2 closest areas + 15 closest streets (tiers 1-3) + always-show labels
+                const areas = nearbyLabels.filter(l => l.tier === 0).slice(0, 2);
+                const alwaysShowLabels = phoenixLabels
+                  .filter(l => l.alwaysShow)
+                  .map(label => ({
+                    ...label,
+                    distance: getDistanceFeet(currentLat, currentLng, label.lat, label.lng)
+                  }));
+                const streets = nearbyLabels.filter(l => l.tier >= 1 && l.tier <= 3 && !l.alwaysShow).slice(0, 15);
+                const labelsToShow = [...areas, ...alwaysShowLabels, ...streets];
+
+                console.log(`Creating ${labelsToShow.length} labels (${areas.length} areas, ${alwaysShowLabels.length} always-show, ${streets.length} streets)`);
+
+                // Create new labels
+                labelsToShow.forEach((label, index) => {
+                  let fontSize, maxDistance, baseHeight, scale, color;
+
+                  if (label.tier === 0) {
+                    fontSize = 24; maxDistance = 31680; baseHeight = 400; scale = 1.2;
+                    color = Cesium.Color.fromCssColorString('rgba(0, 255, 255, 0.9)');
+                  } else if (label.tier === 1) {
+                    fontSize = 22; maxDistance = 26400; baseHeight = 300; scale = 1.1;
+                    color = Cesium.Color.fromCssColorString('rgba(0, 220, 255, 0.85)');
+                  } else if (label.tier === 2) {
+                    fontSize = 20; maxDistance = 21120; baseHeight = 250; scale = 1.0;
+                    color = Cesium.Color.fromCssColorString('rgba(0, 200, 255, 0.8)');
+                  } else {
+                    fontSize = 18; maxDistance = 15840; baseHeight = 200; scale = 0.9;
+                    color = Cesium.Color.fromCssColorString('rgba(0, 180, 255, 0.75)');
+                  }
+
+                  const position = Cesium.Cartesian3.fromDegrees(label.lng, label.lat, baseHeight);
+                  const eyeOffsetY = (index % 5) * 40 - 80;
+
+                  createHolographicBillboard(Cesium, viewer, {
+                    position: position,
+                    text: label.name,
+                    fontSize: fontSize,
+                    color: color,
+                    scale: scale,
+                    pixelOffset: new Cesium.Cartesian2(0, eyeOffsetY),
+                    distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, maxDistance),
+                    scaleByDistance: new Cesium.NearFarScalar(1000, 1.5, maxDistance * 0.7, 0.8),
+                    translucencyByDistance: new Cesium.NearFarScalar(maxDistance * 0.7, 1.0, maxDistance, 0.0),
+                  });
+                });
+
+                // Update last position and reset frame counter
+                viewer._lastLabelUpdatePos = { lat: currentLat, lng: currentLng };
+                viewer._labelUpdateFrameCount = 0;
+              }
+            }
 
             // Update HUD data
             // Reuse positionIndex already calculated above
@@ -2067,7 +2375,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               }
 
               setHudData({
-                speed: currentPos.ground_speed_knots || 0,
+                speed: knotsToMph(currentPos.ground_speed_knots || 0),
                 altitude: currentPos.altitude_feet || 0,
                 heading: Cesium.Math.toDegrees(hpr.heading),
                 groundElevation: currentPos.ground_elevation_feet || 0,
@@ -2111,6 +2419,14 @@ export const FlightVisualization3DCesiumFixed: React.FC<
     const viewer = (window as any).cesiumViewer;
     if (viewer && viewer.clock) {
       viewer.clock.shouldAnimate = false;
+
+      // Re-enable camera controls when animation stops
+      viewer.scene.screenSpaceCameraController.enableRotate = true;
+      viewer.scene.screenSpaceCameraController.enableZoom = true;
+      viewer.scene.screenSpaceCameraController.enableLook = true;
+      viewer.scene.screenSpaceCameraController.enableTilt = true;
+      viewer.scene.screenSpaceCameraController.enableTranslate = true;
+      console.log("Camera controls re-enabled");
 
       // Clean up camera update listener
       if (viewer._cameraUpdateListener) {
@@ -2264,8 +2580,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           </div>
         )}
 
-        {/* Holographic Street Labels - Division-inspired world-space labels */}
-        {!isLoading && viewerRef.current && cameraPosition && (
+        {/* Holographic Street Labels - DISABLED - Using screen-space labels instead */}
+        {/* {!isLoading && viewerRef.current && cameraPosition && (
           <HolographicStreetLabels
             viewer={viewerRef.current}
             cameraPosition={cameraPosition}
@@ -2273,7 +2589,16 @@ export const FlightVisualization3DCesiumFixed: React.FC<
             maxVisibleLabels={50}
             progressiveReveal={true}
           />
-        )}
+        )} */}
+
+        {/* Screen-Space Label Overlay - DISABLED in favor of 3D world-space labels */}
+        {/* {!isLoading && viewerRef.current && (
+          <ScreenSpaceLabels
+            viewer={viewerRef.current}
+            labels={(window as any).phoenixLabelsData || PHOENIX_LABELS}
+            updateInterval={500}
+          />
+        )} */}
 
         {/* Phoenix Area Minimap - Division-inspired overview map */}
         {!isLoading && positions.length > 0 && viewerRef.current && (
@@ -2284,7 +2609,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               latitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].latitude,
               longitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].longitude,
             } : undefined}
-            className="absolute bottom-4 right-4 z-40"
+            className="absolute z-[9999]"
             size={200}
             onClick={(latitude, longitude) => {
               // Navigate camera to clicked location
@@ -2409,26 +2734,56 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                 </span>
               </div>
 
-              {/* Timeline Legend */}
-              <div className="flex items-center gap-3 mt-2 text-xs text-gray-600 dark:text-gray-400 px-1">
-                {hoverLocations && hoverLocations.length > 0 && (
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
-                    <span>Hover locations</span>
-                  </div>
-                )}
-                {positions.some(p => p.altitude_feet < 500 && p.over_private_property) && (
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                    <span>Low altitude</span>
-                  </div>
-                )}
-                {searchContext && closestPointIndex !== null && (
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    <span>Search location</span>
-                  </div>
-                )}
+              {/* Timeline Legend and Controls */}
+              <div className="flex items-center justify-between mt-2 text-xs px-1">
+                {/* Legend items */}
+                <div className="flex items-center gap-3 text-gray-600 dark:text-gray-400">
+                  {hoverLocations && hoverLocations.length > 0 && (
+                    <div className="flex items-center gap-1">
+                      <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
+                      <span>Hover locations</span>
+                    </div>
+                  )}
+                  {positions.some(p => p.altitude_feet < 500 && p.over_private_property) && (
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                      <span>Low altitude</span>
+                    </div>
+                  )}
+                  {searchContext && closestPointIndex !== null && (
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                      <span>Search location</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* View controls */}
+                <div className="flex items-center gap-3">
+                  {/* Look-down view toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer text-gray-700 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={lookDownView}
+                      onChange={(e) => setLookDownView(e.target.checked)}
+                      className="w-3.5 h-3.5 text-blue-500 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-medium">Look down</span>
+                  </label>
+
+                  {/* Slow-down toggle (only show if search context exists) */}
+                  {searchContext && (
+                    <label className="flex items-center gap-2 cursor-pointer text-gray-700 dark:text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={enableSlowdownInRadius}
+                        onChange={(e) => setEnableSlowdownInRadius(e.target.checked)}
+                        className="w-3.5 h-3.5 text-cyan-500 bg-gray-100 border-gray-300 rounded focus:ring-cyan-500 dark:focus:ring-cyan-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                      />
+                      <span className="text-xs font-medium">Slow in radius</span>
+                    </label>
+                  )}
+                </div>
               </div>
             </div>
           )}
