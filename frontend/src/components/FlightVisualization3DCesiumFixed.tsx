@@ -25,6 +25,7 @@ import {
   getDistanceMiles,
   knotsToMph,
   metersToFeet,
+  feetToMeters,
 } from "../utils/flightUtils";
 import {
   FlightPosition,
@@ -104,6 +105,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   const enableSlowdownInRadiusRef = useRef(true); // Ref for accessing in callbacks
   const [lookDownView, setLookDownView] = useState(false); // Toggle for camera looking nearly straight down
   const lookDownViewRef = useRef(false); // Ref for accessing in callbacks
+  const [thirdPersonView, setThirdPersonView] = useState(false); // Toggle for 3rd person camera view
+  const thirdPersonViewRef = useRef(false); // Ref for accessing in callbacks
   const [hudData, setHudData] = useState({
     speed: 0,
     altitude: 0,
@@ -143,6 +146,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<
     lookDownViewRef.current = lookDownView;
     console.log(`Look-down view: ${lookDownView ? 'enabled' : 'disabled'}`);
   }, [lookDownView]);
+
+  // Keep third-person view ref in sync with state
+  useEffect(() => {
+    thirdPersonViewRef.current = thirdPersonView;
+    console.log(`Third-person view: ${thirdPersonView ? 'enabled' : 'disabled'}`);
+  }, [thirdPersonView]);
 
   // Clean up function
   const cleanup = useCallback(() => {
@@ -927,10 +936,36 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           orientation: orientationProperty, // Use velocity-based orientation for heading
           // Use a billboard to represent the helicopter (only visible in third-person)
           billboard: {
-            image: "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHRleHQgeD0iNSIgeT0iNDAiIGZvbnQtc2l6ZT0iNDgiPvCfmoE8L3RleHQ+PC9zdmc+",
-            scale: 0.8,
-            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+            // SVG helicopter icon with clear heading indicator (arrow pointing forward)
+            image: "data:image/svg+xml;base64," + btoa(`
+              <svg width="64" height="64" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <filter id="glow">
+                    <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                    <feMerge>
+                      <feMergeNode in="coloredBlur"/>
+                      <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                  </filter>
+                </defs>
+                <!-- Helicopter body (circle) -->
+                <circle cx="32" cy="36" r="12" fill="#00ccff" stroke="#00ffff" stroke-width="2" filter="url(#glow)" opacity="0.9"/>
+                <!-- Main rotor (horizontal line) -->
+                <line x1="12" y1="36" x2="52" y2="36" stroke="#00ffff" stroke-width="2" opacity="0.7"/>
+                <!-- Forward direction indicator (arrow pointing up = forward) -->
+                <path d="M 32 12 L 38 26 L 32 22 L 26 26 Z" fill="#ff6600" stroke="#ffaa00" stroke-width="2" filter="url(#glow)"/>
+                <!-- Tail rotor indicator -->
+                <circle cx="32" cy="48" r="3" fill="#00ffff" opacity="0.7"/>
+                <!-- Heading line (from center forward) -->
+                <line x1="32" y1="36" x2="32" y2="16" stroke="#ff6600" stroke-width="2" opacity="0.8"/>
+              </svg>
+            `),
+            scale: 1.2,
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
             show: false, // Hide in first-person view
+            alignedAxis: Cesium.Cartesian3.UNIT_Z, // Align to helicopter's heading
+            rotation: 0, // Will be controlled by entity orientation
           },
           // Optionally add a label
           label: {
@@ -2188,14 +2223,59 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               cameraPitch = Cesium.Math.toRadians(-75); // Nearly straight down (75 degrees)
             }
 
-            viewer.camera.setView({
-              destination: position,
-              orientation: {
-                heading: cameraHeading, // Lock heading during hover to prevent spinning
-                pitch: cameraPitch, // Dynamic pitch based on location or look-down override
-                roll: 0
+            // Handle third-person view
+            if (thirdPersonViewRef.current) {
+              // Position camera above and behind the helicopter
+              const carto = Cesium.Ellipsoid.WGS84.cartesianToCartographic(position);
+              const heightAbove = 150; // feet above helicopter
+              const distanceBehind = 200; // feet behind helicopter
+
+              // Calculate offset position behind helicopter based on its heading
+              const heading = hpr.heading;
+              const latOffset = -(distanceBehind / 364000) * Math.cos(heading); // 364000 ft per degree latitude
+              const lngOffset = -(distanceBehind / (364000 * Math.cos(carto.latitude))) * Math.sin(heading);
+
+              const cameraPosition = Cesium.Cartesian3.fromRadians(
+                carto.longitude + lngOffset,
+                carto.latitude + latOffset,
+                carto.height + feetToMeters(heightAbove)
+              );
+
+              // Point camera at helicopter with slight downward angle
+              const direction = Cesium.Cartesian3.normalize(
+                Cesium.Cartesian3.subtract(position, cameraPosition, new Cesium.Cartesian3()),
+                new Cesium.Cartesian3()
+              );
+              const up = Cesium.Cartesian3.normalize(cameraPosition, new Cesium.Cartesian3());
+
+              viewer.camera.setView({
+                destination: cameraPosition,
+                orientation: {
+                  direction: direction,
+                  up: up
+                }
+              });
+
+              // Make helicopter billboard visible in third-person
+              if (viewer.helicopterEntity && viewer.helicopterEntity.billboard) {
+                viewer.helicopterEntity.billboard.show = true;
               }
-            });
+            } else {
+              // First-person view
+              viewer.camera.setView({
+                destination: position,
+                orientation: {
+                  heading: cameraHeading, // Lock heading during hover to prevent spinning
+                  pitch: cameraPitch, // Dynamic pitch based on location or look-down override
+                  roll: 0
+                }
+              });
+
+              // Hide helicopter billboard in first-person
+              if (viewer.helicopterEntity && viewer.helicopterEntity.billboard) {
+                viewer.helicopterEntity.billboard.show = false;
+              }
+            }
 
             // Set realistic H125 field of view (90° horizontal is realistic for pilot view)
             // Default Cesium FOV is 60°, H125 bubble canopy allows wider view
@@ -2769,6 +2849,17 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                       className="w-3.5 h-3.5 text-blue-500 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
                     />
                     <span className="text-xs font-medium">Look down</span>
+                  </label>
+
+                  {/* Third-person view toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer text-gray-700 dark:text-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={thirdPersonView}
+                      onChange={(e) => setThirdPersonView(e.target.checked)}
+                      className="w-3.5 h-3.5 text-purple-500 bg-gray-100 border-gray-300 rounded focus:ring-purple-500 dark:focus:ring-purple-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600 cursor-pointer"
+                    />
+                    <span className="text-xs font-medium">3rd person</span>
                   </label>
 
                   {/* Slow-down toggle (only show if search context exists) */}
