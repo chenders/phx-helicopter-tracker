@@ -936,31 +936,59 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           orientation: orientationProperty, // Use velocity-based orientation for heading
           // Use a billboard to represent the helicopter (only visible in third-person)
           billboard: {
-            // SVG helicopter icon with clear heading indicator (arrow pointing forward)
+            // SVG helicopter icon - top-down view with clear heading indicator
             image: "data:image/svg+xml;base64," + btoa(`
-              <svg width="64" height="64" xmlns="http://www.w3.org/2000/svg">
+              <svg width="80" height="80" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                   <filter id="glow">
-                    <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                    <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
                     <feMerge>
                       <feMergeNode in="coloredBlur"/>
                       <feMergeNode in="SourceGraphic"/>
                     </feMerge>
                   </filter>
+                  <linearGradient id="bodyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" style="stop-color:#00ddff;stop-opacity:1" />
+                    <stop offset="100%" style="stop-color:#0088cc;stop-opacity:1" />
+                  </linearGradient>
                 </defs>
-                <!-- Helicopter body (circle) -->
-                <circle cx="32" cy="36" r="12" fill="#00ccff" stroke="#00ffff" stroke-width="2" filter="url(#glow)" opacity="0.9"/>
-                <!-- Main rotor (horizontal line) -->
-                <line x1="12" y1="36" x2="52" y2="36" stroke="#00ffff" stroke-width="2" opacity="0.7"/>
-                <!-- Forward direction indicator (arrow pointing up = forward) -->
-                <path d="M 32 12 L 38 26 L 32 22 L 26 26 Z" fill="#ff6600" stroke="#ffaa00" stroke-width="2" filter="url(#glow)"/>
-                <!-- Tail rotor indicator -->
-                <circle cx="32" cy="48" r="3" fill="#00ffff" opacity="0.7"/>
-                <!-- Heading line (from center forward) -->
-                <line x1="32" y1="36" x2="32" y2="16" stroke="#ff6600" stroke-width="2" opacity="0.8"/>
+
+                <!-- Shadow for depth -->
+                <ellipse cx="40" cy="42" rx="16" ry="12" fill="#000000" opacity="0.2"/>
+
+                <!-- Main rotor blades (cross pattern) -->
+                <g filter="url(#glow)">
+                  <line x1="10" y1="38" x2="70" y2="38" stroke="#00ffff" stroke-width="3" opacity="0.8" stroke-linecap="round"/>
+                  <line x1="40" y1="8" x2="40" y2="68" stroke="#00ffff" stroke-width="3" opacity="0.8" stroke-linecap="round"/>
+                </g>
+
+                <!-- Tail boom (extending backward/down) -->
+                <rect x="36" y="38" width="8" height="28" fill="#00aacc" stroke="#00ccdd" stroke-width="1" rx="2"/>
+
+                <!-- Tail rotor (small circle at end of tail) -->
+                <circle cx="40" cy="66" r="4" fill="#00ffff" stroke="#00ffff" stroke-width="1.5" opacity="0.8"/>
+
+                <!-- Main fuselage body (rounded rectangle) -->
+                <ellipse cx="40" cy="36" rx="14" ry="11" fill="url(#bodyGradient)" stroke="#00eeff" stroke-width="2" filter="url(#glow)"/>
+
+                <!-- Cockpit/front window (slight highlight) -->
+                <ellipse cx="40" cy="28" rx="8" ry="5" fill="#66ddff" opacity="0.6"/>
+
+                <!-- Forward direction indicator (large orange arrow at nose) -->
+                <g filter="url(#glow)">
+                  <path d="M 40 8 L 48 22 L 44 22 L 44 30 L 36 30 L 36 22 L 32 22 Z"
+                        fill="#ff6600" stroke="#ffaa00" stroke-width="2"/>
+                </g>
+
+                <!-- Center rotor hub -->
+                <circle cx="40" cy="38" r="5" fill="#00aacc" stroke="#00ffff" stroke-width="2" filter="url(#glow)"/>
+
+                <!-- Direction indicator text -->
+                <text x="40" y="12" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
+                      fill="#ff8800" text-anchor="middle" filter="url(#glow)">▲</text>
               </svg>
             `),
-            scale: 1.2,
+            scale: 1.5,
             verticalOrigin: Cesium.VerticalOrigin.CENTER,
             horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
             show: false, // Hide in first-person view
@@ -2225,28 +2253,61 @@ export const FlightVisualization3DCesiumFixed: React.FC<
 
             // Handle third-person view
             if (thirdPersonViewRef.current) {
-              // Position camera above and behind the helicopter
-              const carto = Cesium.Ellipsoid.WGS84.cartesianToCartographic(position);
-              const heightAbove = 150; // feet above helicopter
-              const distanceBehind = 200; // feet behind helicopter
+              // Follow camera: position behind and slightly above the helicopter
+              const distanceBehind = 100; // meters (~328 feet)
+              const heightAbove = 20; // meters (~65 feet)
 
-              // Calculate offset position behind helicopter based on its heading
+              // Get helicopter's current heading
               const heading = hpr.heading;
-              const latOffset = -(distanceBehind / 364000) * Math.cos(heading); // 364000 ft per degree latitude
-              const lngOffset = -(distanceBehind / (364000 * Math.cos(carto.latitude))) * Math.sin(heading);
 
-              const cameraPosition = Cesium.Cartesian3.fromRadians(
-                carto.longitude + lngOffset,
-                carto.latitude + latOffset,
-                carto.height + feetToMeters(heightAbove)
+              // Create offset vector pointing backward from helicopter's heading
+              // Heading of 0 = North, π/2 = East, π = South, 3π/2 = West
+              // We want to go opposite the heading direction
+              const backwardHeading = heading + Math.PI; // 180 degrees opposite
+
+              // Calculate offset in ENU (East-North-Up) coordinates
+              const offsetENU = new Cesium.Cartesian3(
+                distanceBehind * Math.sin(backwardHeading), // East
+                distanceBehind * Math.cos(backwardHeading), // North
+                heightAbove // Up
               );
 
-              // Point camera at helicopter with slight downward angle
-              const direction = Cesium.Cartesian3.normalize(
-                Cesium.Cartesian3.subtract(position, cameraPosition, new Cesium.Cartesian3()),
+              // Convert helicopter position to cartographic to get the local reference frame
+              const helicopterCarto = Cesium.Ellipsoid.WGS84.cartesianToCartographic(position);
+
+              // Get transform from ENU to world coordinates at helicopter location
+              const transformMatrix = Cesium.Transforms.eastNorthUpToFixedFrame(position);
+
+              // Transform offset from ENU to world coordinates
+              const offsetWorld = Cesium.Matrix4.multiplyByPoint(
+                transformMatrix,
+                offsetENU,
                 new Cesium.Cartesian3()
               );
-              const up = Cesium.Cartesian3.normalize(cameraPosition, new Cesium.Cartesian3());
+
+              // Calculate camera position (offset from helicopter)
+              const cameraPosition = offsetWorld;
+
+              // Camera looks forward in the direction of helicopter's heading
+              // This creates a smooth follow-cam effect
+              const forwardDirection = new Cesium.Cartesian3(
+                Math.sin(heading),
+                Math.cos(heading),
+                -0.1 // Slight downward tilt to see helicopter better
+              );
+
+              // Transform forward direction to world coordinates
+              const forwardWorld = Cesium.Matrix4.multiplyByPointAsVector(
+                transformMatrix,
+                forwardDirection,
+                new Cesium.Cartesian3()
+              );
+
+              // Normalize the direction vector
+              const direction = Cesium.Cartesian3.normalize(forwardWorld, new Cesium.Cartesian3());
+
+              // Up vector (perpendicular to surface at camera location)
+              const up = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(cameraPosition, new Cesium.Cartesian3());
 
               viewer.camera.setView({
                 destination: cameraPosition,
