@@ -983,9 +983,8 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                 <!-- Center rotor hub -->
                 <circle cx="40" cy="38" r="5" fill="#00aacc" stroke="#00ffff" stroke-width="2" filter="url(#glow)"/>
 
-                <!-- Direction indicator text -->
-                <text x="40" y="12" font-family="Arial, sans-serif" font-size="10" font-weight="bold"
-                      fill="#ff8800" text-anchor="middle" filter="url(#glow)">▲</text>
+                <!-- Additional direction indicator triangle above arrow -->
+                <path d="M 40 2 L 35 8 L 45 8 Z" fill="#ff8800" stroke="#ffaa00" stroke-width="1" filter="url(#glow)"/>
               </svg>
             `),
             scale: 1.5,
