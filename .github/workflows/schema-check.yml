@@ -42,17 +42,6 @@ jobs:
           grep -ivE 'openai-whisper|faster-whisper' requirements.txt > "$RUNNER_TEMP/reqs-ci.txt"
           pip install -r "$RUNNER_TEMP/reqs-ci.txt"
 
-      - name: Seed base schema (init.sql bootstrap, minus timescaledb extras)
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-        run: |
-          cd backend
-          # The first migration ALTERs tables that init.sql creates out-of-band.
-          # Seed that base schema first (strip timescaledb-only lines the postgis
-          # image can't run); alembic then applies deltas on top, as in real deploys.
-          grep -ivE 'timescaledb|create_hypertable|compression_policy|retention_policy' init.sql > "$RUNNER_TEMP/seed.sql"
-          psql "$DATABASE_URL" -f "$RUNNER_TEMP/seed.sql"
-
       - name: Run Alembic migrations
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
