@@ -28,7 +28,10 @@ jobs:
         run: |
           cd backend
           pip install --upgrade pip
-          pip install -r requirements.txt
+          # openai-whisper's build imports pkg_resources (removed in setuptools>=81);
+          # constrain the build env to a setuptools that still provides it.
+          printf 'setuptools<81\n' > "$RUNNER_TEMP/constraints.txt"
+          PIP_CONSTRAINT="$RUNNER_TEMP/constraints.txt" pip install -r requirements.txt
           pip install black ruff
 
       - name: Check code formatting with Black
@@ -82,7 +85,10 @@ jobs:
         run: |
           cd backend
           pip install --upgrade pip
-          pip install -r requirements.txt
+          # openai-whisper's build imports pkg_resources (removed in setuptools>=81);
+          # constrain the build env to a setuptools that still provides it.
+          printf 'setuptools<81\n' > "$RUNNER_TEMP/constraints.txt"
+          PIP_CONSTRAINT="$RUNNER_TEMP/constraints.txt" pip install -r requirements.txt
 
       - name: Run tests with pytest
         env:
@@ -117,7 +123,10 @@ jobs:
         run: |
           cd backend
           pip install --upgrade pip
-          pip install -r requirements.txt
+          # openai-whisper's build imports pkg_resources (removed in setuptools>=81);
+          # constrain the build env to a setuptools that still provides it.
+          printf 'setuptools<81\n' > "$RUNNER_TEMP/constraints.txt"
+          PIP_CONSTRAINT="$RUNNER_TEMP/constraints.txt" pip install -r requirements.txt
           pip install mypy
 
       - name: Type check with mypy
