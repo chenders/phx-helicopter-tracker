@@ -12,6 +12,7 @@ from httpx import AsyncClient
 
 from app.main import app
 from app.db.database import Base, get_db
+from app.api.deps import get_db as deps_get_db
 from app.models import (
     Aircraft,
     FlightLog,
@@ -53,21 +54,26 @@ def setup_test_db():
 
 @pytest.fixture(scope="function")
 def db_session():
-    """Create a database session with transaction rollback for isolation."""
-    # Create a connection
+    """DB session in a transaction + SAVEPOINT, rolled back per test.
+
+    The nested SAVEPOINT (restarted after each inner commit) lets endpoint code
+    call session.commit() while the outer transaction is still rolled back at
+    teardown, keeping tests isolated on a single shared connection.
+    """
     connection = test_engine.connect()
-
-    # Begin a transaction
     transaction = connection.begin()
-
-    # Create a session bound to the connection
     session = TestingSessionLocal(bind=connection)
+    session.begin_nested()
+
+    @event.listens_for(session, "after_transaction_end")
+    def _restart_savepoint(sess, trans):
+        if trans.nested and not trans._parent.nested:
+            sess.begin_nested()
 
     try:
         yield session
     finally:
         session.close()
-        # Rollback the transaction to ensure test isolation
         transaction.rollback()
         connection.close()
 
@@ -84,6 +90,7 @@ def client(db_session):
 
     # Override the dependency
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[deps_get_db] = override_get_db
 
     try:
         with TestClient(app) as test_client:
@@ -112,6 +119,7 @@ async def async_client(db_session):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[deps_get_db] = override_get_db
 
     try:
         async with AsyncClient(app=app, base_url="http://test") as ac:
