@@ -72,7 +72,8 @@ class TestFlightAPI:
         end_date = datetime.now(timezone.utc).isoformat()
 
         response = client.get(
-            f"/api/v1/flights/logs?start_date={start_date}&end_date={end_date}"
+            "/api/v1/flights/logs",
+            params={"start_date": start_date, "end_date": end_date},
         )
         assert response.status_code == 200
         data = response.json()

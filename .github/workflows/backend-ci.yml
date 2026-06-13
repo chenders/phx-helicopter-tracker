@@ -98,6 +98,9 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: test-secret-key-for-ci
           ENVIRONMENT: test
+          # Run FR24 in sandbox for tests (never production); a dummy key is enough.
+          FR24_API_ENVIRONMENT: sandbox
+          FR24_API_KEY_SANDBOX: test-sandbox-key
         run: |
           cd backend
           pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=xml

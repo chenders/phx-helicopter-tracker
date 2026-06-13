@@ -108,11 +108,7 @@ class UnifiedTrackingService:
                     is_active = await fr24_api_service.is_aircraft_active(
                         pos.registration
                     )
-                    if (
-                        not is_active
-                        and pos.ground_speed_knots
-                        and pos.ground_speed_knots < 5
-                    ):
+                    if not is_active and (pos.ground_speed_knots or 0) < 5:
                         continue
 
                 # Record activity for intelligent polling
@@ -205,7 +201,9 @@ class UnifiedTrackingService:
         """Get status of all tracking services"""
         status = {
             "primary_source": self.primary_source.value,
-            "fallback_source": self.fallback_source.value,
+            "fallback_source": (
+                DataSource.CACHED.value if self.use_cache_on_failure else None
+            ),
             "services": {},
         }
 
@@ -217,10 +215,10 @@ class UnifiedTrackingService:
         except Exception as e:
             status["services"]["fr24_api"] = {"status": "error", "error": str(e)}
 
-        # ADS-B status: fallback service is not implemented (no adsb_service exists).
-        status["services"]["adsb_exchange"] = {
+        # Cache is the only fallback (no ADS-B service).
+        status["services"]["cache"] = {
+            "enabled": self.use_cache_on_failure,
             "status": "not_implemented",
-            "error": "ADS-B service not configured",
         }
 
         return status

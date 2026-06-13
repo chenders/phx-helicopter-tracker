@@ -127,14 +127,20 @@ class TestAppConfiguration:
 class TestDatabaseSetup:
     """Test database setup and initialization."""
 
-    @patch("app.main.Base")
-    @patch("app.main.engine")
-    def test_database_tables_creation(self, mock_engine, mock_base):
-        """Test that database tables are created on startup."""
-        mock_base.metadata.create_all = MagicMock()
+    def test_database_tables_creation(self):
+        """Importing app.main triggers Base.metadata.create_all(bind=engine).
 
-        # Import main to trigger the table creation
+        main is already imported by conftest, so we reload it under patched
+        source objects to re-run the module-level create_all and observe it.
+        """
+        import importlib
         from app import main
 
-        # Verify create_all was called
-        mock_base.metadata.create_all.assert_called_with(bind=mock_engine)
+        with patch("app.db.database.engine") as mock_engine, patch(
+            "app.models.Base"
+        ) as mock_base:
+            importlib.reload(main)
+            mock_base.metadata.create_all.assert_called_with(bind=mock_engine)
+
+        # Restore the real module state for the rest of the suite.
+        importlib.reload(main)
