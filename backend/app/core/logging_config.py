@@ -8,9 +8,16 @@ from pathlib import Path
 from datetime import datetime
 import json
 
-# Create logs directory if it doesn't exist
-LOG_DIR = Path("/app/logs")
-LOG_DIR.mkdir(exist_ok=True)
+import tempfile
+
+# Logs dir, overridable via LOG_DIR env. Falls back to a temp dir when the
+# default /app/logs (a Docker path) is not creatable, e.g. on CI runners.
+LOG_DIR = Path(os.getenv("LOG_DIR", "/app/logs"))
+try:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    LOG_DIR = Path(tempfile.gettempdir()) / "phx-helicopter-logs"
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class JSONFormatter(logging.Formatter):

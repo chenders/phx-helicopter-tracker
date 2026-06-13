@@ -53,7 +53,10 @@ ruff = "^0.1.5"
 line-length = 120
 target-version = "py312"
 # E712 ignored: `== True/False` is intentional in SQLAlchemy query filters.
-ignore = ["E712"]
+# Enforce real-bug rules project-wide (same scope as the CI/pre-push gate).
+# Style rules (E*) and unused import/var (F401/F841) are not enforced yet.
+select = ["F", "ASYNC"]
+ignore = ["E712", "F401", "F841"]
 # Generated/version-pinned Alembic migrations are historical artifacts.
 extend-exclude = ["alembic/versions", "migrations/versions"]
 
