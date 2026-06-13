@@ -13,7 +13,6 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 from bs4 import BeautifulSoup
 from celery import current_task
-import whisper
 
 from app.workers.celery_app import celery_app
 from app.db.database import SessionLocal
@@ -22,8 +21,8 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 # Broadcastify credentials from environment
-#BROADCASTIFY_USERNAME = settings.BROADCASTIFY_USERNAME
-#BROADCASTIFY_PASSWORD = settings.BROADCASTIFY_PASSWORD
+# BROADCASTIFY_USERNAME = settings.BROADCASTIFY_USERNAME
+# BROADCASTIFY_PASSWORD = settings.BROADCASTIFY_PASSWORD
 BROADCASTIFY_USERNAME = "chris@waitingforthefuture.org"
 BROADCASTIFY_PASSWORD = "qjt4KRC_mem4rqu8brg"
 logger.info(f"Using {BROADCASTIFY_USERNAME} / {BROADCASTIFY_PASSWORD}")
@@ -294,7 +293,6 @@ def download_broadcastify_archives(
         raise exc
     finally:
         session.close()
-
 
 
 # REMOVED cleanup_old_radio_archives task - we want to keep all radio archives permanently

@@ -19,7 +19,9 @@ from typing import List, Tuple
 import time
 
 # Database connection
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432/phoenix_helicopters")
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql://postgres:postgres@db:5432/phoenix_helicopters"
+)
 
 # Phoenix area elevation data (feet above sea level)
 # Based on USGS topographical data for Phoenix metro area
@@ -39,6 +41,7 @@ PHOENIX_ELEVATION_MAP = {
     # Sky Harbor Airport: ~1,135 ft
     (33.4343, -112.0117): 1135,
 }
+
 
 def get_elevation_from_coordinates(lat: float, lon: float) -> float:
     """
@@ -70,6 +73,7 @@ def get_elevation_from_coordinates(lat: float, lon: float) -> float:
     # Return weighted average
     return round(weighted_elevation / total_weight) if total_weight > 0 else 1100
 
+
 def update_flight_elevations(flight_id: int):
     """Update ground elevations for all positions in a flight."""
 
@@ -78,13 +82,15 @@ def update_flight_elevations(flight_id: int):
     with engine.begin() as conn:
         # Get all positions for the flight
         result = conn.execute(
-            text("""
+            text(
+                """
                 SELECT id, latitude, longitude, altitude_feet
                 FROM flight_positions
                 WHERE flight_log_id = :flight_id
                 ORDER BY timestamp
-            """),
-            {"flight_id": flight_id}
+            """
+            ),
+            {"flight_id": flight_id},
         )
 
         positions = result.fetchall()
@@ -94,50 +100,62 @@ def update_flight_elevations(flight_id: int):
         updates = []
         for pos in positions:
             ground_elev = get_elevation_from_coordinates(pos.latitude, pos.longitude)
-            agl_altitude = max(0, pos.altitude_feet - ground_elev) if pos.altitude_feet else None
+            agl_altitude = (
+                max(0, pos.altitude_feet - ground_elev) if pos.altitude_feet else None
+            )
 
-            updates.append({
-                "id": pos.id,
-                "ground_elevation": ground_elev,
-                "agl_altitude": agl_altitude
-            })
+            updates.append(
+                {
+                    "id": pos.id,
+                    "ground_elevation": ground_elev,
+                    "agl_altitude": agl_altitude,
+                }
+            )
 
         # Update in batches of 100
         batch_size = 100
         for i in range(0, len(updates), batch_size):
-            batch = updates[i:i + batch_size]
+            batch = updates[i : i + batch_size]
 
             # Build case statements for batch update
-            ground_cases = " ".join([
-                f"WHEN {u['id']} THEN {u['ground_elevation']}"
-                for u in batch
-            ])
+            ground_cases = " ".join(
+                [f"WHEN {u['id']} THEN {u['ground_elevation']}" for u in batch]
+            )
 
-            agl_cases = " ".join([
-                f"WHEN {u['id']} THEN {u['agl_altitude']}" if u['agl_altitude'] is not None else f"WHEN {u['id']} THEN NULL::INTEGER"
-                for u in batch
-            ])
+            agl_cases = " ".join(
+                [
+                    f"WHEN {u['id']} THEN {u['agl_altitude']}"
+                    if u["agl_altitude"] is not None
+                    else f"WHEN {u['id']} THEN NULL::INTEGER"
+                    for u in batch
+                ]
+            )
 
-            ids = ",".join([str(u['id']) for u in batch])
+            ids = ",".join([str(u["id"]) for u in batch])
 
             conn.execute(
-                text(f"""
+                text(
+                    f"""
                     UPDATE flight_positions
                     SET
                         ground_elevation_feet = CASE id {ground_cases} END,
                         altitude_agl_feet = CASE id {agl_cases} END
                     WHERE id IN ({ids})
-                """)
+                """
+                )
             )
 
             if i % 1000 == 0:
-                print(f"Updated {min(i + batch_size, len(updates))}/{len(updates)} positions...")
+                print(
+                    f"Updated {min(i + batch_size, len(updates))}/{len(updates)} positions..."
+                )
 
         print(f"✓ Updated all {len(positions)} positions with elevation data")
 
         # Update flight summary with AGL statistics
         conn.execute(
-            text("""
+            text(
+                """
                 UPDATE flight_logs
                 SET
                     max_altitude_agl_feet = (
@@ -158,11 +176,13 @@ def update_flight_elevations(flight_id: int):
                         AND altitude_agl_feet > 0
                     )
                 WHERE id = :flight_id
-            """),
-            {"flight_id": flight_id}
+            """
+            ),
+            {"flight_id": flight_id},
         )
 
         print("✓ Updated flight summary with AGL statistics")
+
 
 def verify_update(flight_id: int):
     """Verify the elevation update."""
@@ -171,7 +191,8 @@ def verify_update(flight_id: int):
 
     with engine.connect() as conn:
         result = conn.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) as total_positions,
                     COUNT(ground_elevation_feet) as positions_with_elevation,
@@ -183,8 +204,9 @@ def verify_update(flight_id: int):
                     AVG(altitude_agl_feet) as avg_agl
                 FROM flight_positions
                 WHERE flight_log_id = :flight_id
-            """),
-            {"flight_id": flight_id}
+            """
+            ),
+            {"flight_id": flight_id},
         )
 
         stats = result.fetchone()
@@ -192,13 +214,17 @@ def verify_update(flight_id: int):
         print("\n📊 Elevation Update Statistics:")
         print(f"  Total positions: {stats.total_positions}")
         print(f"  Positions with elevation: {stats.positions_with_elevation}")
-        print(f"  Ground elevation range: {stats.min_ground_elev:.0f} - {stats.max_ground_elev:.0f} ft")
+        print(
+            f"  Ground elevation range: {stats.min_ground_elev:.0f} - {stats.max_ground_elev:.0f} ft"
+        )
         print(f"  Average ground elevation: {stats.avg_ground_elev:.0f} ft")
         print(f"  AGL altitude range: {stats.min_agl:.0f} - {stats.max_agl:.0f} ft")
         print(f"  Average AGL altitude: {stats.avg_agl:.0f} ft")
 
+
 if __name__ == "__main__":
     import sys
+
     flight_id = int(sys.argv[1]) if len(sys.argv) > 1 else 3979
     print(f"Updating ground elevation data for flight {flight_id}...")
     print("Using Phoenix topographical elevation model")

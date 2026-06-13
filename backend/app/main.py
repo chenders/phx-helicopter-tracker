@@ -16,10 +16,10 @@ from app.services.websocket_manager import WebSocketManager
 
 # Initialize logging
 setup_logging(
-    log_level=settings.LOG_LEVEL if hasattr(settings, 'LOG_LEVEL') else "INFO",
+    log_level=settings.LOG_LEVEL if hasattr(settings, "LOG_LEVEL") else "INFO",
     log_to_file=True,
     log_to_console=True,
-    json_format=False
+    json_format=False,
 )
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,7 @@ app = FastAPI(
 
 logger.info("FastAPI application initialized")
 
+
 # Middleware to handle proxy headers and preserve HTTPS
 @app.middleware("http")
 async def proxy_headers_middleware(request, call_next):
@@ -51,10 +52,12 @@ async def proxy_headers_middleware(request, call_next):
     response = await call_next(request)
     return response
 
+
 # Request logging middleware
 @app.middleware("http")
 async def logging_middleware(request, call_next):
     import time
+
     start_time = time.time()
 
     # Log request
@@ -72,6 +75,7 @@ async def logging_middleware(request, call_next):
     )
 
     return response
+
 
 # CORS middleware
 app.add_middleware(

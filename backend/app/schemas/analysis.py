@@ -214,4 +214,6 @@ class RealTimeAlert(BaseModel):
     timestamp: Optional[str] = Field(None, description="Alert timestamp ISO format")
     active: bool = Field(default=True, description="Is alert still active")
     flight_id: Optional[int] = Field(None, description="Associated flight log ID")
-    surveillance_likelihood: Optional[float] = Field(None, description="Surveillance likelihood 0-1")
+    surveillance_likelihood: Optional[float] = Field(
+        None, description="Surveillance likelihood 0-1"
+    )

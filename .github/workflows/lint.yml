@@ -1,0 +1,27 @@
+name: Lint
+
+on:
+  push:
+    branches: [main, dev, develop]
+  pull_request:
+
+jobs:
+  ruff-bug-gate:
+    name: Ruff bug + async gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend # so ruff reads backend/pyproject.toml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install ruff
+        run: pip install ruff==0.1.5 # keep in sync with pyproject ruff pin
+      # Fails the build on real bugs: logic errors (undefined names, redefinitions,
+      # duplicate dict keys, bad string formatting) and ASYNC sync/async mismatches
+      # (blocking open/sleep/subprocess in async fns). Excludes F401/F841 (noise)
+      # and style rules. Migrations/__init__ handled via pyproject config.
+      - name: Ruff bug + async gate
+        run: ruff check . --select F,ASYNC --ignore F401,F841 --output-format=github

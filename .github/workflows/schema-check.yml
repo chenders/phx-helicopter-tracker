@@ -18,6 +18,8 @@ jobs:
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -35,7 +37,10 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          pip install -r requirements.txt
+          # Skip transcription-only whisper packages (they pull torch/CUDA, ~2.5 min).
+          # The API/tests/migrations don't transcribe; the worker installs them.
+          grep -ivE 'openai-whisper|faster-whisper' requirements.txt > "$RUNNER_TEMP/reqs-ci.txt"
+          pip install -r "$RUNNER_TEMP/reqs-ci.txt"
 
       - name: Run Alembic migrations
         env:

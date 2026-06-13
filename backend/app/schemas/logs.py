@@ -10,6 +10,7 @@ from app.models.system_logs import LogLevel, LogCategory
 
 class SystemLogResponse(BaseModel):
     """Response model for system log entry"""
+
     id: int
     level: LogLevel
     category: LogCategory
@@ -42,12 +43,13 @@ class SystemLogResponse(BaseModel):
             error_type=obj.error_type,
             error_details=obj.error_details,
             context_metadata=obj.context_metadata,
-            created_at=obj.created_at
+            created_at=obj.created_at,
         )
 
 
 class PaginatedLogsResponse(BaseModel):
     """Paginated response for system logs"""
+
     logs: List[SystemLogResponse]
     total: int = Field(description="Total number of logs matching filters")
     page: int = Field(description="Current page number")
@@ -59,6 +61,7 @@ class PaginatedLogsResponse(BaseModel):
 
 class LogStatsResponse(BaseModel):
     """Statistics about system logs"""
+
     period_days: int
     levels: dict[str, int]
     categories: dict[str, int]

@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.workers.celery_app import celery_app
 
+
 def trigger_download(days_back: int = 730):
     """
     Trigger the full historical download task
@@ -31,11 +32,10 @@ def trigger_download(days_back: int = 730):
 
     # Send the task to Celery
     task = celery_app.send_task(
-        'download_full_historical_data',
-        kwargs={'days_back': days_back}
+        "download_full_historical_data", kwargs={"days_back": days_back}
     )
 
-    print(f"✓ Task submitted successfully!")
+    print("✓ Task submitted successfully!")
     print(f"  Task ID: {task.id}")
     print(f"  Status: {task.state}")
     print("")
@@ -50,15 +50,16 @@ def trigger_download(days_back: int = 730):
 
     return task
 
+
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description='Download full historical flight data')
+    parser = argparse.ArgumentParser(description="Download full historical flight data")
     parser.add_argument(
-        '--days',
+        "--days",
         type=int,
         default=730,
-        help='Number of days to download (default: 730 = 2 years, max: 730)'
+        help="Number of days to download (default: 730 = 2 years, max: 730)",
     )
 
     args = parser.parse_args()

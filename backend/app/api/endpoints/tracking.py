@@ -234,6 +234,7 @@ async def get_tracking_statistics(*, db: Session = Depends(get_db)) -> TrackingS
 
     # Get today's flights (using Phoenix time zone since that's where operations occur)
     from zoneinfo import ZoneInfo
+
     phoenix_tz = ZoneInfo("America/Phoenix")
     now_phoenix = datetime.now(phoenix_tz)
     today_start_phoenix = now_phoenix.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -263,10 +264,15 @@ async def get_tracking_statistics(*, db: Session = Depends(get_db)) -> TrackingS
 
     # Get pattern alerts for today (using Phoenix time)
     from app.models.abnormal_patterns import AbnormalPattern
-    todays_patterns = db.query(AbnormalPattern).filter(
-        AbnormalPattern.detected_at >= today_start,
-        AbnormalPattern.pattern_type != "normal"  # Exclude normal patterns
-    ).all()
+
+    todays_patterns = (
+        db.query(AbnormalPattern)
+        .filter(
+            AbnormalPattern.detected_at >= today_start,
+            AbnormalPattern.pattern_type != "normal",  # Exclude normal patterns
+        )
+        .all()
+    )
     pattern_alerts_count = len(todays_patterns)
 
     # Get LIVE tracking data to count currently active flights

@@ -8,9 +8,16 @@ from pathlib import Path
 from datetime import datetime
 import json
 
-# Create logs directory if it doesn't exist
-LOG_DIR = Path("/app/logs")
-LOG_DIR.mkdir(exist_ok=True)
+import tempfile
+
+# Logs dir, overridable via LOG_DIR env. Falls back to a temp dir when the
+# default /app/logs (a Docker path) is not creatable, e.g. on CI runners.
+LOG_DIR = Path(os.getenv("LOG_DIR", "/app/logs"))
+try:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    LOG_DIR = Path(tempfile.gettempdir()) / "phx-helicopter-logs"
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class JSONFormatter(logging.Formatter):
@@ -42,7 +49,7 @@ def setup_logging(
     log_level: str = "INFO",
     log_to_file: bool = True,
     log_to_console: bool = True,
-    json_format: bool = False
+    json_format: bool = False,
 ):
     """
     Configure application-wide logging
@@ -65,8 +72,8 @@ def setup_logging(
         formatter = JSONFormatter()
     else:
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
+            "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
 
     # Console handler
@@ -81,9 +88,7 @@ def setup_logging(
         # Main application log with rotation
         app_log_file = LOG_DIR / "app.log"
         app_file_handler = logging.handlers.RotatingFileHandler(
-            app_log_file,
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5
+            app_log_file, maxBytes=10 * 1024 * 1024, backupCount=5  # 10MB
         )
         app_file_handler.setFormatter(formatter)
         app_file_handler.setLevel(logging.DEBUG)
@@ -92,9 +97,7 @@ def setup_logging(
         # Error log file
         error_log_file = LOG_DIR / "error.log"
         error_file_handler = logging.handlers.RotatingFileHandler(
-            error_log_file,
-            maxBytes=10 * 1024 * 1024,  # 10MB
-            backupCount=5
+            error_log_file, maxBytes=10 * 1024 * 1024, backupCount=5  # 10MB
         )
         error_file_handler.setFormatter(formatter)
         error_file_handler.setLevel(logging.ERROR)
@@ -110,7 +113,9 @@ def setup_logging(
     logging.getLogger("celery").setLevel(logging.INFO)
 
     # Log startup message
-    root_logger.info(f"Logging initialized - Level: {log_level}, File: {log_to_file}, Console: {log_to_console}")
+    root_logger.info(
+        f"Logging initialized - Level: {log_level}, File: {log_to_file}, Console: {log_to_console}"
+    )
 
 
 def setup_service_loggers(formatter):
@@ -119,9 +124,7 @@ def setup_service_loggers(formatter):
     # FR24 API logger
     fr24_logger = logging.getLogger("app.services.flightradar24")
     fr24_handler = logging.handlers.RotatingFileHandler(
-        LOG_DIR / "fr24_api.log",
-        maxBytes=5 * 1024 * 1024,  # 5MB
-        backupCount=3
+        LOG_DIR / "fr24_api.log", maxBytes=5 * 1024 * 1024, backupCount=3  # 5MB
     )
     fr24_handler.setFormatter(formatter)
     fr24_logger.addHandler(fr24_handler)
@@ -130,9 +133,7 @@ def setup_service_loggers(formatter):
     # Celery tasks logger
     celery_logger = logging.getLogger("app.workers")
     celery_handler = logging.handlers.RotatingFileHandler(
-        LOG_DIR / "celery_tasks.log",
-        maxBytes=10 * 1024 * 1024,  # 10MB
-        backupCount=3
+        LOG_DIR / "celery_tasks.log", maxBytes=10 * 1024 * 1024, backupCount=3  # 10MB
     )
     celery_handler.setFormatter(formatter)
     celery_logger.addHandler(celery_handler)
@@ -141,9 +142,7 @@ def setup_service_loggers(formatter):
     # Database operations logger
     db_logger = logging.getLogger("app.crud")
     db_handler = logging.handlers.RotatingFileHandler(
-        LOG_DIR / "database.log",
-        maxBytes=5 * 1024 * 1024,  # 5MB
-        backupCount=3
+        LOG_DIR / "database.log", maxBytes=5 * 1024 * 1024, backupCount=3  # 5MB
     )
     db_handler.setFormatter(formatter)
     db_logger.addHandler(db_handler)
@@ -152,9 +151,7 @@ def setup_service_loggers(formatter):
     # API endpoints logger
     api_logger = logging.getLogger("app.api")
     api_handler = logging.handlers.RotatingFileHandler(
-        LOG_DIR / "api.log",
-        maxBytes=10 * 1024 * 1024,  # 10MB
-        backupCount=3
+        LOG_DIR / "api.log", maxBytes=10 * 1024 * 1024, backupCount=3  # 10MB
     )
     api_handler.setFormatter(formatter)
     api_logger.addHandler(api_handler)
@@ -178,9 +175,7 @@ def log_with_context(logger: logging.Logger, level: str, message: str, **context
         **context: Additional context to include in the log
     """
     record = logger.makeRecord(
-        logger.name,
-        getattr(logging, level.upper()),
-        None, None, message, None, None
+        logger.name, getattr(logging, level.upper()), None, None, message, None, None
     )
     record.extra_fields = context
     logger.handle(record)

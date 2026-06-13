@@ -37,7 +37,7 @@ class SystemLoggerService:
         error_type: Optional[str] = None,
         error_details: Optional[str] = None,
         context_metadata: Optional[Dict[str, Any]] = None,
-        db: Optional[Session] = None
+        db: Optional[Session] = None,
     ) -> Optional[SystemLog]:
         """
         Log a system event
@@ -77,8 +77,10 @@ class SystemLoggerService:
                 flight_id=flight_id,
                 registration=registration,
                 error_type=error_type,
-                error_details=error_details[:10000] if error_details else None,  # Truncate very long errors
-                context_metadata=metadata_str
+                error_details=error_details[:10000]
+                if error_details
+                else None,  # Truncate very long errors
+                context_metadata=metadata_str,
             )
 
             db.add(log_entry)
@@ -101,7 +103,13 @@ class SystemLoggerService:
             if close_db and db:
                 db.close()
 
-    def _log_to_python(self, level: LogLevel, category: LogCategory, message: str, context_metadata: Optional[Dict] = None):
+    def _log_to_python(
+        self,
+        level: LogLevel,
+        category: LogCategory,
+        message: str,
+        context_metadata: Optional[Dict] = None,
+    ):
         """Log to Python logger as backup"""
         log_message = f"[{category.value}] {message}"
         if context_metadata:
@@ -123,7 +131,7 @@ class SystemLoggerService:
         category: LogCategory,
         message: str,
         exception: Optional[Exception] = None,
-        **kwargs
+        **kwargs,
     ):
         """
         Convenience method for logging errors
@@ -147,23 +155,23 @@ class SystemLoggerService:
             message=message,
             error_type=error_type,
             error_details=error_details,
-            **kwargs
+            **kwargs,
         )
 
     def log_warning(self, category: LogCategory, message: str, **kwargs):
         """Convenience method for logging warnings"""
-        return self.log(level=LogLevel.WARNING, category=category, message=message, **kwargs)
+        return self.log(
+            level=LogLevel.WARNING, category=category, message=message, **kwargs
+        )
 
     def log_info(self, category: LogCategory, message: str, **kwargs):
         """Convenience method for logging info"""
-        return self.log(level=LogLevel.INFO, category=category, message=message, **kwargs)
+        return self.log(
+            level=LogLevel.INFO, category=category, message=message, **kwargs
+        )
 
     def log_anomaly(
-        self,
-        message: str,
-        anomaly_type: str,
-        details: Dict[str, Any],
-        **kwargs
+        self, message: str, anomaly_type: str, details: Dict[str, Any], **kwargs
     ):
         """
         Log detected anomalies
@@ -177,7 +185,7 @@ class SystemLoggerService:
         context_metadata = {
             "anomaly_type": anomaly_type,
             "details": details,
-            "detected_at": datetime.now(timezone.utc).isoformat()
+            "detected_at": datetime.now(timezone.utc).isoformat(),
         }
 
         return self.log(
@@ -185,7 +193,7 @@ class SystemLoggerService:
             category=LogCategory.ANOMALY,
             message=message,
             context_metadata=context_metadata,
-            **kwargs
+            **kwargs,
         )
 
     def log_fr24_error(
@@ -194,12 +202,12 @@ class SystemLoggerService:
         flight_id: Optional[str] = None,
         registration: Optional[str] = None,
         error_code: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ):
         """Log FlightRadar24 API errors"""
-        context_metadata = kwargs.pop('context_metadata', {})
+        context_metadata = kwargs.pop("context_metadata", {})
         if error_code:
-            context_metadata['error_code'] = error_code
+            context_metadata["error_code"] = error_code
 
         return self.log_error(
             category=LogCategory.FR24_API,
@@ -207,7 +215,7 @@ class SystemLoggerService:
             flight_id=flight_id,
             registration=registration,
             context_metadata=context_metadata,
-            **kwargs
+            **kwargs,
         )
 
     def log_download_error(
@@ -215,7 +223,7 @@ class SystemLoggerService:
         message: str,
         flight_id: Optional[str] = None,
         registration: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ):
         """Log flight download errors"""
         return self.log_error(
@@ -223,24 +231,19 @@ class SystemLoggerService:
             message=message,
             flight_id=flight_id,
             registration=registration,
-            **kwargs
+            **kwargs,
         )
 
-    def log_parsing_error(
-        self,
-        message: str,
-        data_type: str,
-        **kwargs
-    ):
+    def log_parsing_error(self, message: str, data_type: str, **kwargs):
         """Log data parsing errors"""
-        context_metadata = kwargs.pop('context_metadata', {})
-        context_metadata['data_type'] = data_type
+        context_metadata = kwargs.pop("context_metadata", {})
+        context_metadata["data_type"] = data_type
 
         return self.log_error(
             category=LogCategory.DATA_PARSING,
             message=message,
             context_metadata=context_metadata,
-            **kwargs
+            **kwargs,
         )
 
     def log_celery_task_error(
@@ -249,11 +252,11 @@ class SystemLoggerService:
         task_id: str,
         message: str,
         exception: Optional[Exception] = None,
-        **kwargs
+        **kwargs,
     ):
         """Log Celery task errors"""
-        context_metadata = kwargs.pop('context_metadata', {})
-        context_metadata['task_name'] = task_name
+        context_metadata = kwargs.pop("context_metadata", {})
+        context_metadata["task_name"] = task_name
 
         return self.log_error(
             category=LogCategory.CELERY_TASK,
@@ -262,21 +265,17 @@ class SystemLoggerService:
             exception=exception,
             context_metadata=context_metadata,
             source=task_name,
-            **kwargs
+            **kwargs,
         )
 
     def log_integrity_issue(
-        self,
-        message: str,
-        issue_type: str,
-        affected_data: Dict[str, Any],
-        **kwargs
+        self, message: str, issue_type: str, affected_data: Dict[str, Any], **kwargs
     ):
         """Log data integrity issues"""
         context_metadata = {
             "issue_type": issue_type,
             "affected_data": affected_data,
-            "detected_at": datetime.now(timezone.utc).isoformat()
+            "detected_at": datetime.now(timezone.utc).isoformat(),
         }
 
         return self.log(
@@ -284,7 +283,7 @@ class SystemLoggerService:
             category=LogCategory.DATA_INTEGRITY,
             message=message,
             context_metadata=context_metadata,
-            **kwargs
+            **kwargs,
         )
 
     @contextmanager
@@ -301,9 +300,7 @@ class SystemLoggerService:
 
         # Log start
         self.log_info(
-            category=category,
-            message=f"Starting: {operation}",
-            **context_kwargs
+            category=category, message=f"Starting: {operation}", **context_kwargs
         )
 
         try:
@@ -314,7 +311,7 @@ class SystemLoggerService:
                 category=category,
                 message=f"Completed: {operation} (took {duration:.2f}s)",
                 context_metadata={"duration_seconds": duration},
-                **context_kwargs
+                **context_kwargs,
             )
         except Exception as e:
             # Log failure
@@ -324,7 +321,7 @@ class SystemLoggerService:
                 message=f"Failed: {operation} (after {duration:.2f}s)",
                 exception=e,
                 context_metadata={"duration_seconds": duration},
-                **context_kwargs
+                **context_kwargs,
             )
             raise
 

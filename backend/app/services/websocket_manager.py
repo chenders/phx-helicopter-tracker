@@ -48,6 +48,21 @@ class WebSocketManager:
         for conn in disconnected:
             self.disconnect(conn)
 
+    async def broadcast_to_area(self, area: dict, message: dict):
+        """Send a message only to websockets subscribed to a specific area."""
+        area_key = (
+            f"{area['lat_min']},{area['lat_max']},{area['lon_min']},{area['lon_max']}"
+        )
+        subscribers = self.area_subscriptions.get(area_key, set())
+        disconnected = []
+        for subscriber in subscribers.copy():
+            try:
+                await subscriber.send_text(json.dumps(message))
+            except Exception:
+                disconnected.append(subscriber)
+        for conn in disconnected:
+            subscribers.discard(conn)
+
     async def subscribe_to_area(self, websocket: WebSocket, area: dict):
         """Subscribe a websocket to helicopter activity in a specific area"""
         area_key = (

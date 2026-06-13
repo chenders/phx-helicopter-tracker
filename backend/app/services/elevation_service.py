@@ -26,7 +26,7 @@ class ElevationService:
         "min_lat": 33.2,
         "max_lat": 33.9,
         "min_lon": -112.4,
-        "max_lon": -111.6
+        "max_lon": -111.6,
     }
 
     # Default elevation for Phoenix area if API fails (feet)
@@ -52,9 +52,7 @@ class ElevationService:
 
         if not self.redis_client:
             self.redis_client = await redis.from_url(
-                f"redis://redis:6379",
-                encoding="utf-8",
-                decode_responses=True
+                "redis://redis:6379", encoding="utf-8", decode_responses=True
             )
         if not self.session or self.session.closed:
             self.session = aiohttp.ClientSession()
@@ -107,22 +105,26 @@ class ElevationService:
 
             # Cache the result
             await self.redis_client.setex(
-                cache_key,
-                int(self.cache_ttl.total_seconds()),
-                elevation_feet
+                cache_key, int(self.cache_ttl.total_seconds()), elevation_feet
             )
 
-            logger.debug(f"Fetched elevation {elevation_feet}ft for {latitude}, {longitude}")
+            logger.debug(
+                f"Fetched elevation {elevation_feet}ft for {latitude}, {longitude}"
+            )
             return elevation_feet
 
         # If in Phoenix area, use default elevation
         if self._is_in_phoenix_area(latitude, longitude):
-            logger.warning(f"Using default Phoenix elevation for {latitude}, {longitude}")
+            logger.warning(
+                f"Using default Phoenix elevation for {latitude}, {longitude}"
+            )
             return self.DEFAULT_PHOENIX_ELEVATION
 
         return None
 
-    async def get_elevations_batch(self, coordinates: List[Tuple[float, float]]) -> Dict[Tuple[float, float], Optional[int]]:
+    async def get_elevations_batch(
+        self, coordinates: List[Tuple[float, float]]
+    ) -> Dict[Tuple[float, float], Optional[int]]:
         """
         Get elevations for multiple coordinates efficiently
         Returns dict mapping (lat, lon) to elevation in feet
@@ -146,7 +148,7 @@ class ElevationService:
             # Open-Elevation API supports batch requests
             batch_size = 100  # API limit
             for i in range(0, len(uncached_coords), batch_size):
-                batch = uncached_coords[i:i+batch_size]
+                batch = uncached_coords[i : i + batch_size]
                 elevations = await self._fetch_elevations_batch_from_api(batch)
 
                 for (lat, lon), elev_m in elevations.items():
@@ -157,9 +159,7 @@ class ElevationService:
                         # Cache result
                         cache_key = self._get_cache_key(lat, lon)
                         await self.redis_client.setex(
-                            cache_key,
-                            int(self.cache_ttl.total_seconds()),
-                            elev_ft
+                            cache_key, int(self.cache_ttl.total_seconds()), elev_ft
                         )
                     elif self._is_in_phoenix_area(lat, lon):
                         results[(lat, lon)] = self.DEFAULT_PHOENIX_ELEVATION
@@ -168,8 +168,12 @@ class ElevationService:
 
         return results
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    async def _fetch_elevation_from_api(self, latitude: float, longitude: float) -> Optional[float]:
+    @retry(
+        stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10)
+    )
+    async def _fetch_elevation_from_api(
+        self, latitude: float, longitude: float
+    ) -> Optional[float]:
         """
         Fetch elevation from Open-Elevation API
         Returns elevation in meters or None if failed
@@ -177,14 +181,7 @@ class ElevationService:
         url = "https://api.open-elevation.com/api/v1/lookup"
 
         try:
-            data = {
-                "locations": [
-                    {
-                        "latitude": latitude,
-                        "longitude": longitude
-                    }
-                ]
-            }
+            data = {"locations": [{"latitude": latitude, "longitude": longitude}]}
 
             async with self.session.post(url, json=data, timeout=5) as response:
                 if response.status == 200:
@@ -198,7 +195,9 @@ class ElevationService:
 
         return None
 
-    async def _fetch_elevations_batch_from_api(self, coordinates: List[Tuple[float, float]]) -> Dict[Tuple[float, float], Optional[float]]:
+    async def _fetch_elevations_batch_from_api(
+        self, coordinates: List[Tuple[float, float]]
+    ) -> Dict[Tuple[float, float], Optional[float]]:
         """
         Fetch elevations for multiple coordinates from API
         Returns dict mapping coordinates to elevation in meters
@@ -209,8 +208,7 @@ class ElevationService:
         try:
             data = {
                 "locations": [
-                    {"latitude": lat, "longitude": lon}
-                    for lat, lon in coordinates
+                    {"latitude": lat, "longitude": lon} for lat, lon in coordinates
                 ]
             }
 
@@ -223,7 +221,9 @@ class ElevationService:
                                 elevation = api_result["results"][i].get("elevation")
                                 results[(lat, lon)] = elevation
                 else:
-                    logger.error(f"Elevation API batch returned status {response.status}")
+                    logger.error(
+                        f"Elevation API batch returned status {response.status}"
+                    )
         except Exception as e:
             logger.error(f"Failed to fetch batch elevations: {e}")
 
@@ -237,11 +237,15 @@ class ElevationService:
     def _is_in_phoenix_area(self, latitude: float, longitude: float) -> bool:
         """Check if coordinates are within Phoenix area bounds"""
         return (
-            self.PHOENIX_BOUNDS["min_lat"] <= latitude <= self.PHOENIX_BOUNDS["max_lat"] and
-            self.PHOENIX_BOUNDS["min_lon"] <= longitude <= self.PHOENIX_BOUNDS["max_lon"]
+            self.PHOENIX_BOUNDS["min_lat"] <= latitude <= self.PHOENIX_BOUNDS["max_lat"]
+            and self.PHOENIX_BOUNDS["min_lon"]
+            <= longitude
+            <= self.PHOENIX_BOUNDS["max_lon"]
         )
 
-    def calculate_agl(self, msl_altitude_feet: Optional[int], ground_elevation_feet: Optional[int]) -> Optional[int]:
+    def calculate_agl(
+        self, msl_altitude_feet: Optional[int], ground_elevation_feet: Optional[int]
+    ) -> Optional[int]:
         """
         Calculate Above Ground Level altitude
 
@@ -259,7 +263,9 @@ class ElevationService:
 
         # Sanity check - helicopters shouldn't have negative AGL
         if agl < 0:
-            logger.warning(f"Calculated negative AGL: MSL={msl_altitude_feet}, Ground={ground_elevation_feet}")
+            logger.warning(
+                f"Calculated negative AGL: MSL={msl_altitude_feet}, Ground={ground_elevation_feet}"
+            )
             return 0
 
         return agl

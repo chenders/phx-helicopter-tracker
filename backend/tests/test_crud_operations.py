@@ -10,7 +10,7 @@ from app.crud.flights import flight_log_crud, flight_position_crud
 from app.schemas.aircraft import AircraftCreate, AircraftUpdate
 from app.schemas.flights import FlightLogCreate, FlightPositionCreate, FlightLogUpdate
 from app.models.aircraft import Aircraft
-from app.models.flight_logs import FlightLog, FlightPosition
+from app.models import FlightLog, FlightPosition
 
 
 class TestAircraftCRUD:
@@ -104,7 +104,7 @@ class TestAircraftCRUD:
 
         aircraft_crud.update_last_seen(db_session, aircraft_id=sample_aircraft.id)
 
-        db.refresh(sample_aircraft)
+        db_session.refresh(sample_aircraft)
         assert sample_aircraft.last_seen is not None
         assert sample_aircraft.last_seen > original_time if original_time else True
 
@@ -133,7 +133,7 @@ class TestFlightLogCRUD:
     ):
         """Test getting flight by flight ID"""
         flight = flight_log_crud.get_by_flight_id(
-            db, flight_id=sample_flight_log.flight_id
+            db_session, flight_id=sample_flight_log.flight_id
         )
 
         assert flight is not None
@@ -144,7 +144,7 @@ class TestFlightLogCRUD:
     ):
         """Test getting flights for an aircraft"""
         flights = flight_log_crud.get_by_aircraft(
-            db, aircraft_id=sample_flight_log.aircraft_id
+            db_session, aircraft_id=sample_flight_log.aircraft_id
         )
 
         assert len(flights) > 0
@@ -204,7 +204,7 @@ class TestFlightLogCRUD:
 
         # Get high surveillance flights
         surveillance_flights = flight_log_crud.get_surveillance_flights(
-            db, min_surveillance_score=0.7
+            db_session, min_surveillance_score=0.7
         )
 
         assert high_surveillance.id in [f.id for f in surveillance_flights]
@@ -240,7 +240,7 @@ class TestFlightLogCRUD:
         )
 
         summary = flight_log_crud.calculate_cost_summary(
-            db,
+            db_session,
             start_date=datetime.now(timezone.utc) - timedelta(days=1),
             end_date=datetime.now(timezone.utc),
         )
@@ -279,7 +279,7 @@ class TestFlightPositionCRUD:
     ):
         """Test getting positions for a flight"""
         positions = flight_position_crud.get_by_flight(
-            db, flight_log_id=sample_flight_with_positions.id
+            db_session, flight_log_id=sample_flight_with_positions.id
         )
 
         assert len(positions) > 0
@@ -324,7 +324,7 @@ class TestFlightPositionCRUD:
         )
 
         hovering = flight_position_crud.get_hovering_positions(
-            db, min_duration_seconds=30
+            db_session, min_duration_seconds=30
         )
 
         assert hover_pos.id in [p.id for p in hovering]
@@ -366,7 +366,7 @@ class TestFlightPositionCRUD:
         )
 
         low_altitude = flight_position_crud.get_low_altitude_positions(
-            db, max_altitude_feet=400
+            db_session, max_altitude_feet=400
         )
 
         assert low_pos.id in [p.id for p in low_altitude]

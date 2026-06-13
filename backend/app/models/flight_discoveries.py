@@ -16,7 +16,7 @@ class FlightDiscovery(Base):
     callsign = Column(String(10))
     aircraft_type = Column(String(10))
     hex_code = Column(String(10))
-    
+
     # Flight times
     departure_time = Column(DateTime(timezone=True), index=True)
     arrival_time = Column(DateTime(timezone=True))
@@ -25,14 +25,16 @@ class FlightDiscovery(Base):
     flight_duration_minutes = Column(Float)
     first_seen = Column(DateTime(timezone=True))
     last_seen = Column(DateTime(timezone=True))
-    
+
     # Discovery and download tracking
     discovered_at = Column(DateTime(timezone=True), server_default=func.now())
     track_downloaded = Column(Boolean, default=False, index=True)
     track_download_attempted_at = Column(DateTime(timezone=True))
     track_download_error = Column(Text)
     positions_count = Column(Integer, default=0)
-    
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

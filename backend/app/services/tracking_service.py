@@ -108,11 +108,7 @@ class UnifiedTrackingService:
                     is_active = await fr24_api_service.is_aircraft_active(
                         pos.registration
                     )
-                    if (
-                        not is_active
-                        and pos.ground_speed_knots
-                        and pos.ground_speed_knots < 5
-                    ):
+                    if not is_active and (pos.ground_speed_knots or 0) < 5:
                         continue
 
                 # Record activity for intelligent polling
@@ -194,39 +190,10 @@ class UnifiedTrackingService:
                     )
         except Exception as e:
             logger.error(f"FR24 failed for {registration}: {e}")
-
-            # Fallback to ADS-B
-            try:
-                async with adsb_service:
-                    position = await adsb_service.get_aircraft_by_registration(
-                        registration
-                    )
-
-                    if position:
-                        return LiveTrackingData(
-                            aircraft_registration=position.registration or registration,
-                            icao_code=position.icao,
-                            timestamp=position.timestamp,
-                            latitude=position.latitude,
-                            longitude=position.longitude,
-                            altitude_feet=position.altitude_feet,
-                            ground_speed_knots=position.ground_speed_knots,
-                            track_degrees=position.track_degrees,
-                            vertical_rate=position.vertical_rate,
-                            is_phoenix_pd=adsb_service.is_phoenix_pd_aircraft(
-                                position.registration
-                            ),
-                            data_source=TrackingSource.ADSB_EXCHANGE,
-                            is_hovering=position.ground_speed_knots
-                            and position.ground_speed_knots < 10,
-                            is_circling=False,
-                            over_residential=False,
-                            privacy_concern=adsb_service.is_likely_surveillance(
-                                position
-                            ),
-                        )
-            except Exception as e2:
-                logger.error(f"ADS-B also failed for {registration}: {e2}")
+            # NOTE: An ADS-B fallback was intended here but never implemented
+            # (no `adsb_service` exists), so the old code only ever raised and
+            # swallowed a NameError. Removed as dead code. Wire up a real ADS-B
+            # source here to restore the fallback; until then this returns None.
 
         return None
 
@@ -234,7 +201,9 @@ class UnifiedTrackingService:
         """Get status of all tracking services"""
         status = {
             "primary_source": self.primary_source.value,
-            "fallback_source": self.fallback_source.value,
+            "fallback_source": (
+                DataSource.CACHED.value if self.use_cache_on_failure else None
+            ),
             "services": {},
         }
 
@@ -246,12 +215,11 @@ class UnifiedTrackingService:
         except Exception as e:
             status["services"]["fr24_api"] = {"status": "error", "error": str(e)}
 
-        # Get ADS-B status
-        try:
-            adsb_status = adsb_service.get_service_status()
-            status["services"]["adsb_exchange"] = adsb_status
-        except Exception as e:
-            status["services"]["adsb_exchange"] = {"status": "error", "error": str(e)}
+        # Cache is the only fallback (no ADS-B service).
+        status["services"]["cache"] = {
+            "enabled": self.use_cache_on_failure,
+            "status": "not_implemented",
+        }
 
         return status
 

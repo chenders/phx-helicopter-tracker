@@ -28,8 +28,11 @@ jobs:
         run: |
           cd backend
           pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install black ruff
+          # Skip transcription-only whisper packages (they pull torch/CUDA, ~2.5 min).
+          # The API/tests/migrations don't transcribe; the worker installs them.
+          grep -ivE 'openai-whisper|faster-whisper' requirements.txt > "$RUNNER_TEMP/reqs-ci.txt"
+          pip install -r "$RUNNER_TEMP/reqs-ci.txt"
+          pip install black==23.10.1 ruff==0.1.5
 
       - name: Check code formatting with Black
         run: |
@@ -82,14 +85,22 @@ jobs:
         run: |
           cd backend
           pip install --upgrade pip
-          pip install -r requirements.txt
+          # Skip transcription-only whisper packages (they pull torch/CUDA, ~2.5 min).
+          # The API/tests/migrations don't transcribe; the worker installs them.
+          grep -ivE 'openai-whisper|faster-whisper' requirements.txt > "$RUNNER_TEMP/reqs-ci.txt"
+          pip install -r "$RUNNER_TEMP/reqs-ci.txt"
 
       - name: Run tests with pytest
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          # conftest.py reads TEST_DATABASE_URL (defaults to the docker port 5433)
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: test-secret-key-for-ci
           ENVIRONMENT: test
+          # Run FR24 in sandbox for tests (never production); a dummy key is enough.
+          FR24_API_ENVIRONMENT: sandbox
+          FR24_API_KEY_SANDBOX: test-sandbox-key
         run: |
           cd backend
           pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=xml
@@ -117,7 +128,10 @@ jobs:
         run: |
           cd backend
           pip install --upgrade pip
-          pip install -r requirements.txt
+          # Skip transcription-only whisper packages (they pull torch/CUDA, ~2.5 min).
+          # The API/tests/migrations don't transcribe; the worker installs them.
+          grep -ivE 'openai-whisper|faster-whisper' requirements.txt > "$RUNNER_TEMP/reqs-ci.txt"
+          pip install -r "$RUNNER_TEMP/reqs-ci.txt"
           pip install mypy
 
       - name: Type check with mypy

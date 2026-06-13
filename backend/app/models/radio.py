@@ -27,6 +27,7 @@ class RadioArchive(Base):
     Radio archive file metadata
     Represents a single MP3 file downloaded from Broadcastify
     """
+
     __tablename__ = "radio_archives"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -46,7 +47,9 @@ class RadioArchive(Base):
     duration_seconds = Column(Integer)
 
     # Download tracking
-    downloaded_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    downloaded_at = Column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
     download_source = Column(String(100))  # 'broadcastify', 'manual', etc.
 
     # Audio metadata
@@ -63,7 +66,12 @@ class RadioArchive(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    transcription = relationship("RadioTranscription", back_populates="archive", uselist=False, cascade="all, delete-orphan")
+    transcription = relationship(
+        "RadioTranscription",
+        back_populates="archive",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
     # Indexes for efficient querying
     __table_args__ = (
@@ -81,17 +89,26 @@ class RadioTranscription(Base):
     Full transcription of a radio archive
     Stores the complete transcription with model metadata
     """
+
     __tablename__ = "radio_transcriptions"
 
     id = Column(Integer, primary_key=True, index=True)
-    archive_id = Column(Integer, ForeignKey("radio_archives.id"), unique=True, nullable=False, index=True)
+    archive_id = Column(
+        Integer,
+        ForeignKey("radio_archives.id"),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
 
     # Transcription content
     full_text = Column(Text, nullable=False)  # Complete transcription
     language = Column(String(10), default="en")  # Detected language
 
     # Whisper model metadata
-    model_name = Column(String(50), index=True)  # 'tiny', 'base', 'small', 'medium', 'large'
+    model_name = Column(
+        String(50), index=True
+    )  # 'tiny', 'base', 'small', 'medium', 'large'
     model_version = Column(String(50))
 
     # Transcription quality metrics
@@ -99,7 +116,9 @@ class RadioTranscription(Base):
     no_speech_probability = Column(Float)  # Probability of silence/no speech
 
     # Processing metadata
-    transcribed_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    transcribed_at = Column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
     transcription_time_seconds = Column(Float)  # Time taken to transcribe
     worker_hostname = Column(String(100))  # Which worker processed this
 
@@ -117,12 +136,20 @@ class RadioTranscription(Base):
 
     # Relationships
     archive = relationship("RadioArchive", back_populates="transcription")
-    segments = relationship("RadioSegment", back_populates="transcription", cascade="all, delete-orphan")
-    keywords = relationship("RadioKeyword", back_populates="transcription", cascade="all, delete-orphan")
+    segments = relationship(
+        "RadioSegment", back_populates="transcription", cascade="all, delete-orphan"
+    )
+    keywords = relationship(
+        "RadioKeyword", back_populates="transcription", cascade="all, delete-orphan"
+    )
 
     # Indexes
     __table_args__ = (
-        Index("idx_radio_transcriptions_quality", "confidence_score", "no_speech_probability"),
+        Index(
+            "idx_radio_transcriptions_quality",
+            "confidence_score",
+            "no_speech_probability",
+        ),
         Index("idx_radio_transcriptions_model", "model_name", "transcribed_at"),
     )
 
@@ -135,10 +162,13 @@ class RadioSegment(Base):
     Individual timestamped segments from transcription
     Allows for fine-grained analysis and correlation with flight data
     """
+
     __tablename__ = "radio_segments"
 
     id = Column(Integer, primary_key=True, index=True)
-    transcription_id = Column(Integer, ForeignKey("radio_transcriptions.id"), nullable=False, index=True)
+    transcription_id = Column(
+        Integer, ForeignKey("radio_transcriptions.id"), nullable=False, index=True
+    )
 
     # Segment identification
     segment_index = Column(Integer, nullable=False)  # Order within transcription
@@ -159,9 +189,15 @@ class RadioSegment(Base):
     no_speech_prob = Column(Float)  # Probability this is silence
 
     # Analysis results
-    contains_tail_number = Column(Boolean, default=False, index=True)  # Mentions aircraft registration
-    contains_location = Column(Boolean, default=False, index=True)  # Mentions street/address
-    contains_incident_code = Column(Boolean, default=False, index=True)  # 10-codes, etc.
+    contains_tail_number = Column(
+        Boolean, default=False, index=True
+    )  # Mentions aircraft registration
+    contains_location = Column(
+        Boolean, default=False, index=True
+    )  # Mentions street/address
+    contains_incident_code = Column(
+        Boolean, default=False, index=True
+    )  # 10-codes, etc.
     urgency_score = Column(Float)  # 0-1 score for urgency/priority
 
     # Extracted entities (JSON arrays)
@@ -182,7 +218,12 @@ class RadioSegment(Base):
     __table_args__ = (
         Index("idx_radio_segments_time", "absolute_timestamp"),
         Index("idx_radio_segments_transcript_time", "transcription_id", "start_time"),
-        Index("idx_radio_segments_content_flags", "contains_tail_number", "contains_location", "contains_incident_code"),
+        Index(
+            "idx_radio_segments_content_flags",
+            "contains_tail_number",
+            "contains_location",
+            "contains_incident_code",
+        ),
         Index("idx_radio_segments_urgency", "urgency_score"),
     )
 
@@ -195,17 +236,26 @@ class RadioKeyword(Base):
     Extracted keywords and phrases from radio transcriptions
     Tracks frequency and context for pattern analysis
     """
+
     __tablename__ = "radio_keywords"
 
     id = Column(Integer, primary_key=True, index=True)
-    transcription_id = Column(Integer, ForeignKey("radio_transcriptions.id"), nullable=False, index=True)
+    transcription_id = Column(
+        Integer, ForeignKey("radio_transcriptions.id"), nullable=False, index=True
+    )
 
     # Keyword information
-    keyword = Column(String(100), nullable=False, index=True)  # The actual keyword/phrase
-    keyword_type = Column(String(50), index=True)  # 'tail_number', 'location', 'incident_code', 'person', 'action'
+    keyword = Column(
+        String(100), nullable=False, index=True
+    )  # The actual keyword/phrase
+    keyword_type = Column(
+        String(50), index=True
+    )  # 'tail_number', 'location', 'incident_code', 'person', 'action'
 
     # Frequency and context
-    occurrence_count = Column(Integer, default=1)  # How many times in this transcription
+    occurrence_count = Column(
+        Integer, default=1
+    )  # How many times in this transcription
     first_occurrence_time = Column(Float)  # Seconds from start of audio
     context_snippet = Column(Text)  # Surrounding text for context
 
@@ -231,22 +281,31 @@ class FlightRadioCorrelation(Base):
     Correlation between flight events and radio communications
     Links specific radio segments to flight activities
     """
+
     __tablename__ = "flight_radio_correlations"
 
     id = Column(Integer, primary_key=True, index=True)
 
     # Flight reference
-    flight_log_id = Column(Integer, ForeignKey("flight_logs.id"), nullable=False, index=True)
+    flight_log_id = Column(
+        Integer, ForeignKey("flight_logs.id"), nullable=False, index=True
+    )
 
     # Radio reference
-    radio_segment_id = Column(Integer, ForeignKey("radio_segments.id"), nullable=False, index=True)
+    radio_segment_id = Column(
+        Integer, ForeignKey("radio_segments.id"), nullable=False, index=True
+    )
 
     # Correlation metadata
-    correlation_type = Column(String(50), index=True)  # 'tail_number_mention', 'location_match', 'time_proximity'
+    correlation_type = Column(
+        String(50), index=True
+    )  # 'tail_number_mention', 'location_match', 'time_proximity'
     correlation_strength = Column(Float)  # 0-1 confidence score
 
     # Timing information
-    time_difference_seconds = Column(Float)  # Difference between radio mention and flight event
+    time_difference_seconds = Column(
+        Float
+    )  # Difference between radio mention and flight event
 
     # Context
     correlation_notes = Column(Text)  # What specifically correlates

@@ -12,7 +12,6 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 from celery import current_task
-import whisper
 
 from app.workers.celery_app import celery_app
 
@@ -243,6 +242,8 @@ def transcribe_phoenix_pd_archives(
 
         # Load model with GPU support
         import torch
+        import whisper
+
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = whisper.load_model(model_name, device=device)
         logger.info(f"Loaded Whisper model: {model_name} on device: {device}")
@@ -342,7 +343,7 @@ def transcribe_phoenix_pd_archives(
                 # Also save plain text version for easy reading
                 txt_file = mp3_file.with_suffix(".txt")
                 with open(txt_file, "w") as f:
-                    f.write(f"Phoenix Police Radio Archive Transcription\n")
+                    f.write("Phoenix Police Radio Archive Transcription\n")
                     f.write(f"{'=' * 60}\n")
                     f.write(f"File: {mp3_file.name}\n")
                     f.write(

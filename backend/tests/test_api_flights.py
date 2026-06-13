@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 
-from app.models.flight_logs import FlightLog, FlightPosition
+from app.models import FlightLog, FlightPosition
 
 
 class TestFlightAPI:
@@ -72,7 +72,8 @@ class TestFlightAPI:
         end_date = datetime.now(timezone.utc).isoformat()
 
         response = client.get(
-            f"/api/v1/flights/logs?start_date={start_date}&end_date={end_date}"
+            "/api/v1/flights/logs",
+            params={"start_date": start_date, "end_date": end_date},
         )
         assert response.status_code == 200
         data = response.json()
@@ -161,7 +162,7 @@ class TestFlightAPI:
             "data_source": "test",
         }
 
-        response = client.post(f"/api/v1/flights/positions", json=position_data)
+        response = client.post("/api/v1/flights/positions", json=position_data)
         assert response.status_code == 200
         data = response.json()
         assert data["flight_log_id"] == sample_flight_log.id
@@ -172,7 +173,7 @@ class TestFlightAPI:
         self, client: TestClient, db_session: Session, sample_flight_log: FlightLog
     ):
         """Test getting flight statistics"""
-        response = client.get(f"/api/v1/flights/analysis/cost-summary")
+        response = client.get("/api/v1/flights/analysis/cost-summary")
         assert response.status_code == 200
         data = response.json()
 
