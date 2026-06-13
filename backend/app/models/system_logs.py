@@ -10,6 +10,7 @@ from app.db.database import Base
 
 class LogLevel(str, enum.Enum):
     """Log severity levels"""
+
     DEBUG = "debug"
     INFO = "info"
     WARNING = "warning"
@@ -19,6 +20,7 @@ class LogLevel(str, enum.Enum):
 
 class LogCategory(str, enum.Enum):
     """Categories of system operations"""
+
     FLIGHT_DOWNLOAD = "flight_download"
     DATA_PARSING = "data_parsing"
     FR24_API = "fr24_api"
@@ -34,6 +36,7 @@ class LogCategory(str, enum.Enum):
 
 class SystemLog(Base):
     """System log entries for tracking all system events and errors"""
+
     __tablename__ = "system_logs"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -57,11 +60,13 @@ class SystemLog(Base):
     context_metadata = Column(Text)  # JSON string for additional context
 
     # Timestamps
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
 
     # Indexes for common queries
     __table_args__ = (
-        Index('idx_logs_created_level', 'created_at', 'level'),
-        Index('idx_logs_category_created', 'category', 'created_at'),
-        Index('idx_logs_level_category', 'level', 'category'),
+        Index("idx_logs_created_level", "created_at", "level"),
+        Index("idx_logs_category_created", "category", "created_at"),
+        Index("idx_logs_level_category", "level", "category"),
     )

@@ -13,7 +13,7 @@ from pathlib import Path
 from celery import current_task
 
 # CRITICAL: Set this BEFORE any CUDA imports to prevent fork issues
-os.environ['CUDA_MODULE_LOADING'] = 'LAZY'
+os.environ["CUDA_MODULE_LOADING"] = "LAZY"
 
 from app.workers.celery_app import celery_app
 
@@ -250,13 +250,16 @@ def transcribe_phoenix_pd_archives_faster(
 
         # Detect device and compute type
         import torch
+
         device = "cuda" if torch.cuda.is_available() else "cpu"
         # Use float16 for best performance with cuDNN 9 (CUDA 12.1)
         compute_type = "float16" if device == "cuda" else "int8"
 
         # Load model with faster-whisper
         model = WhisperModel(model_name, device=device, compute_type=compute_type)
-        logger.info(f"Loaded faster-whisper model: {model_name} on device: {device} with compute_type: {compute_type}")
+        logger.info(
+            f"Loaded faster-whisper model: {model_name} on device: {device} with compute_type: {compute_type}"
+        )
 
         if device == "cuda":
             logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
@@ -303,7 +306,14 @@ def transcribe_phoenix_pd_archives_faster(
                     language="en",
                     condition_on_previous_text=False,  # CRITICAL - prevents repetition loops
                     beam_size=5,
-                    temperature=(0.0, 0.2, 0.4, 0.6, 0.8, 1.0),  # Fallback strategy breaks loops
+                    temperature=(
+                        0.0,
+                        0.2,
+                        0.4,
+                        0.6,
+                        0.8,
+                        1.0,
+                    ),  # Fallback strategy breaks loops
                     compression_ratio_threshold=1.35,  # More aggressive hallucination detection
                     log_prob_threshold=-1.0,  # Triggers fallback on low confidence (note: log_prob not logprob)
                     no_speech_threshold=0.4,  # Lower for noisy audio (default: 0.6)

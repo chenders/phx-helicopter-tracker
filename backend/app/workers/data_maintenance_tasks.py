@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def backfill_altitude_agl_values(
     self,
     batch_size: int = 100,
-    ground_elevation_feet: int = 1086  # Phoenix average elevation in feet
+    ground_elevation_feet: int = 1086,  # Phoenix average elevation in feet
 ) -> dict:
     """
     Backfill altitude AGL (Above Ground Level) values for existing flight logs.
@@ -38,12 +38,14 @@ def backfill_altitude_agl_values(
     try:
         with SessionLocal() as db:
             # Count total flights needing AGL values
-            count_query = text("""
+            count_query = text(
+                """
                 SELECT COUNT(*)
                 FROM flight_logs
                 WHERE max_altitude_agl_feet IS NULL
                 AND max_altitude_feet IS NOT NULL
-            """)
+            """
+            )
             total_count = db.execute(count_query).scalar()
 
             if total_count == 0:
@@ -51,7 +53,7 @@ def backfill_altitude_agl_values(
                 return {
                     "success": True,
                     "updated": 0,
-                    "message": "No flights need AGL altitude backfilling"
+                    "message": "No flights need AGL altitude backfilling",
                 }
 
             logger.info(f"Found {total_count} flights needing AGL altitude values")
@@ -60,19 +62,20 @@ def backfill_altitude_agl_values(
             offset = 0
             while offset < total_count:
                 # Update progress
-                if hasattr(self, 'update_state'):
+                if hasattr(self, "update_state"):
                     self.update_state(
-                        state='PROGRESS',
+                        state="PROGRESS",
                         meta={
-                            'current': offset,
-                            'total': total_count,
-                            'status': f'Processing batch {offset // batch_size + 1}'
-                        }
+                            "current": offset,
+                            "total": total_count,
+                            "status": f"Processing batch {offset // batch_size + 1}",
+                        },
                     )
 
                 # Update batch of records
                 # AGL = MSL altitude - ground elevation
-                update_query = text("""
+                update_query = text(
+                    """
                     UPDATE flight_logs
                     SET
                         max_altitude_agl_feet = GREATEST(0, max_altitude_feet - :ground_elevation),
@@ -86,14 +89,15 @@ def backfill_altitude_agl_values(
                         AND max_altitude_feet IS NOT NULL
                         LIMIT :batch_size
                     )
-                """)
+                """
+                )
 
                 result = db.execute(
                     update_query,
                     {
                         "ground_elevation": ground_elevation_feet,
-                        "batch_size": batch_size
-                    }
+                        "batch_size": batch_size,
+                    },
                 )
 
                 batch_updated = result.rowcount
@@ -116,25 +120,19 @@ def backfill_altitude_agl_values(
     except Exception as e:
         logger.error(f"Error backfilling AGL altitudes: {str(e)}")
         error_count += 1
-        return {
-            "success": False,
-            "error": str(e),
-            "updated": updated_count
-        }
+        return {"success": False, "error": str(e), "updated": updated_count}
 
     return {
         "success": True,
         "updated": updated_count,
         "errors": error_count,
-        "message": f"Successfully backfilled AGL altitudes for {updated_count} flights"
+        "message": f"Successfully backfilled AGL altitudes for {updated_count} flights",
     }
 
 
 @celery_app.task(bind=True, name="backfill_elevation_data_for_positions")
 def backfill_elevation_data_for_positions(
-    self,
-    batch_size: int = 1000,
-    use_google_elevation_api: bool = False
+    self, batch_size: int = 1000, use_google_elevation_api: bool = False
 ) -> dict:
     """
     Backfill ground elevation data for flight positions.
@@ -168,7 +166,8 @@ def backfill_elevation_data_for_positions(
 
             # Update positions with estimated ground elevation based on location
             # This is a placeholder - ideally would use real elevation data
-            update_query = text("""
+            update_query = text(
+                """
                 UPDATE flight_positions
                 SET
                     ground_elevation_feet = CASE
@@ -191,7 +190,8 @@ def backfill_elevation_data_for_positions(
                 AND latitude IS NOT NULL
                 AND longitude IS NOT NULL
                 LIMIT :batch_size
-            """)
+            """
+            )
 
             while True:
                 result = db.execute(update_query, {"batch_size": batch_size})
@@ -203,35 +203,35 @@ def backfill_elevation_data_for_positions(
                 updated_count += batch_updated
                 db.commit()
 
-                logger.info(f"Updated ground elevation for {batch_updated} positions (total: {updated_count})")
+                logger.info(
+                    f"Updated ground elevation for {batch_updated} positions (total: {updated_count})"
+                )
 
                 # Update progress
-                if hasattr(self, 'update_state'):
+                if hasattr(self, "update_state"):
                     self.update_state(
-                        state='PROGRESS',
+                        state="PROGRESS",
                         meta={
-                            'updated': updated_count,
-                            'status': f'Processing positions...'
-                        }
+                            "updated": updated_count,
+                            "status": f"Processing positions...",
+                        },
                     )
 
     except Exception as e:
         logger.error(f"Error backfilling elevation data: {str(e)}")
-        return {
-            "success": False,
-            "error": str(e),
-            "updated": updated_count
-        }
+        return {"success": False, "error": str(e), "updated": updated_count}
 
     return {
         "success": True,
         "updated": updated_count,
-        "message": f"Successfully updated elevation data for {updated_count} positions"
+        "message": f"Successfully updated elevation data for {updated_count} positions",
     }
 
 
 @celery_app.task(bind=True, name="compute_agl_statistics_for_flights")
-def compute_agl_statistics_for_flights(self, flight_log_id: Optional[int] = None) -> dict:
+def compute_agl_statistics_for_flights(
+    self, flight_log_id: Optional[int] = None
+) -> dict:
     """
     Compute accurate AGL statistics for flights based on their position data.
 
@@ -251,7 +251,8 @@ def compute_agl_statistics_for_flights(self, flight_log_id: Optional[int] = None
                 params = {}
 
             # Compute AGL statistics from actual position data
-            update_query = text(f"""
+            update_query = text(
+                f"""
                 UPDATE flight_logs fl
                 SET
                     max_altitude_agl_feet = stats.max_agl,
@@ -270,7 +271,8 @@ def compute_agl_statistics_for_flights(self, flight_log_id: Optional[int] = None
                 ) stats
                 WHERE fl.id = stats.flight_log_id
                 {where_clause}
-            """)
+            """
+            )
 
             result = db.execute(update_query, params)
             updated_count = result.rowcount
@@ -279,12 +281,9 @@ def compute_agl_statistics_for_flights(self, flight_log_id: Optional[int] = None
             return {
                 "success": True,
                 "updated": updated_count,
-                "message": f"Updated AGL statistics for {updated_count} flights"
+                "message": f"Updated AGL statistics for {updated_count} flights",
             }
 
     except Exception as e:
         logger.error(f"Error computing AGL statistics: {str(e)}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
+        return {"success": False, "error": str(e)}

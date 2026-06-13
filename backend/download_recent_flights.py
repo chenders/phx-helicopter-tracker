@@ -18,14 +18,8 @@ from app.models.flight_discoveries import FlightDiscovery
 import asyncio
 
 # Phoenix PD helicopter registrations
-PHOENIX_PD_HELICOPTERS = [
-    "N620FB",
-    "N621FB",
-    "N622FB",
-    "N623FB",
-    "N624FB",
-    "N625FB"
-]
+PHOENIX_PD_HELICOPTERS = ["N620FB", "N621FB", "N622FB", "N623FB", "N624FB", "N625FB"]
+
 
 async def download_recent_flights():
     """Download flights from Sept 18 to now"""
@@ -54,8 +48,7 @@ async def download_recent_flights():
 
                 # Search for flights
                 flights = await service.search_flights_by_registration(
-                    registration=registration,
-                    days_back=days_back
+                    registration=registration, days_back=days_back
                 )
 
                 if flights:
@@ -63,26 +56,52 @@ async def download_recent_flights():
 
                     for flight_data in flights:
                         # Check if we already have this flight
-                        existing = db.query(FlightDiscovery).filter(
-                            FlightDiscovery.fr24_id == flight_data.get('id')
-                        ).first()
+                        existing = (
+                            db.query(FlightDiscovery)
+                            .filter(FlightDiscovery.fr24_id == flight_data.get("id"))
+                            .first()
+                        )
 
                         if not existing:
                             # Create discovery record
                             discovery = FlightDiscovery(
-                                fr24_id=flight_data.get('id'),
+                                fr24_id=flight_data.get("id"),
                                 registration=registration,
-                                callsign=flight_data.get('callsign'),
-                                aircraft_type=flight_data.get('aircraft', {}).get('model', {}).get('text'),
-                                hex_code=flight_data.get('aircraft', {}).get('hex'),
-                                departure_time=datetime.fromtimestamp(flight_data['time']['real']['departure']) if flight_data.get('time', {}).get('real', {}).get('departure') else None,
-                                arrival_time=datetime.fromtimestamp(flight_data['time']['real']['arrival']) if flight_data.get('time', {}).get('real', {}).get('arrival') else None,
-                                origin_airport=flight_data.get('airport', {}).get('origin', {}).get('code', {}).get('iata'),
-                                destination_airport=flight_data.get('airport', {}).get('destination', {}).get('code', {}).get('iata'),
-                                first_seen=flight_data.get('time', {}).get('real', {}).get('departure'),
-                                last_seen=flight_data.get('time', {}).get('real', {}).get('arrival'),
+                                callsign=flight_data.get("callsign"),
+                                aircraft_type=flight_data.get("aircraft", {})
+                                .get("model", {})
+                                .get("text"),
+                                hex_code=flight_data.get("aircraft", {}).get("hex"),
+                                departure_time=datetime.fromtimestamp(
+                                    flight_data["time"]["real"]["departure"]
+                                )
+                                if flight_data.get("time", {})
+                                .get("real", {})
+                                .get("departure")
+                                else None,
+                                arrival_time=datetime.fromtimestamp(
+                                    flight_data["time"]["real"]["arrival"]
+                                )
+                                if flight_data.get("time", {})
+                                .get("real", {})
+                                .get("arrival")
+                                else None,
+                                origin_airport=flight_data.get("airport", {})
+                                .get("origin", {})
+                                .get("code", {})
+                                .get("iata"),
+                                destination_airport=flight_data.get("airport", {})
+                                .get("destination", {})
+                                .get("code", {})
+                                .get("iata"),
+                                first_seen=flight_data.get("time", {})
+                                .get("real", {})
+                                .get("departure"),
+                                last_seen=flight_data.get("time", {})
+                                .get("real", {})
+                                .get("arrival"),
                                 track_downloaded=False,
-                                discovered_at=datetime.utcnow()
+                                discovered_at=datetime.utcnow(),
                             )
                             db.add(discovery)
                             total_discovered += 1
@@ -105,6 +124,7 @@ async def download_recent_flights():
 
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     asyncio.run(download_recent_flights())

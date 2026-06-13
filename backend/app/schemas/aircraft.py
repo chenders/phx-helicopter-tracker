@@ -19,7 +19,9 @@ class AircraftBase(BaseModel):
     )
     has_flir: Optional[bool] = Field(default=False, description="Has FLIR camera")
     has_spotlight: Optional[bool] = Field(default=False, description="Has searchlight")
-    has_loudspeaker: Optional[bool] = Field(default=False, description="Has loudspeaker")
+    has_loudspeaker: Optional[bool] = Field(
+        default=False, description="Has loudspeaker"
+    )
     max_flight_time_minutes: Optional[int] = Field(
         None, description="Maximum flight time"
     )

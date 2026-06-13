@@ -21,7 +21,7 @@ import logging
 
 logging.basicConfig(
     level=logging.WARNING,  # Only show warnings and errors for other modules
-    format='%(message)s'  # Simplified format
+    format="%(message)s",  # Simplified format
 )
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)  # Show INFO for our script
@@ -44,7 +44,9 @@ async def check_aircraft_activity():
             )
             aircraft_list = result.scalars().all()
 
-            logger.info(f"Checking activity for {len(aircraft_list)} Phoenix PD helicopters")
+            logger.info(
+                f"Checking activity for {len(aircraft_list)} Phoenix PD helicopters"
+            )
 
             # Check date range (last 30 days)
             days_back = 30
@@ -60,10 +62,9 @@ async def check_aircraft_activity():
 
                     # First batch: last 14 days
                     flights_recent = await fr24_service.get_flight_summary(
-                        aircraft.registration,
-                        days_back=14
+                        aircraft.registration, days_back=14
                     )
-                    all_flights.extend(flights_recent.get('data', []))
+                    all_flights.extend(flights_recent.get("data", []))
 
                     # Second batch: 14-28 days ago
                     end_date_2 = datetime.now(timezone.utc) - timedelta(days=14)
@@ -71,20 +72,22 @@ async def check_aircraft_activity():
                     flights_older = await fr24_service.get_flight_summary(
                         aircraft.registration,
                         start_date=start_date_2,
-                        end_date=end_date_2
+                        end_date=end_date_2,
                     )
-                    all_flights.extend(flights_older.get('data', []))
+                    all_flights.extend(flights_older.get("data", []))
 
                     # Check if we need a third batch for day 29-30
                     if days_back > 28:
                         end_date_3 = datetime.now(timezone.utc) - timedelta(days=28)
-                        start_date_3 = datetime.now(timezone.utc) - timedelta(days=days_back)
+                        start_date_3 = datetime.now(timezone.utc) - timedelta(
+                            days=days_back
+                        )
                         flights_oldest = await fr24_service.get_flight_summary(
                             aircraft.registration,
                             start_date=start_date_3,
-                            end_date=end_date_3
+                            end_date=end_date_3,
                         )
-                        all_flights.extend(flights_oldest.get('data', []))
+                        all_flights.extend(flights_oldest.get("data", []))
 
                     # Determine if aircraft is active
                     has_recent_flights = len(all_flights) > 0
@@ -94,15 +97,24 @@ async def check_aircraft_activity():
                     if all_flights:
                         # Get the most recent flight timestamp
                         for flight in all_flights:
-                            if flight.get('timestamp') or flight.get('departure_time'):
-                                flight_time_str = flight.get('timestamp') or flight.get('departure_time')
+                            if flight.get("timestamp") or flight.get("departure_time"):
+                                flight_time_str = flight.get("timestamp") or flight.get(
+                                    "departure_time"
+                                )
                                 try:
                                     if isinstance(flight_time_str, str):
-                                        flight_time = datetime.fromisoformat(flight_time_str.replace('Z', '+00:00'))
+                                        flight_time = datetime.fromisoformat(
+                                            flight_time_str.replace("Z", "+00:00")
+                                        )
                                     else:
-                                        flight_time = datetime.fromtimestamp(flight_time_str, tz=timezone.utc)
+                                        flight_time = datetime.fromtimestamp(
+                                            flight_time_str, tz=timezone.utc
+                                        )
 
-                                    if last_flight_time is None or flight_time > last_flight_time:
+                                    if (
+                                        last_flight_time is None
+                                        or flight_time > last_flight_time
+                                    ):
                                         last_flight_time = flight_time
                                 except:
                                     pass
@@ -113,16 +125,24 @@ async def check_aircraft_activity():
                         update_data["last_seen"] = last_flight_time
 
                     session.execute(
-                        update(Aircraft).where(Aircraft.id == aircraft.id).values(**update_data)
+                        update(Aircraft)
+                        .where(Aircraft.id == aircraft.id)
+                        .values(**update_data)
                     )
                     session.commit()
 
                     if has_recent_flights:
-                        logger.info(f"✓ {aircraft.registration}: ACTIVE - {len(all_flights)} flights in last {days_back} days")
+                        logger.info(
+                            f"✓ {aircraft.registration}: ACTIVE - {len(all_flights)} flights in last {days_back} days"
+                        )
                         if last_flight_time:
-                            logger.info(f"  Last seen: {last_flight_time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+                            logger.info(
+                                f"  Last seen: {last_flight_time.strftime('%Y-%m-%d %H:%M:%S UTC')}"
+                            )
                     else:
-                        logger.info(f"✗ {aircraft.registration}: INACTIVE - No flights in last {days_back} days")
+                        logger.info(
+                            f"✗ {aircraft.registration}: INACTIVE - No flights in last {days_back} days"
+                        )
 
                     # Add delay to respect rate limits
                     await asyncio.sleep(3)
@@ -134,8 +154,7 @@ async def check_aircraft_activity():
             # Final summary
             result = session.execute(
                 select(Aircraft).where(
-                    (Aircraft.is_phoenix_pd == True) &
-                    (Aircraft.is_active == True)
+                    (Aircraft.is_phoenix_pd == True) & (Aircraft.is_active == True)
                 )
             )
             active_count = len(result.scalars().all())

@@ -5,7 +5,8 @@ Creates sample flight data for Phoenix PD helicopters when FR24 API is unavailab
 """
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from datetime import datetime, timedelta
 import random
@@ -53,7 +54,9 @@ def create_demo_flights():
                     # Random flight start time
                     hour = random.choice([6, 9, 12, 15, 18, 21])  # Common patrol hours
                     minute = random.randint(0, 59)
-                    departure_time = current_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                    departure_time = current_date.replace(
+                        hour=hour, minute=minute, second=0, microsecond=0
+                    )
 
                     # Flight duration: 1-3 hours
                     duration_minutes = random.randint(60, 180)
@@ -77,7 +80,10 @@ def create_demo_flights():
                         data_source="DEMO",
                         surveillance_likelihood=random.choice([0.7, 0.8, 0.9]),
                         privacy_concern_level=random.choice(["LOW", "MEDIUM", "HIGH"]),
-                        raw_data={"demo": True, "created_at": datetime.now().isoformat()}
+                        raw_data={
+                            "demo": True,
+                            "created_at": datetime.now().isoformat(),
+                        },
                     )
 
                     db.add(flight)
@@ -97,6 +103,7 @@ def create_demo_flights():
                         radius = random.uniform(0.05, 0.15)  # Degrees lat/lon
 
                         import math
+
                         lat = center_lat + radius * math.cos(math.radians(angle))
                         lon = center_lon + radius * math.sin(math.radians(angle))
 
@@ -114,10 +121,14 @@ def create_demo_flights():
                             track_degrees=random.randint(0, 359),
                             vertical_rate=random.randint(-500, 500),
                             is_hovering=(minute % 20 == 0),  # Hover every 20 minutes
-                            hover_duration_seconds=random.randint(60, 300) if minute % 20 == 0 else 0,
+                            hover_duration_seconds=random.randint(60, 300)
+                            if minute % 20 == 0
+                            else 0,
                             is_circling=(minute % 15 == 0),  # Circle every 15 minutes
-                            circle_radius_feet=random.randint(500, 1500) if minute % 15 == 0 else None,
-                            data_source="DEMO"
+                            circle_radius_feet=random.randint(500, 1500)
+                            if minute % 15 == 0
+                            else None,
+                            data_source="DEMO",
                         )
 
                         db.add(position)

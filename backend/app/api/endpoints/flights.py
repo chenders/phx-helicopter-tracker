@@ -17,7 +17,9 @@ from app.schemas.flights import (
     FlightPositionList,
 )
 from app.models.flight_logs import FlightLog as FlightLogModel
-from app.models.flight_positions import FlightPosition as FlightPositionModel  # Use PostGIS-enabled model
+from app.models.flight_positions import (
+    FlightPosition as FlightPositionModel,
+)  # Use PostGIS-enabled model
 
 router = APIRouter()
 
@@ -289,7 +291,9 @@ def search_flights(
     db: Session = Depends(get_db),
     start_time: datetime = Query(..., description="Search start time"),
     end_time: datetime = Query(..., description="Search end time"),
-    aircraft_registration: Optional[str] = Query(None, description="Aircraft registration"),
+    aircraft_registration: Optional[str] = Query(
+        None, description="Aircraft registration"
+    ),
     latitude: Optional[float] = Query(None, description="Search location latitude"),
     longitude: Optional[float] = Query(None, description="Search location longitude"),
     radius: Optional[float] = Query(1000, description="Search radius in meters")
@@ -303,7 +307,8 @@ def search_flights(
         from sqlalchemy import text
 
         # Use PostGIS for accurate and fast spatial queries
-        spatial_query = text("""
+        spatial_query = text(
+            """
             SELECT DISTINCT fp.flight_log_id
             FROM flight_positions fp
             WHERE fp.location IS NOT NULL
@@ -313,15 +318,19 @@ def search_flights(
                 :radius
             )
             AND fp.timestamp BETWEEN :start_time AND :end_time
-        """)
+        """
+        )
 
-        result = db.execute(spatial_query, {
-            'lon': longitude,
-            'lat': latitude,
-            'radius': radius,
-            'start_time': start_time,
-            'end_time': end_time
-        })
+        result = db.execute(
+            spatial_query,
+            {
+                "lon": longitude,
+                "lat": latitude,
+                "radius": radius,
+                "start_time": start_time,
+                "end_time": end_time,
+            },
+        )
 
         flight_log_ids = [row[0] for row in result]
 
@@ -338,8 +347,8 @@ def search_flights(
                     "start_time": start_time.isoformat(),
                     "end_time": end_time.isoformat(),
                     "aircraft": aircraft_registration,
-                    "location": {"lat": latitude, "lng": longitude, "radius": radius}
-                }
+                    "location": {"lat": latitude, "lng": longitude, "radius": radius},
+                },
             }
     else:
         # No location filter, use time-based query
@@ -351,8 +360,8 @@ def search_flights(
                 FlightLogModel.departure_time <= end_time,
                 or_(
                     FlightLogModel.arrival_time >= start_time,
-                    FlightLogModel.arrival_time.is_(None)
-                )
+                    FlightLogModel.arrival_time.is_(None),
+                ),
             )
         )
 
@@ -369,10 +378,15 @@ def search_flights(
         has_data_quality_issue = False
         data_quality_info = None
 
-        if flight.departure_time and flight.arrival_time and flight.flight_duration_minutes:
+        if (
+            flight.departure_time
+            and flight.arrival_time
+            and flight.flight_duration_minutes
+        ):
             from sqlalchemy import text
 
-            quality_check_query = text("""
+            quality_check_query = text(
+                """
                 SELECT
                     EXTRACT(EPOCH FROM (MAX(fp.timestamp) - MIN(fp.timestamp))) / 60.0 as actual_span_minutes,
                     :recorded_duration as recorded_duration_minutes,
@@ -380,23 +394,36 @@ def search_flights(
                 FROM flight_positions fp
                 WHERE fp.flight_log_id = :flight_id
                 HAVING COUNT(*) > 1
-            """)
+            """
+            )
 
-            quality_result = db.execute(quality_check_query, {
-                'flight_id': flight.id,
-                'recorded_duration': flight.flight_duration_minutes
-            }).first()
+            quality_result = db.execute(
+                quality_check_query,
+                {
+                    "flight_id": flight.id,
+                    "recorded_duration": flight.flight_duration_minutes,
+                },
+            ).first()
 
             if quality_result and quality_result.actual_span_minutes:
-                discrepancy_pct = abs(float(quality_result.discrepancy_minutes)) / flight.flight_duration_minutes if flight.flight_duration_minutes > 0 else 0
+                discrepancy_pct = (
+                    abs(float(quality_result.discrepancy_minutes))
+                    / flight.flight_duration_minutes
+                    if flight.flight_duration_minutes > 0
+                    else 0
+                )
                 # Flag as issue if discrepancy is more than 20% of recorded duration
                 if discrepancy_pct > 0.20:
                     has_data_quality_issue = True
                     data_quality_info = {
                         "recorded_duration_minutes": flight.flight_duration_minutes,
-                        "actual_span_minutes": float(quality_result.actual_span_minutes),
-                        "discrepancy_minutes": float(quality_result.discrepancy_minutes),
-                        "discrepancy_percentage": float(discrepancy_pct * 100)
+                        "actual_span_minutes": float(
+                            quality_result.actual_span_minutes
+                        ),
+                        "discrepancy_minutes": float(
+                            quality_result.discrepancy_minutes
+                        ),
+                        "discrepancy_percentage": float(discrepancy_pct * 100),
                     }
 
         flight_dict = {
@@ -404,12 +431,18 @@ def search_flights(
             "aircraft_id": flight.aircraft_id,
             "registration": flight.aircraft_id,  # Assuming aircraft_id is registration
             "callsign": flight.callsign,
-            "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
-            "arrival_time": flight.arrival_time.isoformat() if flight.arrival_time else None,
+            "departure_time": flight.departure_time.isoformat()
+            if flight.departure_time
+            else None,
+            "arrival_time": flight.arrival_time.isoformat()
+            if flight.arrival_time
+            else None,
             "duration_minutes": flight.flight_duration_minutes,
             "max_altitude": flight.max_altitude_feet,
             "min_altitude": flight.min_altitude_feet,
-            "positions_count": len(flight.positions) if hasattr(flight, 'positions') else 0,
+            "positions_count": len(flight.positions)
+            if hasattr(flight, "positions")
+            else 0,
             "hover_locations": flight.hover_locations,
             "surveillance_score": flight.surveillance_likelihood or 0,
             "has_data_quality_issue": has_data_quality_issue,
@@ -421,7 +454,8 @@ def search_flights(
             from sqlalchemy import text
 
             # Use PostGIS to find closest position efficiently
-            distance_query = text("""
+            distance_query = text(
+                """
                 SELECT
                     ST_Distance(
                         fp.location,
@@ -442,13 +476,13 @@ def search_flights(
                 AND fp.location IS NOT NULL
                 ORDER BY distance
                 LIMIT 1
-            """)
+            """
+            )
 
-            result = db.execute(distance_query, {
-                'lon': longitude,
-                'lat': latitude,
-                'flight_id': flight.id
-            }).first()
+            result = db.execute(
+                distance_query,
+                {"lon": longitude, "lat": latitude, "flight_id": flight.id},
+            ).first()
 
             if result:
                 flight_dict["distance_from_search"] = result.distance
@@ -469,7 +503,8 @@ def search_flights(
                 flight_dict["closest_position"] = None
 
             # Calculate time spent in radius - only count time when consecutive points are BOTH in radius
-            time_in_radius_query = text("""
+            time_in_radius_query = text(
+                """
                 WITH all_positions AS (
                     SELECT
                         fp.timestamp,
@@ -504,17 +539,23 @@ def search_flights(
                         0
                     ) as time_in_radius_seconds
                 FROM all_positions
-            """)
+            """
+            )
 
-            time_result = db.execute(time_in_radius_query, {
-                'lon': longitude,
-                'lat': latitude,
-                'radius': radius,
-                'flight_id': flight.id
-            }).first()
+            time_result = db.execute(
+                time_in_radius_query,
+                {
+                    "lon": longitude,
+                    "lat": latitude,
+                    "radius": radius,
+                    "flight_id": flight.id,
+                },
+            ).first()
 
             if time_result and time_result.time_in_radius_seconds:
-                flight_dict["time_in_radius_seconds"] = int(time_result.time_in_radius_seconds)
+                flight_dict["time_in_radius_seconds"] = int(
+                    time_result.time_in_radius_seconds
+                )
             else:
                 flight_dict["time_in_radius_seconds"] = 0
 
@@ -527,34 +568,33 @@ def search_flights(
 
     # Sort by distance if location search
     if latitude is not None and longitude is not None:
-        results.sort(key=lambda x: x.get("distance_from_search") or float('inf'))
+        results.sort(key=lambda x: x.get("distance_from_search") or float("inf"))
 
     return {"flights": results, "total": len(results)}
 
 
 @router.get("/{flight_id}/positions", response_model=List[FlightPosition])
 def get_flight_positions_by_id(
-    *,
-    db: Session = Depends(get_db),
-    flight_id: int
+    *, db: Session = Depends(get_db), flight_id: int
 ) -> List[FlightPosition]:
     """Get all positions for a specific flight"""
     flight = flight_log_crud.get(db, id=flight_id)
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
-    positions = db.query(FlightPositionModel).filter(
-        FlightPositionModel.flight_log_id == flight_id
-    ).order_by(FlightPositionModel.timestamp).all()
+    positions = (
+        db.query(FlightPositionModel)
+        .filter(FlightPositionModel.flight_log_id == flight_id)
+        .order_by(FlightPositionModel.timestamp)
+        .all()
+    )
 
     return positions
 
 
 @router.get("/{flight_id}/patterns")
 def get_flight_patterns(
-    *,
-    db: Session = Depends(get_db),
-    flight_id: int
+    *, db: Session = Depends(get_db), flight_id: int
 ) -> Dict[str, Any]:
     """Get abnormal patterns detected for a specific flight"""
     from app.models.abnormal_patterns import AbnormalPattern
@@ -564,9 +604,11 @@ def get_flight_patterns(
         raise HTTPException(status_code=404, detail="Flight not found")
 
     # Get all abnormal patterns for this flight
-    patterns = db.query(AbnormalPattern).filter(
-        AbnormalPattern.flight_log_id == flight_id
-    ).all()
+    patterns = (
+        db.query(AbnormalPattern)
+        .filter(AbnormalPattern.flight_log_id == flight_id)
+        .all()
+    )
 
     # Extract hover locations and surveillance types from pattern metadata
     hover_locations = []
@@ -579,18 +621,24 @@ def get_flight_patterns(
 
         # Extract hover locations from metadata
         if pattern.detection_metadata and isinstance(pattern.detection_metadata, dict):
-            hovers = pattern.detection_metadata.get('hovering', [])
+            hovers = pattern.detection_metadata.get("hovering", [])
             if isinstance(hovers, list):
                 for hover in hovers:
-                    if isinstance(hover, dict) and 'latitude' in hover and 'longitude' in hover:
-                        hover_locations.append({
-                            'latitude': hover['latitude'],
-                            'longitude': hover['longitude'],
-                            'duration_minutes': hover.get('duration_minutes', 0),
-                            'start_time': hover.get('start_time'),
-                            'end_time': hover.get('end_time'),
-                            'position_count': hover.get('position_count', 0)
-                        })
+                    if (
+                        isinstance(hover, dict)
+                        and "latitude" in hover
+                        and "longitude" in hover
+                    ):
+                        hover_locations.append(
+                            {
+                                "latitude": hover["latitude"],
+                                "longitude": hover["longitude"],
+                                "duration_minutes": hover.get("duration_minutes", 0),
+                                "start_time": hover.get("start_time"),
+                                "end_time": hover.get("end_time"),
+                                "position_count": hover.get("position_count", 0),
+                            }
+                        )
 
     return {
         "flight_id": flight_id,
@@ -599,14 +647,16 @@ def get_flight_patterns(
                 "id": pattern.id,
                 "pattern_type": pattern.pattern_type,
                 "confidence_score": pattern.confidence_score,
-                "detected_at": pattern.detected_at.isoformat() if pattern.detected_at else None,
-                "detection_metadata": pattern.detection_metadata
+                "detected_at": pattern.detected_at.isoformat()
+                if pattern.detected_at
+                else None,
+                "detection_metadata": pattern.detection_metadata,
             }
             for pattern in patterns
         ],
         "surveillance_types": sorted(list(surveillance_types)),
         "hover_locations": hover_locations,
-        "total_hover_time_minutes": sum(h['duration_minutes'] for h in hover_locations)
+        "total_hover_time_minutes": sum(h["duration_minutes"] for h in hover_locations),
     }
 
 
@@ -626,9 +676,7 @@ def get_flight_cost_summary(
 
 
 @router.get("/data-quality-metrics")
-def get_data_quality_metrics(
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+def get_data_quality_metrics(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """
     Get data quality metrics showing discrepancies between flight metadata
     and actual position data timestamps
@@ -636,7 +684,8 @@ def get_data_quality_metrics(
     from sqlalchemy import text
 
     # Summary statistics
-    summary_query = text("""
+    summary_query = text(
+        """
         WITH flight_position_spans AS (
             SELECT
                 fl.id,
@@ -660,12 +709,14 @@ def get_data_quality_metrics(
             AVG(position_span_minutes - flight_duration_minutes) as avg_discrepancy_minutes,
             MAX(position_span_minutes - flight_duration_minutes) as max_discrepancy_minutes
         FROM flight_position_spans
-    """)
+    """
+    )
 
     summary_result = db.execute(summary_query).first()
 
     # Time series data (monthly aggregation)
-    time_series_query = text("""
+    time_series_query = text(
+        """
         WITH flight_position_spans AS (
             SELECT
                 fl.id,
@@ -693,12 +744,14 @@ def get_data_quality_metrics(
         FROM flight_position_spans
         GROUP BY TO_CHAR(departure_time, 'YYYY-MM')
         ORDER BY month
-    """)
+    """
+    )
 
     time_series_result = db.execute(time_series_query).fetchall()
 
     # Worst cases
-    worst_cases_query = text("""
+    worst_cases_query = text(
+        """
         WITH flight_position_spans AS (
             SELECT
                 fl.id,
@@ -728,7 +781,8 @@ def get_data_quality_metrics(
         WHERE position_span_minutes > flight_duration_minutes * 1.2
         ORDER BY (position_span_minutes - flight_duration_minutes) DESC
         LIMIT 50
-    """)
+    """
+    )
 
     worst_cases_result = db.execute(worst_cases_query).fetchall()
 
@@ -740,8 +794,12 @@ def get_data_quality_metrics(
             "flights_with_any_discrepancy": summary_result.flights_with_any_discrepancy,
             "flights_with_50pct_longer_span": summary_result.flights_with_50pct_longer_span,
             "flights_with_double_span": summary_result.flights_with_double_span,
-            "avg_discrepancy_minutes": float(summary_result.avg_discrepancy_minutes or 0),
-            "max_discrepancy_minutes": float(summary_result.max_discrepancy_minutes or 0),
+            "avg_discrepancy_minutes": float(
+                summary_result.avg_discrepancy_minutes or 0
+            ),
+            "max_discrepancy_minutes": float(
+                summary_result.max_discrepancy_minutes or 0
+            ),
         },
         "time_series": [
             {
@@ -760,7 +818,9 @@ def get_data_quality_metrics(
             {
                 "id": row.id,
                 "flight_id": row.flight_id,
-                "departure_time": row.departure_time.isoformat() if row.departure_time else None,
+                "departure_time": row.departure_time.isoformat()
+                if row.departure_time
+                else None,
                 "recorded_duration_minutes": float(row.recorded_duration_minutes or 0),
                 "actual_span_minutes": float(row.actual_span_minutes or 0),
                 "discrepancy_minutes": float(row.discrepancy_minutes or 0),
@@ -768,14 +828,12 @@ def get_data_quality_metrics(
                 "minutes_after_arrival": float(row.minutes_after_arrival or 0),
             }
             for row in worst_cases_result
-        ]
+        ],
     }
 
 
 @router.get("/camelback-mountain-analysis")
-def analyze_camelback_mountain_flights(
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
+def analyze_camelback_mountain_flights(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """
     Analyze flights near Camelback Mountain peaks.
 
@@ -805,7 +863,8 @@ def analyze_camelback_mountain_flights(
     radius_lat = 500 / 364000  # ~0.00137 degrees
     radius_lng = 500 / 288000  # ~0.00174 degrees
 
-    query = text("""
+    query = text(
+        """
         WITH peak_visits AS (
             -- Find positions near eastern peak
             SELECT DISTINCT
@@ -887,21 +946,26 @@ def analyze_camelback_mountain_flights(
             END as likely_purpose
         FROM unique_flights
         ORDER BY departure_time DESC
-    """)
+    """
+    )
 
-    results = db.execute(query, {
-        "east_lat": east_peak_lat,
-        "east_lng": east_peak_lng,
-        "east_elevation": east_peak_elevation,
-        "west_lat": west_peak_lat,
-        "west_lng": west_peak_lng,
-        "west_elevation": west_peak_elevation,
-        "radius_lat": radius_lat,
-        "radius_lng": radius_lng,
-    }).fetchall()
+    results = db.execute(
+        query,
+        {
+            "east_lat": east_peak_lat,
+            "east_lng": east_peak_lng,
+            "east_elevation": east_peak_elevation,
+            "west_lat": west_peak_lat,
+            "west_lng": west_peak_lng,
+            "west_elevation": west_peak_elevation,
+            "radius_lat": radius_lat,
+            "radius_lng": radius_lng,
+        },
+    ).fetchall()
 
     # Get summary statistics
-    summary_query = text("""
+    summary_query = text(
+        """
         WITH peak_visits AS (
             -- Eastern peak
             SELECT DISTINCT fp.flight_log_id
@@ -924,18 +988,22 @@ def analyze_camelback_mountain_flights(
             (SELECT COUNT(*) FROM flight_logs) as total_flights,
             ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM flight_logs), 2) as percentage
         FROM peak_visits
-    """)
+    """
+    )
 
-    summary = db.execute(summary_query, {
-        "east_lat": east_peak_lat,
-        "east_lng": east_peak_lng,
-        "east_elevation": east_peak_elevation,
-        "west_lat": west_peak_lat,
-        "west_lng": west_peak_lng,
-        "west_elevation": west_peak_elevation,
-        "radius_lat": radius_lat,
-        "radius_lng": radius_lng,
-    }).fetchone()
+    summary = db.execute(
+        summary_query,
+        {
+            "east_lat": east_peak_lat,
+            "east_lng": east_peak_lng,
+            "east_elevation": east_peak_elevation,
+            "west_lat": west_peak_lat,
+            "west_lng": west_peak_lng,
+            "west_elevation": west_peak_elevation,
+            "radius_lat": radius_lat,
+            "radius_lng": radius_lng,
+        },
+    ).fetchone()
 
     return {
         "summary": {
@@ -943,17 +1011,27 @@ def analyze_camelback_mountain_flights(
             "flights_near_camelback_peaks": summary.flights_near_peaks,
             "percentage_of_all_flights": float(summary.percentage),
             "search_criteria": {
-                "eastern_peak": {"lat": east_peak_lat, "lng": east_peak_lng, "elevation_ft": east_peak_elevation},
-                "western_peak": {"lat": west_peak_lat, "lng": west_peak_lng, "elevation_ft": west_peak_elevation},
+                "eastern_peak": {
+                    "lat": east_peak_lat,
+                    "lng": east_peak_lng,
+                    "elevation_ft": east_peak_elevation,
+                },
+                "western_peak": {
+                    "lat": west_peak_lat,
+                    "lng": west_peak_lng,
+                    "elevation_ft": west_peak_elevation,
+                },
                 "search_radius_feet": 500,
                 "elevation_tolerance_feet": 200,
-            }
+            },
         },
         "flights": [
             {
                 "flight_log_id": row.flight_log_id,
                 "flight_id": row.flight_id,
-                "departure_time": row.departure_time.isoformat() if row.departure_time else None,
+                "departure_time": row.departure_time.isoformat()
+                if row.departure_time
+                else None,
                 "aircraft": row.registration,
                 "peaks_visited": row.peaks_visited,
                 "positions_near_peak": row.max_positions_near_peak,
@@ -967,5 +1045,5 @@ def analyze_camelback_mountain_flights(
                 "likely_purpose": row.likely_purpose,
             }
             for row in results
-        ]
+        ],
     }

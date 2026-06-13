@@ -36,9 +36,7 @@ class RedownloadResponse(BaseModel):
 
 @router.get("/flights-with-gaps")
 def get_flights_with_gaps(
-    min_gap_minutes: int = 30,
-    limit: int = 50,
-    db: Session = Depends(get_db)
+    min_gap_minutes: int = 30, limit: int = 50, db: Session = Depends(get_db)
 ) -> List[FlightGap]:
     """
     Find flights with large gaps in position data
@@ -47,7 +45,8 @@ def get_flights_with_gaps(
         min_gap_minutes: Minimum gap size to consider (default: 30)
         limit: Maximum number of results (default: 50)
     """
-    query = text("""
+    query = text(
+        """
         WITH position_gaps AS (
           SELECT
             flight_log_id,
@@ -77,30 +76,29 @@ def get_flights_with_gaps(
         FROM flights_with_gaps
         ORDER BY max_gap_minutes DESC
         LIMIT :limit
-    """)
+    """
+    )
 
-    result = db.execute(query, {
-        "min_gap": min_gap_minutes,
-        "limit": limit
-    })
+    result = db.execute(query, {"min_gap": min_gap_minutes, "limit": limit})
 
     flights = []
     for row in result:
-        flights.append(FlightGap(
-            flight_log_id=row.flight_log_id,
-            flight_id=row.flight_id,
-            departure_time=row.departure_time.isoformat(),
-            gaps_count=row.gaps_count,
-            max_gap_minutes=float(row.max_gap_minutes)
-        ))
+        flights.append(
+            FlightGap(
+                flight_log_id=row.flight_log_id,
+                flight_id=row.flight_id,
+                departure_time=row.departure_time.isoformat(),
+                gaps_count=row.gaps_count,
+                max_gap_minutes=float(row.max_gap_minutes),
+            )
+        )
 
     return flights
 
 
 @router.post("/redownload")
 def redownload_flights(
-    request: RedownloadRequest,
-    db: Session = Depends(get_db)
+    request: RedownloadRequest, db: Session = Depends(get_db)
 ) -> RedownloadResponse:
     """
     Reset and redownload specific flights
@@ -119,77 +117,88 @@ def redownload_flights(
     for flight_log_id in request.flight_log_ids:
         try:
             # Get flight info using raw SQL
-            flight_info_query = text("""
+            flight_info_query = text(
+                """
                 SELECT id, flight_id FROM flight_logs WHERE id = :flight_id
-            """)
+            """
+            )
             flight_info = db.execute(
-                flight_info_query,
-                {"flight_id": flight_log_id}
+                flight_info_query, {"flight_id": flight_log_id}
             ).first()
 
             if not flight_info:
-                details.append({
-                    "flight_log_id": flight_log_id,
-                    "success": False,
-                    "error": "Flight log not found"
-                })
+                details.append(
+                    {
+                        "flight_log_id": flight_log_id,
+                        "success": False,
+                        "error": "Flight log not found",
+                    }
+                )
                 continue
 
-            logger.info(f"Resetting flight {flight_info.flight_id} (ID: {flight_log_id})")
+            logger.info(
+                f"Resetting flight {flight_info.flight_id} (ID: {flight_log_id})"
+            )
 
             # Count positions
-            count_query = text("""
+            count_query = text(
+                """
                 SELECT COUNT(*) as count FROM flight_positions
                 WHERE flight_log_id = :flight_id
-            """)
+            """
+            )
             position_count = db.execute(
-                count_query,
-                {"flight_id": flight_log_id}
+                count_query, {"flight_id": flight_log_id}
             ).scalar()
 
             # Delete positions
-            delete_query = text("""
+            delete_query = text(
+                """
                 DELETE FROM flight_positions WHERE flight_log_id = :flight_id
-            """)
+            """
+            )
             result = db.execute(delete_query, {"flight_id": flight_log_id})
             deleted = result.rowcount
 
             # Find and reset discovery record
-            fr24_id = flight_info.flight_id.replace('fr24_complete_', '')
+            fr24_id = flight_info.flight_id.replace("fr24_complete_", "")
 
             # Check if discovery exists
-            check_discovery_query = text("""
+            check_discovery_query = text(
+                """
                 SELECT id FROM flight_discoveries WHERE fr24_id = :fr24_id
-            """)
-            discovery = db.execute(
-                check_discovery_query,
-                {"fr24_id": fr24_id}
-            ).first()
+            """
+            )
+            discovery = db.execute(check_discovery_query, {"fr24_id": fr24_id}).first()
 
             discovery_reset = False
             if discovery:
                 # Reset discovery flags
-                reset_discovery_query = text("""
+                reset_discovery_query = text(
+                    """
                     UPDATE flight_discoveries
                     SET track_downloaded = FALSE,
                         track_download_attempted_at = NULL,
                         track_download_error = NULL,
                         positions_count = NULL
                     WHERE fr24_id = :fr24_id
-                """)
+                """
+                )
                 db.execute(reset_discovery_query, {"fr24_id": fr24_id})
                 discovery_reset = True
 
             db.commit()
             success_count += 1
 
-            details.append({
-                "flight_log_id": flight_log_id,
-                "flight_id": flight_info.flight_id,
-                "success": True,
-                "positions_deleted": deleted,
-                "discovery_reset": discovery_reset
-            })
+            details.append(
+                {
+                    "flight_log_id": flight_log_id,
+                    "flight_id": flight_info.flight_id,
+                    "success": True,
+                    "positions_deleted": deleted,
+                    "discovery_reset": discovery_reset,
+                }
+            )
 
             logger.info(
                 f"Reset flight {flight_log_id}: deleted {deleted} positions, "
@@ -198,11 +207,9 @@ def redownload_flights(
 
         except Exception as e:
             logger.error(f"Error resetting flight {flight_log_id}: {e}")
-            details.append({
-                "flight_log_id": flight_log_id,
-                "success": False,
-                "error": str(e)
-            })
+            details.append(
+                {"flight_log_id": flight_log_id, "success": False, "error": str(e)}
+            )
             db.rollback()
 
     # Trigger download task if requested
@@ -210,10 +217,11 @@ def redownload_flights(
     if request.trigger_download and success_count > 0:
         try:
             from app.workers.celery_app import celery_app
+
             batch_size = min(len(request.flight_log_ids), 20)
             task = celery_app.send_task(
-                'download_tracks_for_discovered_flights',
-                kwargs={'batch_size': batch_size}
+                "download_tracks_for_discovered_flights",
+                kwargs={"batch_size": batch_size},
             )
             task_id = task.id
             logger.info(f"Triggered download task: {task_id}")
@@ -221,9 +229,7 @@ def redownload_flights(
             logger.error(f"Error triggering download task: {e}")
 
     return RedownloadResponse(
-        flights_reset=success_count,
-        task_id=task_id,
-        details=details
+        flights_reset=success_count, task_id=task_id, details=details
     )
 
 
@@ -232,7 +238,7 @@ def redownload_all_with_gaps(
     min_gap_minutes: int = 60,
     limit: int = 10,
     trigger_download: bool = True,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> RedownloadResponse:
     """
     Find and redownload all flights with large gaps
@@ -244,25 +250,18 @@ def redownload_all_with_gaps(
     """
     # Find flights with gaps
     flights_with_gaps = get_flights_with_gaps(
-        min_gap_minutes=min_gap_minutes,
-        limit=limit,
-        db=db
+        min_gap_minutes=min_gap_minutes, limit=limit, db=db
     )
 
     if not flights_with_gaps:
-        return RedownloadResponse(
-            flights_reset=0,
-            task_id=None,
-            details=[]
-        )
+        return RedownloadResponse(flights_reset=0, task_id=None, details=[])
 
     # Redownload them
     flight_log_ids = [f.flight_log_id for f in flights_with_gaps]
 
     return redownload_flights(
         request=RedownloadRequest(
-            flight_log_ids=flight_log_ids,
-            trigger_download=trigger_download
+            flight_log_ids=flight_log_ids, trigger_download=trigger_download
         ),
-        db=db
+        db=db,
     )

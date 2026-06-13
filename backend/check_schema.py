@@ -10,6 +10,7 @@ from alembic.runtime.migration import MigrationContext
 from sqlalchemy import create_engine
 from app.core.config import settings
 
+
 def check_schema():
     """Check if database schema matches migration head"""
     try:
@@ -39,6 +40,7 @@ def check_schema():
     except Exception as e:
         print(f"❌ Schema check failed: {e}")
         return False
+
 
 if __name__ == "__main__":
     success = check_schema()

@@ -295,7 +295,7 @@ def get_all_active_tasks() -> List[Dict[str, Any]]:
 # DEPRECATED: Removed download_and_import_fr24_flights task
 # This task used an inefficient approach that only captured 12.5% of positions
 # while consuming excessive API credits (21,600 per month per aircraft)
-# 
+#
 # REPLACED BY: monitor_and_download_complete_flights (in flight_tracking_tasks.py)
 # The new task captures 100% of positions using 90% fewer API credits
 
@@ -305,12 +305,10 @@ def get_all_active_tasks() -> List[Dict[str, Any]]:
 
 
 @celery_app.task(bind=True, name="import_fr24_complete_flights")
-def import_fr24_complete_flights(
-    self, registration: str, days_back: int = 7
-):
+def import_fr24_complete_flights(self, registration: str, days_back: int = 7):
     """
     Import complete flight tracks from FlightRadar24 API with ALL position data
-    
+
     This is the correct way to import flights for legal documentation.
     Gets complete flight paths with hundreds/thousands of positions per flight.
 
@@ -344,7 +342,7 @@ def import_fr24_historical_data(
     """
     DEPRECATED: This only gets snapshots, not complete flight tracks!
     Use import_fr24_complete_flights instead for legal documentation.
-    
+
     Import historical flight data from FlightRadar24 API
 
     Args:
@@ -415,60 +413,72 @@ async def _import_fr24_complete_flights_async(
 
             # Step 1: Search for flights using historic positions
             # We'll check multiple timestamps to find flights
-            logger.info(f"Searching for {registration} flights from last {days_back} days")
-            
+            logger.info(
+                f"Searching for {registration} flights from last {days_back} days"
+            )
+
             found_flight_ids = set()
             from datetime import datetime, timedelta, timezone
-            
+
             # Check every 6 hours for the past N days
             end_time = datetime.now(timezone.utc)
             start_time = end_time - timedelta(days=days_back)
             current_time = end_time
-            
+
             while current_time >= start_time:
                 try:
                     # Get positions at this timestamp
                     positions = await fr24_api_service.get_historical_positions(
-                        timestamp=current_time,
-                        registrations=[registration]
+                        timestamp=current_time, registrations=[registration]
                     )
-                    
+
                     # Extract flight IDs
                     for pos in positions:
                         if pos.flight_id and pos.flight_id != "":
                             found_flight_ids.add(pos.flight_id)
-                            logger.info(f"Found flight {pos.flight_id} for {registration} at {current_time}")
-                    
+                            logger.info(
+                                f"Found flight {pos.flight_id} for {registration} at {current_time}"
+                            )
+
                 except Exception as e:
                     logger.warning(f"Error checking {current_time}: {e}")
-                
+
                 # Move back 6 hours
                 current_time -= timedelta(hours=6)
-            
+
             results["flights_found"] = len(found_flight_ids)
-            
+
             if not found_flight_ids:
-                logger.warning(f"No flights found for {registration} in last {days_back} days")
+                logger.warning(
+                    f"No flights found for {registration} in last {days_back} days"
+                )
                 return results
-                
-            logger.info(f"Found {len(found_flight_ids)} unique flights for {registration}")
-            
+
+            logger.info(
+                f"Found {len(found_flight_ids)} unique flights for {registration}"
+            )
+
             # Step 2: Get complete track for each flight
             for flight_id in found_flight_ids:
                 try:
-                        
                     # Check if we already have this flight
-                    existing_log = db.query(FlightLog).filter(
-                        FlightLog.flight_id == f"fr24_{flight_id}"
-                    ).first()
-                    
+                    existing_log = (
+                        db.query(FlightLog)
+                        .filter(FlightLog.flight_id == f"fr24_{flight_id}")
+                        .first()
+                    )
+
                     if existing_log:
                         # Check if we have complete data
-                        position_count = db.query(FlightPosition).filter(
-                            FlightPosition.flight_log_id == existing_log.id
-                        ).count()
-                        
-                        if position_count > 50:  # Assume >50 positions means complete data
+                        position_count = (
+                            db.query(FlightPosition)
+                            .filter(FlightPosition.flight_log_id == existing_log.id)
+                            .count()
+                        )
+
+                        if (
+                            position_count > 50
+                        ):  # Assume >50 positions means complete data
                             logger.info(
                                 f"Flight {flight_id} already has {position_count} positions, skipping"
                             )
@@ -477,33 +487,37 @@ async def _import_fr24_complete_flights_async(
                             logger.info(
                                 f"Flight {flight_id} only has {position_count} positions, re-importing"
                             )
-                    
+
                     # Get complete flight track
                     logger.info(f"Getting complete track for flight {flight_id}")
                     positions = await fr24_api_service.get_flight_track(flight_id)
-                    
+
                     if not positions:
                         logger.warning(f"No track data for flight {flight_id}")
                         continue
-                        
-                    logger.info(f"Got {len(positions)} positions for flight {flight_id}")
-                    
+
+                    logger.info(
+                        f"Got {len(positions)} positions for flight {flight_id}"
+                    )
+
                     # Create or update flight log
                     if positions:
                         first_pos = positions[0]
                         last_pos = positions[-1]
-                        
+
                         flight_log_data = FlightLogCreate(
                             aircraft_id=aircraft.id,
                             flight_id=f"fr24_{flight_id}",
                             callsign=first_pos.callsign or registration,
                             departure_time=first_pos.timestamp,
-                            arrival_time=last_pos.timestamp if len(positions) > 1 else None,
+                            arrival_time=last_pos.timestamp
+                            if len(positions) > 1
+                            else None,
                             origin=first_pos.origin,
                             destination=first_pos.destination,
                             data_source="flightradar24_complete",
                         )
-                        
+
                         if existing_log:
                             # Update existing log
                             for key, value in flight_log_data.dict().items():
@@ -511,7 +525,7 @@ async def _import_fr24_complete_flights_async(
                                     setattr(existing_log, key, value)
                             db.commit()
                             flight_log = existing_log
-                            
+
                             # Delete old incomplete positions
                             db.query(FlightPosition).filter(
                                 FlightPosition.flight_log_id == flight_log.id
@@ -519,9 +533,11 @@ async def _import_fr24_complete_flights_async(
                             db.commit()
                         else:
                             # Create new log
-                            flight_log = flight_log_crud.create(db, obj_in=flight_log_data)
+                            flight_log = flight_log_crud.create(
+                                db, obj_in=flight_log_data
+                            )
                             results["flights_imported"] += 1
-                        
+
                         # Save all positions
                         for pos in positions:
                             position_data = FlightPositionCreate(
@@ -538,32 +554,32 @@ async def _import_fr24_complete_flights_async(
                             )
                             flight_position_crud.create(db, obj_in=position_data)
                             results["positions_imported"] += 1
-                        
+
                         db.commit()
                         logger.info(
                             f"Imported flight {flight_id}: {len(positions)} positions, "
                             f"duration: {(last_pos.timestamp - first_pos.timestamp).total_seconds() / 60:.1f} min"
                         )
-                        
+
                 except Exception as e:
                     logger.error(f"Error importing flight {flight_id}: {e}")
                     results["errors"].append(f"Flight {flight_id}: {str(e)}")
                     db.rollback()
                     continue
-                    
+
             # Log final stats
             if fr24_api_service.credit_manager:
                 final_stats = await fr24_api_service.credit_manager.get_usage_stats()
                 results["credits_used"] = final_stats.get("session_used", 0)
-                
+
         logger.info(
             f"Import complete for {registration}: "
             f"{results['flights_imported']} flights, "
             f"{results['positions_imported']} positions"
         )
-        
+
         return results
-        
+
     except Exception as e:
         logger.error(f"Complete import failed for {registration}: {e}")
         results["errors"].append(str(e))
@@ -645,7 +661,7 @@ async def _import_fr24_historical_async(
                     positions = None
                     retry_count = 0
                     max_retries = 3
-                    
+
                     while retry_count < max_retries:
                         try:
                             positions = await fr24_api_service.get_historical_positions(
@@ -656,7 +672,9 @@ async def _import_fr24_historical_async(
                             if "rate" in str(e).lower() or "429" in str(e):
                                 retry_count += 1
                                 if retry_count < max_retries:
-                                    wait_time = min(60 * retry_count, 300)  # Max 5 min wait
+                                    wait_time = min(
+                                        60 * retry_count, 300
+                                    )  # Max 5 min wait
                                     logger.warning(
                                         f"Rate limited, waiting {wait_time}s before retry {retry_count}/{max_retries}"
                                     )

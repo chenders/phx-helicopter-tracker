@@ -58,7 +58,9 @@ class FR24OfficialAPI:
         )
 
     @fr24_rate_limiter.wait_and_request
-    def _make_api_request(self, url: str, params: Dict[str, Any]) -> Optional[requests.Response]:
+    def _make_api_request(
+        self, url: str, params: Dict[str, Any]
+    ) -> Optional[requests.Response]:
         """Make rate-limited API request"""
         try:
             response = requests.get(
@@ -77,24 +79,26 @@ class FR24OfficialAPI:
         if cached_data:
             logger.info(f"Returning cached data for Phoenix area flights")
             return cached_data
-        
+
         try:
             url = f"{self.base_url}/api/live/flight-positions/light"
             params = {"bounds": self.phoenix_bounds}
 
             logger.info(f"Requesting flights in bounds: {self.phoenix_bounds}")
-            
+
             # Use rate-limited request
             response = self._make_api_request(url, params)
-            
+
             if response is None:
                 # Rate limiter returned None - we're at limit
-                logger.warning("Rate limit prevented request - returning cached data if available")
+                logger.warning(
+                    "Rate limit prevented request - returning cached data if available"
+                )
                 # Try to return any cached data even if expired
                 old_cache = cache_service.cache.get(cache_key)
                 old_data = old_cache[0] if old_cache else None
                 return old_data if old_data else []
-            
+
             if response.status_code == 200:
                 data = response.json()
                 flights = data.get("data", [])
@@ -108,7 +112,9 @@ class FR24OfficialAPI:
                 logger.error("FR24 API payment required - check subscription")
             elif response.status_code == 429:
                 # Rate limit hit despite our limiter - adjust parameters
-                logger.warning("FR24 API returned 429 despite rate limiting - adjusting limits")
+                logger.warning(
+                    "FR24 API returned 429 despite rate limiting - adjusting limits"
+                )
                 fr24_rate_limiter.min_delay *= 1.5  # Increase delay
                 # Try to return any cached data
                 old_cache = cache_service.cache.get(cache_key)

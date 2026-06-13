@@ -113,7 +113,8 @@ def get_pattern_analysis(
     try:
         # Filter surveillance flights
         surveillance_flight_ids = [
-            f.id for f in flights
+            f.id
+            for f in flights
             if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5)
             or (f.flight_duration_minutes and f.flight_duration_minutes > 30)
         ]
@@ -121,7 +122,8 @@ def get_pattern_analysis(
         if surveillance_flight_ids:
             # Query neighborhood distribution using actual village boundaries
             # Count surveillance flight positions by neighborhood
-            neighborhood_query = text("""
+            neighborhood_query = text(
+                """
                 SELECT
                     neighborhood,
                     COUNT(DISTINCT flight_log_id) as surveillance_count,
@@ -133,22 +135,28 @@ def get_pattern_analysis(
                 GROUP BY neighborhood
                 ORDER BY surveillance_count DESC
                 LIMIT 10
-            """)
+            """
+            )
 
             results = db.execute(
                 neighborhood_query,
-                {"flight_ids": surveillance_flight_ids[:1000]}  # Limit to first 1000 flights
+                {
+                    "flight_ids": surveillance_flight_ids[:1000]
+                },  # Limit to first 1000 flights
             ).fetchall()
 
             for row in results:
-                neighborhood_distribution.append({
-                    "neighborhood": row.neighborhood,
-                    "surveillance_count": row.surveillance_count
-                })
+                neighborhood_distribution.append(
+                    {
+                        "neighborhood": row.neighborhood,
+                        "surveillance_count": row.surveillance_count,
+                    }
+                )
 
     except Exception as e:
         # If query fails, return empty array (graceful degradation)
         import logging
+
         logging.error(f"Error generating neighborhood distribution: {e}")
         neighborhood_distribution = []
 
@@ -166,9 +174,7 @@ def get_pattern_analysis(
         if f.flight_duration_minutes and f.flight_duration_minutes > 90
     )
     low_altitude_violations = sum(
-        1
-        for f in flights
-        if f.min_altitude_feet and f.min_altitude_feet < 400
+        1 for f in flights if f.min_altitude_feet and f.min_altitude_feet < 400
     )
     # Note: discriminatory_ratio and systematic_patrol_routes would require
     # geographic clustering and pattern matching which we don't have implemented
@@ -215,7 +221,8 @@ def get_surveillance_hotspots(
     hotspots = []
     try:
         # Use grid-based aggregation for performance
-        hotspot_query = text("""
+        hotspot_query = text(
+            """
             WITH surveillance_flights AS (
                 SELECT id, surveillance_likelihood, min_altitude_feet
                 FROM flight_logs
@@ -249,13 +256,16 @@ def get_surveillance_hotspots(
             HAVING COUNT(*) > 50
             ORDER BY position_count DESC
             LIMIT 10
-        """)
+        """
+        )
 
         results = db.execute(hotspot_query, {"start_date": start_date}).fetchall()
 
         for row in results:
             # Calculate surveillance intensity (0-1 scale)
-            surveillance_intensity = min(1.0, row.avg_surveillance * (row.position_count / 1000))
+            surveillance_intensity = min(
+                1.0, row.avg_surveillance * (row.position_count / 1000)
+            )
 
             # Estimate constitutional risk based on multiple factors
             risk_score = 0
@@ -266,10 +276,17 @@ def get_surveillance_hotspots(
             if surveillance_intensity > 0.7:
                 risk_score += 0.4
 
-            risk_level = "High Risk" if risk_score > 0.6 else "Moderate Risk" if risk_score > 0.3 else "Low Risk"
+            risk_level = (
+                "High Risk"
+                if risk_score > 0.6
+                else "Moderate Risk"
+                if risk_score > 0.3
+                else "Low Risk"
+            )
 
             # Get neighborhood name for this location if available
-            neighborhood_query = text("""
+            neighborhood_query = text(
+                """
                 SELECT name
                 FROM phoenix_neighborhoods
                 WHERE ST_DWithin(
@@ -278,10 +295,10 @@ def get_surveillance_hotspots(
                     1000  -- Within 1km of grid center
                 )
                 LIMIT 1
-            """)
+            """
+            )
             neighborhood_result = db.execute(
-                neighborhood_query,
-                {"lat": row.grid_lat, "lon": row.grid_lon}
+                neighborhood_query, {"lat": row.grid_lat, "lon": row.grid_lon}
             ).fetchone()
 
             location_name = (
@@ -290,18 +307,23 @@ def get_surveillance_hotspots(
                 else f"Area at {round(row.grid_lat, 4)}, {round(row.grid_lon, 4)}"
             )
 
-            hotspots.append({
-                "location": location_name,
-                "event_count": row.flight_count,
-                "surveillance_intensity": round(surveillance_intensity, 2),
-                "demographic_info": neighborhood_result.name if neighborhood_result else "Outside Phoenix",
-                "constitutional_risk": risk_level,
-                "hover_events": row.hover_positions,
-                "low_altitude_incidents": row.low_altitude_count
-            })
+            hotspots.append(
+                {
+                    "location": location_name,
+                    "event_count": row.flight_count,
+                    "surveillance_intensity": round(surveillance_intensity, 2),
+                    "demographic_info": neighborhood_result.name
+                    if neighborhood_result
+                    else "Outside Phoenix",
+                    "constitutional_risk": risk_level,
+                    "hover_events": row.hover_positions,
+                    "low_altitude_incidents": row.low_altitude_count,
+                }
+            )
 
     except Exception as e:
         import logging
+
         logging.error(f"Error generating surveillance hotspots: {e}")
         hotspots = []
 

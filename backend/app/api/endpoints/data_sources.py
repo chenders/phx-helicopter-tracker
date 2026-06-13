@@ -19,6 +19,7 @@ import csv
 from pathlib import Path
 
 from app.api.deps import get_db
+
 # Web scraping downloader removed - using API instead
 # from app.services.flightradar24_downloader import fr24_downloader, DownloadRequest
 from app.workers.data_import_tasks import (

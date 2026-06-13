@@ -14,7 +14,7 @@ from app.models.aircraft import Aircraft
 from app.schemas.abnormal_patterns import (
     AbnormalPatternResponse,
     AbnormalPatternDetail,
-    AbnormalPatternSummary
+    AbnormalPatternSummary,
 )
 from app.schemas.aircraft import AircraftBase
 
@@ -29,14 +29,14 @@ async def get_abnormal_patterns(
     aircraft_id: Optional[int] = Query(None, description="Filter by aircraft ID"),
     days_back: int = Query(7, description="Number of days to look back"),
     limit: int = Query(100, description="Maximum number of patterns to return"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Get list of detected abnormal flight patterns"""
-    
-    query = db.query(AbnormalPattern).join(
-        FlightLog, AbnormalPattern.flight_log_id == FlightLog.id
-    ).join(
-        Aircraft, FlightLog.aircraft_id == Aircraft.id
+
+    query = (
+        db.query(AbnormalPattern)
+        .join(FlightLog, AbnormalPattern.flight_log_id == FlightLog.id)
+        .join(Aircraft, FlightLog.aircraft_id == Aircraft.id)
     )
 
     # Filter out normal patterns (those are just for tracking)
@@ -45,83 +45,84 @@ async def get_abnormal_patterns(
     # Apply filters
     if pattern_type and pattern_type != "all":
         query = query.filter(AbnormalPattern.pattern_type == pattern_type)
-    
+
     if reviewed:
         query = query.filter(AbnormalPattern.reviewed == reviewed)
-    
+
     if aircraft_id:
         query = query.filter(FlightLog.aircraft_id == aircraft_id)
-    
+
     # Time filter
     cutoff_date = datetime.utcnow() - timedelta(days=days_back)
     query = query.filter(AbnormalPattern.detected_at >= cutoff_date)
-    
+
     # Order by confidence score (descending), then by detection time (descending)
-    patterns = query.order_by(
-        desc(AbnormalPattern.confidence_score), 
-        desc(AbnormalPattern.detected_at)
-    ).limit(limit).all()
-    
+    patterns = (
+        query.order_by(
+            desc(AbnormalPattern.confidence_score), desc(AbnormalPattern.detected_at)
+        )
+        .limit(limit)
+        .all()
+    )
+
     # Format response
     results = []
     for pattern in patterns:
         flight = pattern.flight_log
         aircraft = flight.aircraft if flight else None
-        
-        results.append({
-            "id": pattern.id,
-            "flight_id": flight.flight_id if flight else None,
-            "aircraft_registration": aircraft.registration if aircraft else None,
-            "pattern_type": pattern.pattern_type,
-            "confidence_score": pattern.confidence_score,
-            "detected_at": pattern.detected_at,
-            "reviewed": pattern.reviewed,
-            "flight_date": flight.departure_time if flight else None,
-            "duration_minutes": flight.flight_duration_minutes if flight else None,
-            "metadata": pattern.detection_metadata
-        })
-    
+
+        results.append(
+            {
+                "id": pattern.id,
+                "flight_id": flight.flight_id if flight else None,
+                "aircraft_registration": aircraft.registration if aircraft else None,
+                "pattern_type": pattern.pattern_type,
+                "confidence_score": pattern.confidence_score,
+                "detected_at": pattern.detected_at,
+                "reviewed": pattern.reviewed,
+                "flight_date": flight.departure_time if flight else None,
+                "duration_minutes": flight.flight_duration_minutes if flight else None,
+                "metadata": pattern.detection_metadata,
+            }
+        )
+
     return results
 
 
 @router.get("/aircraft", response_model=List[dict])
-async def get_phoenix_pd_aircraft(
-    db: Session = Depends(get_db)
-):
+async def get_phoenix_pd_aircraft(db: Session = Depends(get_db)):
     """Get list of Phoenix PD aircraft for filtering"""
-    aircraft = db.query(Aircraft).filter(
-        Aircraft.is_phoenix_pd == True
-    ).order_by(Aircraft.registration).all()
-    
+    aircraft = (
+        db.query(Aircraft)
+        .filter(Aircraft.is_phoenix_pd == True)
+        .order_by(Aircraft.registration)
+        .all()
+    )
+
     return [
         {
             "id": a.id,
             "registration": a.registration,
             "make": a.make,
             "model": a.model,
-            "is_active": a.is_active
+            "is_active": a.is_active,
         }
         for a in aircraft
     ]
 
 
 @router.get("/{pattern_id}", response_model=AbnormalPatternDetail)
-async def get_abnormal_pattern_detail(
-    pattern_id: int,
-    db: Session = Depends(get_db)
-):
+async def get_abnormal_pattern_detail(pattern_id: int, db: Session = Depends(get_db)):
     """Get detailed information about a specific abnormal pattern"""
-    
-    pattern = db.query(AbnormalPattern).filter(
-        AbnormalPattern.id == pattern_id
-    ).first()
-    
+
+    pattern = db.query(AbnormalPattern).filter(AbnormalPattern.id == pattern_id).first()
+
     if not pattern:
         raise HTTPException(status_code=404, detail="Pattern not found")
-    
+
     flight = pattern.flight_log
     aircraft = flight.aircraft if flight else None
-    
+
     # Get flight positions from FlightPosition table
     positions = []
     if flight:
@@ -129,34 +130,46 @@ async def get_abnormal_pattern_detail(
         if flight.raw_data and "trail" in flight.raw_data:
             trail = flight.raw_data.get("trail", [])
             for point in trail:
-                positions.append({
-                    "lat": point.get("lat"),
-                    "lng": point.get("lng"),
-                    "alt": point.get("alt"),
-                    "spd": point.get("spd"),
-                    "ts": point.get("ts")
-                })
+                positions.append(
+                    {
+                        "lat": point.get("lat"),
+                        "lng": point.get("lng"),
+                        "alt": point.get("alt"),
+                        "spd": point.get("spd"),
+                        "ts": point.get("ts"),
+                    }
+                )
         else:
             # Otherwise get from FlightPosition table
-            from app.models.flight_positions import FlightPosition  # Use PostGIS-enabled model
-            flight_positions = db.query(FlightPosition).filter(
-                FlightPosition.flight_log_id == flight.id
-            ).order_by(FlightPosition.timestamp).all()
-            
+            from app.models.flight_positions import (
+                FlightPosition,
+            )  # Use PostGIS-enabled model
+
+            flight_positions = (
+                db.query(FlightPosition)
+                .filter(FlightPosition.flight_log_id == flight.id)
+                .order_by(FlightPosition.timestamp)
+                .all()
+            )
+
             for pos in flight_positions:
-                positions.append({
-                    "lat": pos.latitude,
-                    "lng": pos.longitude,
-                    "alt": pos.altitude_feet,
-                    "spd": pos.ground_speed_knots,
-                    "ts": int(pos.timestamp.timestamp()) if pos.timestamp else None
-                })
-    
+                positions.append(
+                    {
+                        "lat": pos.latitude,
+                        "lng": pos.longitude,
+                        "alt": pos.altitude_feet,
+                        "spd": pos.ground_speed_knots,
+                        "ts": int(pos.timestamp.timestamp()) if pos.timestamp else None,
+                    }
+                )
+
     return {
         "id": pattern.id,
         "flight_id": flight.flight_id if flight else None,
         "aircraft_registration": aircraft.registration if aircraft else None,
-        "aircraft_type": f"{aircraft.make} {aircraft.model}" if aircraft and aircraft.make and aircraft.model else None,
+        "aircraft_type": f"{aircraft.make} {aircraft.model}"
+        if aircraft and aircraft.make and aircraft.model
+        else None,
         "pattern_type": pattern.pattern_type,
         "confidence_score": pattern.confidence_score,
         "detected_at": pattern.detected_at,
@@ -169,50 +182,54 @@ async def get_abnormal_pattern_detail(
         "departure_airport": flight.departure_airport if flight else None,
         "arrival_airport": flight.arrival_airport if flight else None,
         "metadata": pattern.detection_metadata,
-        "positions": positions
+        "positions": positions,
     }
 
 
 @router.get("/summary/stats", response_model=AbnormalPatternSummary)
 async def get_abnormal_patterns_summary(
     days_back: int = Query(30, description="Number of days to analyze"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Get summary statistics of abnormal patterns"""
-    
+
     cutoff_date = datetime.utcnow() - timedelta(days=days_back)
-    
+
     # Get counts by pattern type
-    patterns = db.query(AbnormalPattern).filter(
-        AbnormalPattern.detected_at >= cutoff_date
-    ).all()
-    
+    patterns = (
+        db.query(AbnormalPattern)
+        .filter(AbnormalPattern.detected_at >= cutoff_date)
+        .all()
+    )
+
     pattern_counts = {}
     for pattern in patterns:
         pattern_type = pattern.pattern_type
         if pattern_type not in pattern_counts:
             pattern_counts[pattern_type] = 0
         pattern_counts[pattern_type] += 1
-    
+
     # Get review status counts
     pending_count = sum(1 for p in patterns if p.reviewed == "pending")
     confirmed_count = sum(1 for p in patterns if p.reviewed == "confirmed")
     false_positive_count = sum(1 for p in patterns if p.reviewed == "false_positive")
-    
+
     # Get high confidence patterns
     high_confidence = [p for p in patterns if p.confidence_score > 0.8]
-    
+
     return {
         "total_patterns": len(patterns),
         "pattern_types": pattern_counts,
         "review_status": {
             "pending": pending_count,
             "confirmed": confirmed_count,
-            "false_positive": false_positive_count
+            "false_positive": false_positive_count,
         },
         "high_confidence_count": len(high_confidence),
         "days_analyzed": days_back,
-        "most_common_pattern": max(pattern_counts.items(), key=lambda x: x[1])[0] if pattern_counts else None
+        "most_common_pattern": max(pattern_counts.items(), key=lambda x: x[1])[0]
+        if pattern_counts
+        else None,
     }
 
 
@@ -221,18 +238,18 @@ async def update_pattern_review(
     pattern_id: int,
     reviewed: str = Query(..., description="Review status: confirmed, false_positive"),
     review_notes: Optional[str] = Query(None, description="Review notes"),
-    legal_relevance: Optional[str] = Query(None, description="Legal relevance: high, medium, low"),
-    db: Session = Depends(get_db)
+    legal_relevance: Optional[str] = Query(
+        None, description="Legal relevance: high, medium, low"
+    ),
+    db: Session = Depends(get_db),
 ):
     """Update the review status of an abnormal pattern"""
-    
-    pattern = db.query(AbnormalPattern).filter(
-        AbnormalPattern.id == pattern_id
-    ).first()
-    
+
+    pattern = db.query(AbnormalPattern).filter(AbnormalPattern.id == pattern_id).first()
+
     if not pattern:
         raise HTTPException(status_code=404, detail="Pattern not found")
-    
+
     # Update review fields
     pattern.reviewed = reviewed
     if review_notes:
@@ -240,7 +257,7 @@ async def update_pattern_review(
     if legal_relevance:
         pattern.legal_relevance = legal_relevance
     pattern.reviewed_at = datetime.utcnow()
-    
+
     db.commit()
-    
+
     return {"message": "Pattern review updated successfully", "pattern_id": pattern_id}

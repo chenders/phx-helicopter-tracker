@@ -243,6 +243,7 @@ def transcribe_phoenix_pd_archives(
 
         # Load model with GPU support
         import torch
+
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = whisper.load_model(model_name, device=device)
         logger.info(f"Loaded Whisper model: {model_name} on device: {device}")

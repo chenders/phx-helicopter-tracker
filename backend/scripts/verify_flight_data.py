@@ -5,6 +5,7 @@ Runs daily to verify integrity of flight data and detect anomalies
 """
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
@@ -17,17 +18,17 @@ from app.services.data_integrity_service import data_integrity_service
 
 # Set up logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
+
 def main():
     """Run data verification checks"""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("FLIGHT DATA VERIFICATION REPORT")
     print(f"Generated: {datetime.now(timezone.utc).isoformat()}")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
     db = SessionLocal()
     try:
@@ -38,7 +39,7 @@ def main():
         # Display database statistics
         print("DATABASE STATISTICS:")
         print("-" * 30)
-        stats = report.get('database_stats', {})
+        stats = report.get("database_stats", {})
         print(f"  Total Flights: {stats.get('total_flights', 0)}")
         print(f"  Total Positions: {stats.get('total_positions', 0)}")
         print(f"  Total Discoveries: {stats.get('total_discoveries', 0)}")
@@ -48,27 +49,27 @@ def main():
         # Display sample verification results
         print("SAMPLE VERIFICATION:")
         print("-" * 30)
-        sample = report.get('sample_verification', {})
+        sample = report.get("sample_verification", {})
         print(f"  Verified: {sample.get('verified', 0)}")
         print(f"  Failed: {sample.get('failed', 0)}")
-        if sample.get('errors'):
+        if sample.get("errors"):
             print("  Errors:")
-            for error in sample['errors'][:5]:  # Show first 5 errors
+            for error in sample["errors"][:5]:  # Show first 5 errors
                 print(f"    - {error}")
         print()
 
         # Display alerts
-        if report.get('alerts'):
+        if report.get("alerts"):
             print("⚠️  ALERTS:")
             print("-" * 30)
-            for alert in report['alerts']:
+            for alert in report["alerts"]:
                 if isinstance(alert, dict):
-                    alert_type = alert.get('type', alert.get('alert', 'Unknown'))
+                    alert_type = alert.get("type", alert.get("alert", "Unknown"))
                     print(f"  [{alert_type}]")
-                    if 'message' in alert:
+                    if "message" in alert:
                         print(f"    {alert['message']}")
-                    if 'errors' in alert:
-                        for error in alert['errors'][:3]:
+                    if "errors" in alert:
+                        for error in alert["errors"][:3]:
                             print(f"      - {error}")
                 else:
                     print(f"    - {alert}")
@@ -81,22 +82,22 @@ def main():
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         report_file = reports_dir / f"integrity_report_{timestamp}.json"
 
-        with open(report_file, 'w') as f:
+        with open(report_file, "w") as f:
             json.dump(report, f, indent=2)
 
         print(f"✓ Report saved to: {report_file}")
 
         # Check overall status
         has_critical_alerts = any(
-            alert.get('alert') == 'CRITICAL'
-            for alert in report.get('alerts', [])
+            alert.get("alert") == "CRITICAL"
+            for alert in report.get("alerts", [])
             if isinstance(alert, dict)
         )
 
         if has_critical_alerts:
             print("\n❌ CRITICAL ISSUES DETECTED - IMMEDIATE ACTION REQUIRED")
             sys.exit(1)
-        elif report.get('alerts'):
+        elif report.get("alerts"):
             print("\n⚠️  Some issues detected - review recommended")
             sys.exit(0)
         else:
@@ -109,6 +110,7 @@ def main():
         sys.exit(1)
     finally:
         db.close()
+
 
 if __name__ == "__main__":
     main()
