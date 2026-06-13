@@ -213,7 +213,7 @@ def backfill_elevation_data_for_positions(
                         state="PROGRESS",
                         meta={
                             "updated": updated_count,
-                            "status": f"Processing positions...",
+                            "status": "Processing positions...",
                         },
                     )
 

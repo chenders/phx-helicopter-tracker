@@ -159,7 +159,7 @@ async def check_aircraft_activity():
             )
             active_count = len(result.scalars().all())
 
-            logger.info(f"\n=== SUMMARY ===")
+            logger.info("\n=== SUMMARY ===")
             logger.info(f"Total Phoenix PD helicopters: {len(aircraft_list)}")
             logger.info(f"Active (flights in last {days_back} days): {active_count}")
             logger.info(f"Inactive: {len(aircraft_list) - active_count}")

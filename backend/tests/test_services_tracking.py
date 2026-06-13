@@ -3,7 +3,7 @@ Unit tests for unified tracking service
 """
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.services.tracking_service import UnifiedTrackingService, DataSource
 from app.schemas.tracking import LiveTrackingData, TrackingSource

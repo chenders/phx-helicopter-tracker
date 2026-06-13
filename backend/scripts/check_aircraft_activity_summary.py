@@ -49,7 +49,7 @@ def check_aircraft_summary():
                     f"  Last seen: {aircraft.last_seen.strftime('%Y-%m-%d')} ({days_ago} days ago)"
                 )
             else:
-                print(f"  Last seen: No recent flight data")
+                print("  Last seen: No recent flight data")
             print()
 
         print("-" * 60)

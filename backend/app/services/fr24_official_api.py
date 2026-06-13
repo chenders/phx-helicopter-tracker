@@ -77,7 +77,7 @@ class FR24OfficialAPI:
         cache_key = "fr24_phoenix_area_flights"
         cached_data = cache_service.get(cache_key)
         if cached_data:
-            logger.info(f"Returning cached data for Phoenix area flights")
+            logger.info("Returning cached data for Phoenix area flights")
             return cached_data
 
         try:

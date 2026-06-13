@@ -12,6 +12,7 @@ from sqlalchemy import and_, or_
 import json
 import os
 import re
+import aiofiles
 
 from app.db.database import get_db
 from app.models.radio import RadioArchive, RadioTranscription
@@ -108,8 +109,8 @@ async def get_radio_archives(
             # If transcription exists in filesystem JSON, add metadata from there
             if json_file.exists():
                 try:
-                    with open(json_file, "r") as f:
-                        trans_data = json.load(f)
+                    async with aiofiles.open(json_file, "r") as f:
+                        trans_data = json.loads(await f.read())
                         archive_info["transcription_model"] = trans_data.get("model")
                         archive_info["transcribed_at"] = trans_data.get(
                             "transcribed_at"
@@ -199,8 +200,8 @@ async def get_archive_stats() -> Dict[str, Any]:
         total_transcription_time = 0
         for json_file in json_files:
             try:
-                with open(json_file, "r") as f:
-                    data = json.load(f)
+                async with aiofiles.open(json_file, "r") as f:
+                    data = json.loads(await f.read())
                     model = data.get("model", "unknown")
                     model_counts[model] = model_counts.get(model, 0) + 1
 
@@ -253,14 +254,14 @@ async def get_transcription(
         # Try to get JSON transcription from filesystem first
         json_file = mp3_file.with_suffix(".json")
         if json_file.exists():
-            with open(json_file, "r") as f:
-                return json.load(f)
+            async with aiofiles.open(json_file, "r") as f:
+                return json.loads(await f.read())
 
         # Fall back to text file
         txt_file = mp3_file.with_suffix(".txt")
         if txt_file.exists():
-            with open(txt_file, "r") as f:
-                return {"filename": filename, "text": f.read(), "segments": []}
+            async with aiofiles.open(txt_file, "r") as f:
+                return {"filename": filename, "text": await f.read(), "segments": []}
 
         # Finally, check database
         db_archive = (
@@ -324,8 +325,8 @@ async def search_transcriptions(
                 break
 
             try:
-                with open(json_file, "r") as f:
-                    data = json.load(f)
+                async with aiofiles.open(json_file, "r") as f:
+                    data = json.loads(await f.read())
                     text = data.get("text", "").lower()
 
                     if query.lower() in text:
@@ -449,10 +450,10 @@ async def get_audio_file(filename: str, request: Request):
                 content_length = end - start + 1
 
                 # Open file and seek to start position
-                with open(file_path, "rb") as file_handle:
-                    file_handle.seek(start)
+                async with aiofiles.open(file_path, "rb") as file_handle:
+                    await file_handle.seek(start)
                     # Read the requested range
-                    data = file_handle.read(content_length)
+                    data = await file_handle.read(content_length)
 
                 # Return partial content response
                 return Response(
@@ -570,7 +571,7 @@ async def get_radio_activity_by_timerange(
     Used to visualize where police activity was occurring during a flight
     """
     try:
-        from app.models.radio import RadioSegment, RadioTranscription, RadioArchive
+        from app.models.radio import RadioSegment
 
         # Query segments within time range
         query = (

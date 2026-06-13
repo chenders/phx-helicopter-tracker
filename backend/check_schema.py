@@ -28,10 +28,10 @@ def check_schema():
         head_rev = script.get_current_head()
 
         if current_rev != head_rev:
-            print(f"❌ Database schema is OUT OF SYNC!")
+            print("❌ Database schema is OUT OF SYNC!")
             print(f"   Current database revision: {current_rev or 'None'}")
             print(f"   Latest migration revision: {head_rev}")
-            print(f"\n   Run: alembic upgrade head")
+            print("\n   Run: alembic upgrade head")
             return False
 
         print(f"✅ Database schema is IN SYNC (revision: {current_rev})")

@@ -35,7 +35,7 @@ def trigger_download(days_back: int = 730):
         "download_full_historical_data", kwargs={"days_back": days_back}
     )
 
-    print(f"✓ Task submitted successfully!")
+    print("✓ Task submitted successfully!")
     print(f"  Task ID: {task.id}")
     print(f"  Status: {task.state}")
     print("")

@@ -180,7 +180,7 @@ def display_download_summary():
             total_discoveries * 10 / 100
         )  # Estimate based on batched discovery
         total_credits = credits_used + credits_discoveries
-        print(f"\n  Estimated FR24 credits used:")
+        print("\n  Estimated FR24 credits used:")
         print(f"    Discovery: ~{credits_discoveries:.0f}")
         print(f"    Track downloads: {credits_used}")
         print(f"    Total: ~{total_credits:.0f}")

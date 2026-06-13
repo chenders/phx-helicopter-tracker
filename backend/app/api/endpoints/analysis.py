@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import and_, func
 
 from app.api.deps import get_db
 from app.schemas.analysis import (
@@ -109,7 +109,7 @@ def analyze_flight_patterns(
 
 
 @router.get("/patterns/{analysis_id}", response_model=PatternAnalysis)
-def get_pattern_analysis(
+def get_pattern_analysis_by_id(
     *, db: Session = Depends(get_db), analysis_id: str
 ) -> PatternAnalysis:
     """
@@ -1122,7 +1122,7 @@ def analyze_time_patterns(
 
     # Get flight data
     from app.crud.flights import flight_log_crud
-    from app.models import Aircraft
+    from app.models import Aircraft, FlightLog
     import statistics
 
     # Build query
@@ -2042,7 +2042,7 @@ def get_historical_analysis(
 
     # Build response
     historical_data = {
-        "time_range": time_range,
+        "time_range_requested": time_range,
         "aircraft_filter": aircraft,
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),

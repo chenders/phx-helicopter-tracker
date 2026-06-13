@@ -48,6 +48,19 @@ pytest-mock = "^3.12.0"
 black = "^23.10.1"
 ruff = "^0.1.5"
 
+[tool.ruff]
+# Pinned to ruff ^0.1.5: line-length/select/ignore are top-level keys here.
+line-length = 120
+target-version = "py312"
+# E712 ignored: `== True/False` is intentional in SQLAlchemy query filters.
+ignore = ["E712"]
+# Generated/version-pinned Alembic migrations are historical artifacts.
+extend-exclude = ["alembic/versions", "migrations/versions"]
+
+[tool.ruff.per-file-ignores]
+# __init__.py imports are re-exports / side-effect registration — not dead code.
+"**/__init__.py" = ["F401"]
+
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"

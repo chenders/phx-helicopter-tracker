@@ -343,7 +343,7 @@ def transcribe_phoenix_pd_archives(
                 # Also save plain text version for easy reading
                 txt_file = mp3_file.with_suffix(".txt")
                 with open(txt_file, "w") as f:
-                    f.write(f"Phoenix Police Radio Archive Transcription\n")
+                    f.write("Phoenix Police Radio Archive Transcription\n")
                     f.write(f"{'=' * 60}\n")
                     f.write(f"File: {mp3_file.name}\n")
                     f.write(

@@ -13,6 +13,7 @@ from app.services.file_processor import process_imported_files_sync
 from app.crud.flights import flight_log_crud, flight_position_crud
 from app.crud.aircraft import aircraft_crud
 from app.schemas.flights import FlightLogCreate, FlightPositionCreate
+from app.models.flight_logs import FlightLog, FlightPosition
 
 logger = logging.getLogger(__name__)
 
@@ -352,8 +353,8 @@ def import_fr24_historical_data(
         interval_hours: Hours between API calls (to minimize credits)
     """
     logger.warning(
-        f"DEPRECATED: import_fr24_historical only gets snapshots. "
-        f"Use import_fr24_complete_flights for complete tracks!"
+        "DEPRECATED: import_fr24_historical only gets snapshots. "
+        "Use import_fr24_complete_flights for complete tracks!"
     )
     try:
         logger.info(f"Starting FR24 historical import for {registration}")
@@ -418,7 +419,6 @@ async def _import_fr24_complete_flights_async(
             )
 
             found_flight_ids = set()
-            from datetime import datetime, timedelta, timezone
 
             # Check every 6 hours for the past N days
             end_time = datetime.now(timezone.utc)

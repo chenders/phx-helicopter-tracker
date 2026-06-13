@@ -236,7 +236,7 @@ def main():
         logger.error(f"Directory does not exist: {directory_path}")
         sys.exit(1)
 
-    logger.info(f"Starting radio archive re-transcription")
+    logger.info("Starting radio archive re-transcription")
     logger.info(f"Directory: {directory_path}")
     logger.info(f"Model: {args.model}")
     logger.info(f"Force re-transcription: {args.force}")

@@ -161,7 +161,7 @@ class TestFlightAPI:
             "data_source": "test",
         }
 
-        response = client.post(f"/api/v1/flights/positions", json=position_data)
+        response = client.post("/api/v1/flights/positions", json=position_data)
         assert response.status_code == 200
         data = response.json()
         assert data["flight_log_id"] == sample_flight_log.id
@@ -172,7 +172,7 @@ class TestFlightAPI:
         self, client: TestClient, db_session: Session, sample_flight_log: FlightLog
     ):
         """Test getting flight statistics"""
-        response = client.get(f"/api/v1/flights/analysis/cost-summary")
+        response = client.get("/api/v1/flights/analysis/cost-summary")
         assert response.status_code == 200
         data = response.json()
 

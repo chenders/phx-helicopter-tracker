@@ -127,7 +127,7 @@ async def continue_track_downloads(batch_size: int = 30):
                                 f"  Created flight log with {len(positions)} positions"
                             )
                         else:
-                            logger.info(f"  Flight log already exists, updating...")
+                            logger.info("  Flight log already exists, updating...")
 
                         # Update discovery record
                         flight.track_downloaded = True
@@ -144,7 +144,7 @@ async def continue_track_downloads(batch_size: int = 30):
                         flight.track_download_error = "No position data returned"
                         session.commit()
                         error_count += 1
-                        logger.info(f"  ✗ No position data available")
+                        logger.info("  ✗ No position data available")
 
                     # Respect rate limits
                     await asyncio.sleep(3)

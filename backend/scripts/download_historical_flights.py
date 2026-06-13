@@ -277,7 +277,7 @@ async def download_historical_flights(days_back: int = 60):
                             )
                             flight.track_download_error = "No position data returned"
                             session.commit()
-                            logger.info(f"    No position data available")
+                            logger.info("    No position data available")
 
                         # Respect rate limits
                         await asyncio.sleep(3)

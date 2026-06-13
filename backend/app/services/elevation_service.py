@@ -52,7 +52,7 @@ class ElevationService:
 
         if not self.redis_client:
             self.redis_client = await redis.from_url(
-                f"redis://redis:6379", encoding="utf-8", decode_responses=True
+                "redis://redis:6379", encoding="utf-8", decode_responses=True
             )
         if not self.session or self.session.closed:
             self.session = aiohttp.ClientSession()

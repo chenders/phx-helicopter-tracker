@@ -138,7 +138,7 @@ def create_demo_flights():
 
         db.commit()
 
-        print(f"\nDemo data created successfully:")
+        print("\nDemo data created successfully:")
         print(f"  Flights: {flights_created}")
         print(f"  Positions: {positions_created}")
 
@@ -146,7 +146,7 @@ def create_demo_flights():
         total_flights = db.query(FlightLog).count()
         total_positions = db.query(FlightPosition).count()
 
-        print(f"\nTotal in database:")
+        print("\nTotal in database:")
         print(f"  Flights: {total_flights}")
         print(f"  Positions: {total_positions}")
 
