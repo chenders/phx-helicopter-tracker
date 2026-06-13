@@ -48,10 +48,14 @@ target_metadata = Base.metadata
 
 def include_object(object, name, type_, reflected, compare_to):
     """
-    Should we include this object in autogenerate comparisons?
-    Exclude PostGIS system tables like spatial_ref_sys
+    Only manage app-defined tables in autogenerate/check comparisons.
+
+    PostGIS (and its tiger geocoder / topology extensions) create their own
+    tables (spatial_ref_sys, featnames, place_lookup, geocode_settings, etc.).
+    Those are reflected from the DB but aren't in our models, so ignore them —
+    otherwise `alembic check` reports them as spurious "removed table" drift.
     """
-    if type_ == "table" and name == "spatial_ref_sys":
+    if type_ == "table" and reflected and name not in target_metadata.tables:
         return False
     return True
 
