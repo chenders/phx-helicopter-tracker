@@ -37,10 +37,10 @@ jobs:
       - name: Install dependencies
         run: |
           cd backend
-          # openai-whisper's build imports pkg_resources (removed in setuptools>=81);
-          # constrain the build env to a setuptools that still provides it.
-          printf 'setuptools<81\n' > "$RUNNER_TEMP/constraints.txt"
-          PIP_CONSTRAINT="$RUNNER_TEMP/constraints.txt" pip install -r requirements.txt
+          # Skip transcription-only whisper packages (they pull torch/CUDA, ~2.5 min).
+          # The API/tests/migrations don't transcribe; the worker installs them.
+          grep -ivE 'openai-whisper|faster-whisper' requirements.txt > "$RUNNER_TEMP/reqs-ci.txt"
+          pip install -r "$RUNNER_TEMP/reqs-ci.txt"
 
       - name: Run Alembic migrations
         env:

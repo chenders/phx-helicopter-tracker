@@ -28,10 +28,10 @@ jobs:
         run: |
           cd backend
           pip install --upgrade pip
-          # openai-whisper's build imports pkg_resources (removed in setuptools>=81);
-          # constrain the build env to a setuptools that still provides it.
-          printf 'setuptools<81\n' > "$RUNNER_TEMP/constraints.txt"
-          PIP_CONSTRAINT="$RUNNER_TEMP/constraints.txt" pip install -r requirements.txt
+          # Skip transcription-only whisper packages (they pull torch/CUDA, ~2.5 min).
+          # The API/tests/migrations don't transcribe; the worker installs them.
+          grep -ivE 'openai-whisper|faster-whisper' requirements.txt > "$RUNNER_TEMP/reqs-ci.txt"
+          pip install -r "$RUNNER_TEMP/reqs-ci.txt"
           pip install black==23.10.1 ruff==0.1.5
 
       - name: Check code formatting with Black
@@ -85,10 +85,10 @@ jobs:
         run: |
           cd backend
           pip install --upgrade pip
-          # openai-whisper's build imports pkg_resources (removed in setuptools>=81);
-          # constrain the build env to a setuptools that still provides it.
-          printf 'setuptools<81\n' > "$RUNNER_TEMP/constraints.txt"
-          PIP_CONSTRAINT="$RUNNER_TEMP/constraints.txt" pip install -r requirements.txt
+          # Skip transcription-only whisper packages (they pull torch/CUDA, ~2.5 min).
+          # The API/tests/migrations don't transcribe; the worker installs them.
+          grep -ivE 'openai-whisper|faster-whisper' requirements.txt > "$RUNNER_TEMP/reqs-ci.txt"
+          pip install -r "$RUNNER_TEMP/reqs-ci.txt"
 
       - name: Run tests with pytest
         env:
@@ -125,10 +125,10 @@ jobs:
         run: |
           cd backend
           pip install --upgrade pip
-          # openai-whisper's build imports pkg_resources (removed in setuptools>=81);
-          # constrain the build env to a setuptools that still provides it.
-          printf 'setuptools<81\n' > "$RUNNER_TEMP/constraints.txt"
-          PIP_CONSTRAINT="$RUNNER_TEMP/constraints.txt" pip install -r requirements.txt
+          # Skip transcription-only whisper packages (they pull torch/CUDA, ~2.5 min).
+          # The API/tests/migrations don't transcribe; the worker installs them.
+          grep -ivE 'openai-whisper|faster-whisper' requirements.txt > "$RUNNER_TEMP/reqs-ci.txt"
+          pip install -r "$RUNNER_TEMP/reqs-ci.txt"
           pip install mypy
 
       - name: Type check with mypy

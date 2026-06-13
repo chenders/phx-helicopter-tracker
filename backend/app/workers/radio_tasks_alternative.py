@@ -12,7 +12,6 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 from celery import current_task
-import whisper
 
 from app.workers.celery_app import celery_app
 
@@ -243,6 +242,7 @@ def transcribe_phoenix_pd_archives(
 
         # Load model with GPU support
         import torch
+        import whisper
 
         device = "cuda" if torch.cuda.is_available() else "cpu"
         model = whisper.load_model(model_name, device=device)

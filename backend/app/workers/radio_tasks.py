@@ -13,7 +13,6 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 from bs4 import BeautifulSoup
 from celery import current_task
-import whisper
 
 from app.workers.celery_app import celery_app
 from app.db.database import SessionLocal
