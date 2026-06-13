@@ -10,7 +10,7 @@ from app.crud.flights import flight_log_crud, flight_position_crud
 from app.schemas.aircraft import AircraftCreate, AircraftUpdate
 from app.schemas.flights import FlightLogCreate, FlightPositionCreate, FlightLogUpdate
 from app.models.aircraft import Aircraft
-from app.models.flight_logs import FlightLog, FlightPosition
+from app.models import FlightLog, FlightPosition
 
 
 class TestAircraftCRUD:

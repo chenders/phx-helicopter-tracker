@@ -13,7 +13,7 @@ from app.services.file_processor import process_imported_files_sync
 from app.crud.flights import flight_log_crud, flight_position_crud
 from app.crud.aircraft import aircraft_crud
 from app.schemas.flights import FlightLogCreate, FlightPositionCreate
-from app.models.flight_logs import FlightLog, FlightPosition
+from app.models import FlightLog, FlightPosition
 
 logger = logging.getLogger(__name__)
 

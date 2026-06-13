@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 
-from app.models.flight_logs import FlightLog, FlightPosition
+from app.models import FlightLog, FlightPosition
 
 
 class TestFlightAPI:
