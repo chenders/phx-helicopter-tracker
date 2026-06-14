@@ -417,8 +417,13 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           window.CESIUM_BASE_URL =
           "https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/";
 
-        // Set Cesium Ion default access token (your personal token)
+        // Cesium Ion access token. Prefer the VITE_CESIUM_API_KEY env var (set
+        // per-environment via the gitignored .env, matching the other 3D
+        // components); fall back to the previously-committed token so existing
+        // deploys keep working. NOTE: that fallback token is already in git
+        // history and should be rotated and moved fully to env.
         Cesium.Ion.defaultAccessToken =
+          import.meta.env.VITE_CESIUM_API_KEY ||
           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiM2FlZDAyOS00ZjE4LTQ0NjItOTY4ZC0xNzQyNGIzNjhhOTkiLCJpZCI6MzQ2MjQ4LCJpYXQiOjE3NTkzMDkyMjl9.zkS_2D4Y8scZkqmS_lckpl2G_7c8sGaFwMazm26eAT0";
 
         // Initialize the Cesium Viewer with mobile-optimized settings
@@ -935,14 +940,25 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           };
         });
 
-        const timeStepInSeconds = 5;
-        const totalSeconds = timeStepInSeconds * (flightData.length - 1);
-        const start = Cesium.JulianDate.fromIso8601(flightData[0].timestamp);
-        const stop = Cesium.JulianDate.addSeconds(
-          start,
-          totalSeconds,
-          new Cesium.JulianDate(),
-        );
+        // Build the clock from the REAL recorded timestamps. Previously every
+        // sample was forced 5s apart (timeStepInSeconds), which fabricated a
+        // uniform timeline and hid the true gaps between recorded positions —
+        // misleading for evidence. start/stop now span the actual flight.
+        //
+        // Derive the span from the first/last positions that actually have a
+        // valid timestamp — not flightData[0]/[last] blindly. A null/malformed
+        // timestamp there would throw in fromIso8601 and abort the whole viewer,
+        // and if position 0 were skipped by the sample loop's guard, `start`
+        // would sit ahead of the first real sample (helicopter at the origin).
+        const firstValid = flightData.find((d) => !!d.timestamp);
+        const lastValid = [...flightData].reverse().find((d) => !!d.timestamp);
+        if (!firstValid || !lastValid) {
+          throw new Error(
+            "No positions with valid timestamps — cannot build the 3D timeline",
+          );
+        }
+        const start = Cesium.JulianDate.fromIso8601(firstValid.timestamp);
+        const stop = Cesium.JulianDate.fromIso8601(lastValid.timestamp);
         viewer.clock.startTime = start.clone();
         viewer.clock.stopTime = stop.clone();
         viewer.clock.currentTime = start.clone();
@@ -957,15 +973,24 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         const positionProperty = new Cesium.SampledPositionProperty();
         const orientationProperty = new Cesium.SampledProperty(Cesium.Quaternion);
 
+        // Cesium sampled properties require strictly increasing sample times.
+        let lastSampleTime: any = null;
+
         for (let i = 0; i < flightData.length; i++) {
           const dataPoint = flightData[i];
 
-          // Declare the time for this individual sample and store it in a new JulianDate instance.
-          const time = Cesium.JulianDate.addSeconds(
-            start,
-            i * timeStepInSeconds,
-            new Cesium.JulianDate(),
-          );
+          // Use this position's REAL recorded timestamp. Skip any missing,
+          // duplicate, or out-of-order timestamps so the series stays strictly
+          // increasing (and honest about the real spacing between positions).
+          if (!dataPoint.timestamp) continue;
+          const time = Cesium.JulianDate.fromIso8601(dataPoint.timestamp);
+          if (
+            lastSampleTime &&
+            Cesium.JulianDate.lessThanOrEquals(time, lastSampleTime)
+          ) {
+            continue;
+          }
+          lastSampleTime = time;
           // Convert altitude from feet to meters (Cesium uses meters)
           const position = Cesium.Cartesian3.fromDegrees(
             dataPoint.longitude,
@@ -1093,8 +1118,18 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         // Also store globally for testing
         (window as any).cesiumViewer = viewer;
 
-        // Hide credits
-        // viewer.cesiumWidget.creditContainer.style.display = "none";
+        // Keep the Google / Cesium ion attribution visible (required by their
+        // terms — it must not be hidden or obscured) but move it from Cesium's
+        // default bottom-left to the bottom-right, freeing the bottom-left
+        // corner for the minimap. Inline styles override widgets.css.
+        const creditContainer = (viewer as any).cesiumWidget?.creditContainer as
+          | HTMLElement
+          | undefined;
+        if (creditContainer) {
+          creditContainer.style.left = "auto";
+          creditContainer.style.right = "8px";
+          creditContainer.style.textAlign = "right";
+        }
 
         // Configure scene - completely hide the globe to avoid grid
         // viewer.scene.globe.show = false; // Hide globe completely from the start
@@ -1306,19 +1341,84 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           );
         });
 
-        // Create flight path
-        const flightPath = viewer.entities.add({
-          name: "Flight Path",
-          polyline: {
-            positions: cartesianPositions,
-            width: 4,
-            material: new Cesium.PolylineGlowMaterialProperty({
-              glowPower: 0.2,
+        // Split the path into continuous segments, breaking wherever there is a
+        // tracking gap between consecutive positions. Drawing one unbroken line
+        // across a gap would imply a flight path that was never recorded —
+        // misleading for evidence. Normal sampling is ~2-3s (<=16s even on dense
+        // flights); a delta over GAP_THRESHOLD_SECONDS means tracking was lost
+        // (out of range, transponder off, etc.), so the line is broken there.
+        const GAP_THRESHOLD_SECONDS = 30;
+        const pathSegments: any[][] = [];
+        // A position isolated on both sides by gaps can't form a line. Keep it
+        // as a point rather than dropping it — silently omitting a real recorded
+        // coordinate would be an evidence gap, not a rendering nicety.
+        const isolatedPoints: any[] = [];
+        let currentSegment: any[] = [];
+        const flushSegment = () => {
+          if (currentSegment.length >= 2) pathSegments.push(currentSegment);
+          else if (currentSegment.length === 1)
+            isolatedPoints.push(currentSegment[0]);
+          currentSegment = [];
+        };
+        for (let i = 0; i < displayPositions.length; i++) {
+          if (i > 0) {
+            const prevTs = displayPositions[i - 1].timestamp;
+            const curTs = displayPositions[i].timestamp;
+            const prevMs = prevTs ? new Date(prevTs).getTime() : NaN;
+            const curMs = curTs ? new Date(curTs).getTime() : NaN;
+            // If either timestamp is missing or unparseable we can't verify the
+            // two positions are contiguous in time. Treat that as a gap (break
+            // the line) rather than asserting a continuity we can't support —
+            // bridging an unknown interval with a solid line would fabricate a
+            // path. (Mirrors the animation sample loop, which skips positions
+            // without a usable timestamp.)
+            const gapSeconds =
+              Number.isFinite(prevMs) && Number.isFinite(curMs)
+                ? (curMs - prevMs) / 1000
+                : Infinity;
+            if (gapSeconds > GAP_THRESHOLD_SECONDS) {
+              flushSegment();
+            }
+          }
+          currentSegment.push(cartesianPositions[i]);
+        }
+        flushSegment();
+
+        // One polyline entity per continuous segment; gaps are left visibly
+        // unbridged rather than connected by a fabricated straight line.
+        pathSegments.forEach((segmentPositions, segIdx) => {
+          viewer.entities.add({
+            name:
+              segIdx === 0
+                ? "Flight Path"
+                : `Flight Path (segment ${segIdx + 1})`,
+            polyline: {
+              positions: segmentPositions,
+              width: 4,
+              material: new Cesium.PolylineGlowMaterialProperty({
+                glowPower: 0.2,
+                color: Cesium.Color.RED.withAlpha(0.9),
+              }),
+              clampToGround: false,
+              show: true,
+            },
+          });
+        });
+
+        // Render any gap-isolated single positions as points so they remain
+        // visible in the record instead of disappearing.
+        isolatedPoints.forEach((pointPosition) => {
+          viewer.entities.add({
+            name: "Isolated position",
+            position: pointPosition,
+            point: {
+              pixelSize: 8,
               color: Cesium.Color.RED.withAlpha(0.9),
-            }),
-            clampToGround: false,
-            show: true,
-          },
+              outlineColor: Cesium.Color.WHITE,
+              outlineWidth: 1,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
+            },
+          });
         });
 
         // Add start marker
@@ -2930,12 +3030,22 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           </div>
         )}
 
-        {/* 2D Street Label List - Shows nearby streets and areas */}
+        {/* Right-side locations panel. top-44 clears the HUD's default position
+            (the HUD is independently draggable; dragging it here is the user's
+            choice); bottom-10 clears the relocated bottom-right attribution
+            strip so the expanded card never covers it. pointer-events-none on
+            the wrapper + auto on the card keeps the gaps click-through for
+            camera dragging. */}
         {!isLoading && positions.length > 0 && (
-          <StreetLabelList labels={nearbyLabels} />
+          <div className="absolute right-4 top-44 bottom-10 z-30 flex flex-col items-end pointer-events-none">
+            {/* 2D Street Label List - Shows nearby streets and areas */}
+            <StreetLabelList labels={nearbyLabels} className="flex-1 min-h-0" />
+          </div>
         )}
 
-        {/* Phoenix Area Minimap - Division-inspired overview map */}
+        {/* Phoenix Area Minimap - moved to the bottom-left (the corner the
+            Cesium/Google attribution used to occupy; we relocated that to the
+            bottom-right at viewer init). */}
         {!isLoading && positions.length > 0 && viewerRef.current && (
           <PhoenixMinimap
             viewer={viewerRef.current}
@@ -2944,7 +3054,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               latitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].latitude,
               longitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].longitude,
             } : undefined}
-            className="absolute bottom-4 right-4 z-[9999]"
+            className="absolute bottom-4 left-4 z-[9999]"
             size={200}
             onClick={(latitude, longitude) => {
               // Navigate camera to clicked location

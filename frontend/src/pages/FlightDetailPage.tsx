@@ -1051,29 +1051,10 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
           onLoad={(map) => {
             mapRef.current = map
 
-            // Add native polyline for flight path
-            if (positions.length > 0) {
-              console.log('2D View: Creating flight path with', positions.length, 'positions');
-              const pathCoordinates = positions.map(p => ({
-                lat: p.latitude,
-                lng: p.longitude
-              }))
-
-              // Create the polyline
-              const flightPath = new google.maps.Polyline({
-                path: pathCoordinates,
-                geodesic: true,
-                strokeColor: '#EF4444',
-                strokeOpacity: 1.0,
-                strokeWeight: 4,
-                map: map
-              })
-
-              console.log('2D View: Flight path created');
-
-              // Store reference for cleanup
-              (window as any).flightPath2D = flightPath
-            }
+            // The flight path is rendered by the declarative <Polyline> below.
+            // Previously an imperative google.maps.Polyline was also created
+            // here, double-drawing the same path and leaking a stale
+            // window.flightPath2D global that nothing read or cleaned up.
 
             const bounds = getMapBounds()
             if (bounds && !isPlaying) {
