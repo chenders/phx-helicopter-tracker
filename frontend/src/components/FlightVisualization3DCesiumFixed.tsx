@@ -2,31 +2,22 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import "../styles/slider.css";
 import {
   createHolographicBillboard,
-  createProgressiveRevealLabel,
-  createPulsingHolographicMarker,
   createHolographicBeam,
-  getTierHolographicColor,
   HolographicColors,
 } from "../utils/holographicMaterials";
-import { HolographicStreetLabels } from "./HolographicStreetLabels";
-import { PHOENIX_LABELS } from "../data/phoenixStreetLabels";
-import { FlightHUD, FlightHUDData } from "./FlightHUD";
+import { FlightHUD } from "./FlightHUD";
 import { RadioAudioIndicator } from "./RadioAudioIndicator";
 import { useRadioArchives } from "../hooks/useRadioArchives";
 import { CADActivityPanel } from "./CADActivityPanel";
 import { useRadioActivity } from "../hooks/useRadioActivity";
 import { StreetLabelList } from "./StreetLabelList";
 import { PhoenixMinimap } from "./PhoenixMinimap";
-import { ScreenSpaceLabels } from "./ScreenSpaceLabels";
 import {
   isMobileDevice,
-  getCardinalDirection,
   formatTime,
   getDistanceFeet,
-  getDistanceMiles,
   knotsToMph,
   metersToFeet,
-  feetToMeters,
 } from "../utils/flightUtils";
 import {
   FlightPosition,
@@ -34,11 +25,7 @@ import {
   HoverLocationData,
 } from "../types/flight";
 import {
-  CAMERA_CONFIG,
   ANIMATION_CONFIG,
-  DISTANCE_CONFIG,
-  CONVERSION_CONSTANTS,
-  MOBILE_BREAKPOINT,
 } from "../config/cesiumConfig";
 
 declare global {
@@ -121,7 +108,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
   });
   const [totalTimeInRadius, setTotalTimeInRadius] = useState(0); // Total time spent in search radius in seconds
   const [cameraPosition, setCameraPosition] = useState<any>(null); // Cesium.Cartesian3 camera position for street labels
-  const [nearbyLabels, setNearbyLabels] = useState<Array<{name: string; tier: number; distance: number; type?: string; alwaysShow?: boolean}>>([]);
+  const [nearbyLabels, setNearbyLabels] = useState<Array<{name: string; tier: number; distance: number; type?: 'area' | 'street' | 'highway' | 'landmark'; alwaysShow?: boolean}>>([]);
 
   // Fetch radio archives for flight time range
   const flightStartTime = positions.length > 0 ? positions[0].timestamp : undefined;
@@ -426,7 +413,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         const Cesium = window.Cesium;
 
         // Suppress the sandboxed iframe warning - must be set before creating viewer
-        // @ts-ignore
+        // @ts-expect-error CESIUM_BASE_URL is a global injected at runtime, not typed on Window
           window.CESIUM_BASE_URL =
           "https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/";
 
@@ -2131,7 +2118,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
       } catch (err) {
         console.error("Error loading Cesium:", err);
         if (mountedRef.current) {
-          // @ts-ignore
+          // @ts-expect-error err is typed as unknown in catch; message is accessed defensively
             setError(`Failed to load 3D visualization: ${err.message}`);
           setIsLoading(false);
         }
@@ -2367,6 +2354,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               const currentPosTime = new Date(currentPos.timestamp).getTime();
 
               for (const hoverLoc of hoverLocations) {
+                if (!hoverLoc.start_time || !hoverLoc.end_time) continue;
                 const hoverStartTime = new Date(hoverLoc.start_time).getTime();
                 const hoverEndTime = new Date(hoverLoc.end_time).getTime();
 
@@ -2584,11 +2572,11 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               const distanceMoved = R * c;
 
               // Update labels if moved > 1.5 miles
-              if (distanceMoved > 1.5 && window.phoenixLabelsData) {
+              if (distanceMoved > 1.5 && (window as any).phoenixLabelsData) {
                 console.log(`Helicopter moved ${distanceMoved.toFixed(2)} miles - regenerating labels`);
 
                 // Remove all existing ground label entities (keep helicopter and other markers)
-                const entitiesToRemove = [];
+                const entitiesToRemove: any[] = [];
                 for (let i = 0; i < viewer.entities.values.length; i++) {
                   const entity = viewer.entities.values[i];
                   if (entity.name && entity.name.startsWith('Ground Label:')) {
@@ -2599,7 +2587,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                 console.log(`Removed ${entitiesToRemove.length} old ground labels`);
 
                 // Regenerate labels centered on current helicopter position
-                const phoenixLabels = window.phoenixLabelsData;
+                const phoenixLabels = (window as any).phoenixLabelsData;
                 const getDistanceFeet = (lat1, lng1, lat2, lng2) => {
                   const R = 20925721; // Earth radius in feet
                   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -3007,6 +2995,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                   {/* Hover location markers - Red dots */}
                   {hoverLocations && hoverLocations.map((hoverLoc, idx) => {
                     // Find position indices that match this hover location's time range
+                    if (!hoverLoc.start_time || !hoverLoc.end_time) return null;
                     const hoverStartTime = new Date(hoverLoc.start_time).getTime();
                     const hoverEndTime = new Date(hoverLoc.end_time).getTime();
 

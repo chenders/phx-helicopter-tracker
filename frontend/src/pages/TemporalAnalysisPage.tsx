@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useTimeAnalysis } from '../hooks/useTimeAnalysis'
 
 type AnalysisType = 'hourly' | 'daily' | 'weekly' | 'monthly'

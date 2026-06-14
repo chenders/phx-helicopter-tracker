@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { formatLocalDate, formatRelativeTime, formatDuration } from '../utils/dateUtils'
+import { formatRelativeTime } from '../utils/dateUtils'
 
 interface TaskHistory {
   id: number

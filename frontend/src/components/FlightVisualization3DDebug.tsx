@@ -68,7 +68,7 @@ export const FlightVisualization3DDebug: React.FC<FlightVisualization3DDebugProp
         addDebugLog(`🔑 API Keys: ${JSON.stringify(apiKeys)}`);
 
         // Try to use experimental 3D features
-        let mapConfig: any = {
+        const mapConfig: any = {
           center: {
             lat: positions[0]?.latitude || 33.4484,
             lng: positions[0]?.longitude || -112.0740

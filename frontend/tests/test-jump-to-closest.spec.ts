@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test('test jump to closest functionality', async ({ page }) => {
   // Navigate to flight 72 with search context

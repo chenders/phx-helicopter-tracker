@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test('flight timeline slider navigation', async ({ page }) => {
   // Navigate to flight 4 which has 5014 positions

@@ -1,11 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { GoogleMap, Polyline, MarkerF, InfoWindow, Circle } from '@react-google-maps/api'
 import {
-  ArrowLeft,
-  Plane,
-  Clock,
-  MapPin,
   AlertTriangle,
   Radio,
   Play,
@@ -14,17 +10,13 @@ import {
   Activity,
   Eye,
   Home,
-  Building2,
   TrendingUp,
   TrendingDown,
-  Mountain,
-  Globe,
-  ChevronDown,
-  ChevronUp
+  Mountain
 } from 'lucide-react'
 import axios from '@/lib/axios'
-import { formatLocalTime, formatRelativeTime } from '../utils/dateUtils'
-import FlightVisualization3DCesium, { HudData, getCardinalDirection, formatTime } from '../components/FlightVisualization3DCesiumFixed'
+import { formatLocalTime } from '../utils/dateUtils'
+import FlightVisualization3DCesium, { HudData } from '../components/FlightVisualization3DCesiumFixed'
 import { FlightDetailHeader } from '../components/FlightDetailHeader'
 
 interface FlightDetails {
@@ -159,7 +151,7 @@ const getHelicopterIcon = (heading: number = 0, isPlaying: boolean = false) => {
     }
   }
 
-  return null
+  return undefined
 }
 
 // Mobile device detection utility
@@ -257,17 +249,17 @@ export function FlightDetailPage() {
 
   // Get search context from URL parameters
   const searchContext = {
-    lat: searchParams.get('searchLat') ? parseFloat(searchParams.get('searchLat')!) : null,
-    lng: searchParams.get('searchLng') ? parseFloat(searchParams.get('searchLng')!) : null,
-    radius: searchParams.get('searchRadius') ? parseFloat(searchParams.get('searchRadius')!) : null,
-    closestDistance: searchParams.get('closestDistance') ? parseFloat(searchParams.get('closestDistance')!) : null,
-    closestTime: searchParams.get('closestTime') || null,
-    closestSpeed: searchParams.get('closestSpeed') ? parseFloat(searchParams.get('closestSpeed')!) : null,
-    closestAltitude: searchParams.get('closestAltitude') ? parseFloat(searchParams.get('closestAltitude')!) : null,
-    closestAltitudeAGL: searchParams.get('closestAltitudeAGL') ? parseFloat(searchParams.get('closestAltitudeAGL')!) : null,
-    closestBearing: searchParams.get('closestBearing') ? parseFloat(searchParams.get('closestBearing')!) : null,
+    lat: searchParams.get('searchLat') ? parseFloat(searchParams.get('searchLat')!) : undefined,
+    lng: searchParams.get('searchLng') ? parseFloat(searchParams.get('searchLng')!) : undefined,
+    radius: searchParams.get('searchRadius') ? parseFloat(searchParams.get('searchRadius')!) : undefined,
+    closestDistance: searchParams.get('closestDistance') ? parseFloat(searchParams.get('closestDistance')!) : undefined,
+    closestTime: searchParams.get('closestTime') || undefined,
+    closestSpeed: searchParams.get('closestSpeed') ? parseFloat(searchParams.get('closestSpeed')!) : undefined,
+    closestAltitude: searchParams.get('closestAltitude') ? parseFloat(searchParams.get('closestAltitude')!) : undefined,
+    closestAltitudeAGL: searchParams.get('closestAltitudeAGL') ? parseFloat(searchParams.get('closestAltitudeAGL')!) : undefined,
+    closestBearing: searchParams.get('closestBearing') ? parseFloat(searchParams.get('closestBearing')!) : undefined,
     isHovering: searchParams.get('isHovering') === 'true',
-    hoverDuration: searchParams.get('hoverDuration') ? parseInt(searchParams.get('hoverDuration')!) : null,
+    hoverDuration: searchParams.get('hoverDuration') ? parseInt(searchParams.get('hoverDuration')!) : undefined,
   }
 
   const [flight, setFlight] = useState<FlightDetails | null>(null)
@@ -519,13 +511,13 @@ export function FlightDetailPage() {
 
       // When audio is loaded, seek to start time and play
       audio.addEventListener('loadedmetadata', () => {
-        audio.currentTime = segment.segment_start
+        audio.currentTime = segment.audio_file.segment_start
         audio.play()
         setPlayingAudio(audioId)
 
         // Stop at segment end time
         const checkTime = () => {
-          if (audio.currentTime >= segment.segment_end) {
+          if (audio.currentTime >= segment.audio_file.segment_end) {
             audio.pause()
             setPlayingAudio(null)
             audio.removeEventListener('timeupdate', checkTime)
@@ -575,7 +567,7 @@ export function FlightDetailPage() {
       return null
     }
 
-    let closestPos = null
+    let closestPos: (FlightPosition & { distance: number }) | null = null
     let minDistance = Infinity
 
     positions.forEach(pos => {
@@ -1080,7 +1072,7 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
               console.log('2D View: Flight path created');
 
               // Store reference for cleanup
-              ;(window as any).flightPath2D = flightPath
+              (window as any).flightPath2D = flightPath
             }
 
             const bounds = getMapBounds()

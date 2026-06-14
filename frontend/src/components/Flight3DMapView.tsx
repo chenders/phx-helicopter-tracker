@@ -3,13 +3,9 @@ import { GoogleMap, Polyline, MarkerF, InfoWindow, Circle } from '@react-google-
 import {
   Play,
   Pause,
-  SkipForward,
   Eye,
-  Compass,
-  Gauge,
   Mountain,
   Camera,
-  Maximize2,
   Navigation
 } from 'lucide-react'
 
@@ -262,7 +258,7 @@ export const Flight3DMapView: React.FC<Flight3DMapViewProps> = ({ positions, fli
     console.log('Polyline created in useEffect');
 
     // Store reference and debug function
-    ;(window as any).mainFlightPath = flightPath
+    (window as any).mainFlightPath = flightPath
     ;(window as any).debugFlightPath = () => {
       const fp = (window as any).mainFlightPath
       if (fp) {
@@ -320,7 +316,7 @@ export const Flight3DMapView: React.FC<Flight3DMapViewProps> = ({ positions, fli
     });
 
     // Store reference for cleanup
-    ;(window as any).miniMapFlightPath = miniMapPath;
+    (window as any).miniMapFlightPath = miniMapPath;
 
     // Cleanup function
     return () => {
@@ -812,7 +808,7 @@ export const Flight3DMapView: React.FC<Flight3DMapViewProps> = ({ positions, fli
             console.log('Path map:', flightPath.getMap());
 
             // Store reference for cleanup
-            ;(window as any).mainFlightPath = flightPath
+            (window as any).mainFlightPath = flightPath
 
             // Fit bounds to show entire flight path
             const bounds = new google.maps.LatLngBounds()

@@ -20,6 +20,7 @@ interface PhoenixMinimapProps {
   flightPath: Array<{ latitude: number; longitude: number }>;
   currentPosition?: { latitude: number; longitude: number };
   className?: string;
+  style?: React.CSSProperties;
   size?: number;  // Width/height in pixels
   onClick?: (latitude: number, longitude: number) => void;
 }
@@ -125,6 +126,7 @@ export const PhoenixMinimap: React.FC<PhoenixMinimapProps> = ({
   flightPath,
   currentPosition,
   className = '',
+  style,
   size = 200,
   onClick,
 }) => {
@@ -339,6 +341,7 @@ export const PhoenixMinimap: React.FC<PhoenixMinimapProps> = ({
   return (
     <div
       className={className}
+      style={style}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

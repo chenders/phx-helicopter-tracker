@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import axios from '@/lib/axios'
 import {
   TrendingUp,
-  Clock,
   MapPin,
   Radio,
   BarChart3,

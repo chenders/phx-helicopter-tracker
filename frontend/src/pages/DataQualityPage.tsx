@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ScatterChart, Scatter, Cell } from 'recharts'
-import { AlertTriangle, TrendingUp, Calendar, Clock, Activity } from 'lucide-react'
+import { AlertTriangle, TrendingUp, Clock, Activity } from 'lucide-react'
 import axios from '@/lib/axios'
 
 interface DiscrepancyData {
@@ -389,7 +389,7 @@ export function DataQualityPage() {
             </p>
           </div>
           <button
-            onClick={fetchDataQuality}
+            onClick={() => fetchDataQuality()}
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
           >
             Refresh Data

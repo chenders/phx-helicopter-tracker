@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, ScatterChart, Scatter } from 'recharts'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { usePatternAnalysis } from '../hooks/usePatternAnalysis'
 import { useSurveillanceHotspots } from '../hooks/useSurveillanceHotspots'
 

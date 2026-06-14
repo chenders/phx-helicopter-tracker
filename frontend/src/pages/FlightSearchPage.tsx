@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { GoogleMap, MarkerF, Circle, Polyline, Autocomplete } from '@react-google-maps/api'
-import { Search, Calendar, MapPin, Plane, Clock, Radio, ChevronRight, Play, Pause, Volume2, ArrowUpDown, Users } from 'lucide-react'
+import { Search, Calendar, MapPin, Plane, Clock, ChevronRight, Users } from 'lucide-react'
 import axios from '@/lib/axios'
 import { useNavigate, Link } from 'react-router-dom'
-import { formatLocalTime } from '../utils/dateUtils'
 
 interface FlightResult {
   id: number
@@ -26,6 +25,12 @@ interface FlightResult {
     longitude: number
     timestamp: string
     altitude: number
+    ground_speed_knots: number | null
+    altitude_feet: number | null
+    altitude_agl_feet: number | null
+    track_degrees: number | null
+    is_hovering?: boolean
+    hover_duration_seconds?: number | null
   }
   grouped_count?: number
   grouped_flights?: FlightResult[]
@@ -908,7 +913,7 @@ export function FlightSearchPage() {
             center={mapCenter}
             zoom={11}
             onClick={handleMapClick}
-            onLoad={map => mapRef.current = map}
+            onLoad={map => { mapRef.current = map }}
             data-id="search-map"
             options={{
               styles: darkMapStyles,

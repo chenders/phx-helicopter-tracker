@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test('debug ground labels on flight 6661', async ({ page }) => {
   // Capture console logs

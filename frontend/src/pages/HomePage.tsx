@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useRealtimeFlights } from '../hooks/useRealtimeFlights'
 import { useStats } from '../hooks/useStats'
-import { formatRelativeTime, formatLocalTime } from '../utils/dateUtils'
+import { formatRelativeTime } from '../utils/dateUtils'
 
 interface DashboardStats {
   active_flights: number

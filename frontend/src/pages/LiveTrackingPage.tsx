@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState } from 'react'
 // TODO: Migrate to AdvancedMarkerElement when @react-google-maps/api supports it
 // For now, using deprecated Marker which is still supported and will receive 12+ months notice before removal
-import { GoogleMap, MarkerF, InfoWindow, HeatmapLayer, Polygon, Polyline } from '@react-google-maps/api'
+import { GoogleMap, MarkerF, InfoWindow, HeatmapLayer, Polyline } from '@react-google-maps/api'
 import { useRealtimeFlightsDB, useLiveTrackingStats, forceAPIUpdate } from '../hooks/useRealtimeFlightsDB'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { useSurveillanceAlerts } from '../hooks/useSurveillanceAlerts'

@@ -11,7 +11,7 @@
  * - Semantic color coding (amber for radio)
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { HolographicColors } from '../utils/holographicMaterials';
 
 export interface RadioArchiveData {
