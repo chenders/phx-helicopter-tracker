@@ -756,6 +756,7 @@ def get_data_quality_metrics(db: Session = Depends(get_db)) -> Dict[str, Any]:
         WITH flight_position_spans AS (
             SELECT
                 fl.id,
+                fl.public_id,
                 fl.flight_id,
                 fl.departure_time,
                 fl.arrival_time,
@@ -767,10 +768,10 @@ def get_data_quality_metrics(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 EXTRACT(EPOCH FROM (MAX(fp.timestamp) - fl.arrival_time))/60 as minutes_after_arrival
             FROM flight_logs fl
             JOIN flight_positions fp ON fp.flight_log_id = fl.id
-            GROUP BY fl.id, fl.flight_id, fl.departure_time, fl.arrival_time, fl.flight_duration_minutes
+            GROUP BY fl.id, fl.public_id, fl.flight_id, fl.departure_time, fl.arrival_time, fl.flight_duration_minutes
         )
         SELECT
-            id,
+            public_id,
             flight_id,
             departure_time,
             flight_duration_minutes as recorded_duration_minutes,
@@ -817,7 +818,7 @@ def get_data_quality_metrics(db: Session = Depends(get_db)) -> Dict[str, Any]:
         ],
         "worst_cases": [
             {
-                "id": row.id,
+                "public_id": row.public_id,
                 "flight_id": row.flight_id,
                 "departure_time": row.departure_time.isoformat()
                 if row.departure_time
