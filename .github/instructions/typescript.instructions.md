@@ -36,7 +36,25 @@ Path-scoped rules Copilot activates when reviewing `frontend/**`. Same recurring
 ## Accessibility
 
 - Icon-only controls need `aria-label`; don't put meaning in color alone; interactive elements
-  need keyboard support. (Deeper a11y + legibility-over-imagery is `hud-ux-reviewer`'s lane.)
+  need keyboard support.
+
+## Flag these (map / HUD visualization — what's checkable from code)
+
+These mirror `hud-ux-reviewer`. Full visual judgment needs a rendered screenshot (which a code
+review can't see — note that), but several issues are catchable in source:
+
+- **Evidentiary honesty (highest — this UI shows lawsuit evidence).** Flag a track/line drawn
+  **solid/continuous across a data gap** (render gaps dashed/greyed), or a visualization that
+  **implies precision the data lacks** (e.g. a crisp altitude line when AGL carries error). The viz
+  must not overstate the evidence.
+- **Legibility over map imagery** — labels/markers placed over satellite/map tiles need a contrast
+  guarantee (halo/outline/scrim); flag thin or low-contrast text floating on variable imagery.
+- **Color encodings** — colorblind-unsafe ramps (red/green-only); meaning encoded by color alone
+  without a second cue or legend.
+- **Explicit units** — altitude must say **ft AGL vs MSL**, speed kt, time zone (local vs UTC); flag
+  ambiguous/unlabeled units on evidentiary readouts.
+- **`@vitest`/`@deck.gl`/WebGL lifecycle** — for map/3D components, flag missing cleanup (context/
+  layer leaks) and rendering large `flight_positions` sets without bounding/LOD.
 
 ## Tests & don't-flag
 
