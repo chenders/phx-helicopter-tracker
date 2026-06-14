@@ -28,10 +28,10 @@ interface FlightDetailHeaderProps {
   aircraft: string;
   callsign: string;
   departureTime: string;
-  duration: number;
+  duration: number | null;
   distance: string;
   avgSpeed: string;
-  estimatedCost: number;
+  estimatedCost: number | null;
   isAnimating: boolean;
   playbackSpeed: number;
   onToggleAnimation: () => void;
@@ -108,10 +108,18 @@ export const FlightDetailHeader: React.FC<FlightDetailHeaderProps> = ({
                 <Clock className="h-3 w-3" />
                 {date} {time}
               </span>
-              <span>•</span>
-              <span>{duration.toFixed(0)}m</span>
-              <span>•</span>
-              <span>{distance} mi</span>
+              {duration != null && (
+                <>
+                  <span>•</span>
+                  <span>{duration.toFixed(0)}m</span>
+                </>
+              )}
+              {distance && (
+                <>
+                  <span>•</span>
+                  <span>{distance} mi</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -181,7 +189,9 @@ export const FlightDetailHeader: React.FC<FlightDetailHeaderProps> = ({
                 <Clock className="h-3 w-3" />
                 Duration
               </div>
-              <div className="text-lg font-bold text-cyan-50">{duration.toFixed(2)} min</div>
+              <div className="text-lg font-bold text-cyan-50">
+                {duration != null ? `${duration.toFixed(2)} min` : 'N/A'}
+              </div>
             </div>
 
             <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/30 rounded-lg p-3">
@@ -205,7 +215,9 @@ export const FlightDetailHeader: React.FC<FlightDetailHeaderProps> = ({
                 <DollarSign className="h-3 w-3" />
                 Est. Cost
               </div>
-              <div className="text-lg font-bold text-cyan-50">${estimatedCost.toLocaleString()}</div>
+              <div className="text-lg font-bold text-cyan-50">
+                {estimatedCost != null ? `$${estimatedCost.toLocaleString()}` : 'N/A'}
+              </div>
             </div>
           </div>
 

@@ -20,6 +20,7 @@ import { FlightSearchPage } from './pages/FlightSearchPage'
 import { FlightDetailPage } from './pages/FlightDetailPage'
 import { DataQualityPage } from './pages/DataQualityPage'
 import { LogsPage } from './pages/LogsPage'
+import MinimapTest from './pages/MinimapTest'
 import './App.css'
 
 function App() {
@@ -62,6 +63,7 @@ function App() {
                 <Route path="/flight/:flightId" element={<FlightDetailPage />} />
                 <Route path="/data-quality" element={<DataQualityPage />} />
                 <Route path="/logs" element={<LogsPage />} />
+                <Route path="/minimap-test" element={<MinimapTest />} />
               </Routes>
             </main>
           </div>
@@ -88,6 +90,7 @@ function App() {
                 <Route path="/flight/:flightId" element={<FlightDetailPage />} />
                 <Route path="/data-quality" element={<DataQualityPage />} />
                 <Route path="/logs" element={<LogsPage />} />
+                <Route path="/minimap-test" element={<MinimapTest />} />
               </Routes>
             </main>
           </div>

@@ -75,7 +75,7 @@ const MinimapTest: React.FC = () => {
 
           <div className="mt-4 p-4 bg-gray-50 rounded">
             <p className="font-mono text-sm">
-              Current className: "{positionType} top-4 left-4 z-[{zIndex}]"
+              Current className: "{positionType} bottom-4 right-4" with z-index: {zIndex}
             </p>
           </div>
         </div>
@@ -96,7 +96,7 @@ const MinimapTest: React.FC = () => {
             <PhoenixMinimap
               flightPath={mockFlightPath}
               currentPosition={mockCurrentPosition}
-              className={positionType}
+              className={`${positionType} bottom-4 right-4`}
               style={{ zIndex }}
               size={200}
               onClick={(lat, lng) => console.log('Clicked:', lat, lng)}
@@ -149,7 +149,7 @@ const MinimapTest: React.FC = () => {
             <PhoenixMinimap
               flightPath={mockFlightPath}
               currentPosition={mockCurrentPosition}
-              className={positionType}
+              className={`${positionType} bottom-4 right-4`}
               style={{ zIndex }}
               size={200}
               onClick={(lat, lng) => console.log('Clicked:', lat, lng)}

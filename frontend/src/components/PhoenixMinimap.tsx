@@ -338,7 +338,7 @@ export const PhoenixMinimap: React.FC<PhoenixMinimapProps> = ({
 
   return (
     <div
-      className={`relative ${className}`}
+      className={className}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

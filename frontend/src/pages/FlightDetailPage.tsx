@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { GoogleMap, Polyline, MarkerF, InfoWindow, Circle } from '@react-google-maps/api'
 import {
@@ -25,6 +25,7 @@ import {
 import axios from '@/lib/axios'
 import { formatLocalTime, formatRelativeTime } from '../utils/dateUtils'
 import FlightVisualization3DCesium, { HudData, getCardinalDirection, formatTime } from '../components/FlightVisualization3DCesiumFixed'
+import { FlightDetailHeader } from '../components/FlightDetailHeader'
 
 interface FlightDetails {
   id: number
@@ -293,6 +294,18 @@ export function FlightDetailPage() {
   const accumulatedTimeRef = useRef<number>(0)
   const startAnimationRef = useRef<(() => void) | null>(null)
   const stopAnimationRef = useRef<(() => void) | null>(null)
+
+  // Memoize searchContext for 3D visualization to prevent infinite re-renders
+  const searchContextFor3D = useMemo(() => {
+    if (searchContext.lat && searchContext.lng) {
+      return {
+        lat: searchContext.lat,
+        lng: searchContext.lng,
+        radius: searchContext.radius || 1000
+      };
+    }
+    return undefined;
+  }, [searchContext.lat, searchContext.lng, searchContext.radius]);
 
   useEffect(() => {
     let cancelled = false;
@@ -839,304 +852,53 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            Back
-          </button>
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Radio Segments Indicator */}
-            {radioSegments.length > 0 && (
-              <div className="flex items-center gap-2 bg-green-900/20 border border-green-500/30 px-3 py-2 rounded-lg">
-                <Radio className="h-4 w-4 text-green-400" />
-                <span className="text-sm font-medium text-green-300">
-                  {radioSegments.length} Radio Transmissions
-                </span>
-              </div>
-            )}
+      {/* Header Section - Compact Design */}
+      <div className="space-y-4">
+        {/* Radio Segments Indicator - Now at top */}
+        {radioSegments.length > 0 && (
+          <div className="flex items-center gap-2 bg-green-900/20 border border-green-500/30 px-3 py-2 rounded-lg w-fit ml-auto">
+            <Radio className="h-4 w-4 text-green-400" />
+            <span className="text-sm font-medium text-green-300">
+              {radioSegments.length} Radio Transmissions
+            </span>
+          </div>
+        )}
 
-            <button
-              onClick={() => {
-                if (is3DAnimating) {
-                  // Pause animation
-                  if (stopAnimationRef.current) {
-                    stopAnimationRef.current();
-                  }
-                } else {
-                  // Scroll to map section - align top of map with top of viewport
-                  const mapSection = document.querySelector('[data-map-section]');
-                  if (mapSection) {
-                    mapSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                  // Start animation after a brief delay to allow scroll
-                  setTimeout(() => {
-                    if (startAnimationRef.current) {
-                      console.log('Calling start animation via ref');
-                      startAnimationRef.current();
-                    } else {
-                      console.warn('Start animation function not available yet');
-                    }
-                  }, 800);
+        {/* Compact Flight Header Component */}
+        <FlightDetailHeader
+          flightId={flight.flight_id || `#${flight.id}`}
+          aircraft={flight.aircraft_id}
+          callsign={flight.callsign || 'No Callsign'}
+          departureTime={flight.departure_time}
+          duration={flight.flight_duration_minutes}
+          distance={calculateTotalDistance()}
+          avgSpeed={`${(parseFloat(calculateAverageSpeed()) * 1.15078).toFixed(1)} mph`}
+          estimatedCost={flight.estimated_cost || 0}
+          isAnimating={is3DAnimating}
+          playbackSpeed={playbackSpeed}
+          onToggleAnimation={() => {
+            if (is3DAnimating) {
+              // Pause animation
+              if (stopAnimationRef.current) {
+                stopAnimationRef.current();
+              }
+            } else {
+              // Scroll to map section
+              const mapSection = document.querySelector('[data-map-section]');
+              if (mapSection) {
+                mapSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+              // Start animation after delay
+              setTimeout(() => {
+                if (startAnimationRef.current) {
+                  startAnimationRef.current();
                 }
-              }}
-              className="relative flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl font-bold transition-all"
-              title={is3DAnimating ? "Pause animation" : "Start 3D flight animation"}
-            >
-              {!is3DAnimating && (
-                <span className="absolute inset-0 rounded-lg animate-pulse border-2 border-emerald-400"></span>
-              )}
-              {is3DAnimating ? (
-                <Pause className="h-4 w-4 relative z-10" />
-              ) : (
-                <Play className="h-4 w-4 relative z-10" />
-              )}
-              <span className="relative z-10">{is3DAnimating ? 'Pause' : 'Start Animation'}</span>
-            </button>
-
-            {/* Speed Selector */}
-            <div className="flex items-center gap-2 bg-white dark:bg-gray-700 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 shadow">
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                Speed:
-              </label>
-              <select
-                value={playbackSpeed}
-                onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
-                className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value={0.5}>0.5x</option>
-                <option value={1}>1x</option>
-                <option value={2}>2x</option>
-                <option value={3}>3x</option>
-                <option value={5}>5x</option>
-                <option value={10}>10x</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
-          className="flex items-center justify-between w-full mb-4 group"
-        >
-          <div className="flex items-center gap-4">
-            <Plane className="h-8 w-8 text-purple-600" />
-            <div className="text-left">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Flight {flight.flight_id || `#${flight.id}`}
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400">
-                {flight.aircraft_id} • {flight.callsign || 'No Callsign'}
-              </p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                {new Date(flight.departure_time).toLocaleDateString('en-US', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })} • Start: {new Date(flight.departure_time).toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true
-                })}
-              </p>
-            </div>
-          </div>
-          {isDetailsExpanded ? (
-            <ChevronUp className="h-6 w-6 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
-          ) : (
-            <ChevronDown className="h-6 w-6 text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300" />
-          )}
-        </button>
-
-
-        {/* Collapsible Content */}
-        {isDetailsExpanded && (
-          <>
-            {/* Key Metrics */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Duration</div>
-            <div className="font-semibold text-gray-900 dark:text-white">
-              {typeof flight.flight_duration_minutes === 'number'
-                ? flight.flight_duration_minutes.toFixed(2)
-                : flight.flight_duration_minutes} min
-            </div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Distance</div>
-            <div className="font-semibold text-gray-900 dark:text-white">
-              {calculateTotalDistance()} mi
-            </div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Avg Speed</div>
-            <div className="font-semibold text-gray-900 dark:text-white">
-              {(parseFloat(calculateAverageSpeed()) * 1.15078).toFixed(2)} mph
-              <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">
-                ({calculateAverageSpeed()} kts)
-              </span>
-            </div>
-          </div>
-          <div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Est. Cost</div>
-            <div className="font-semibold text-gray-900 dark:text-white">
-              ${flight.estimated_cost?.toLocaleString() || 'N/A'}
-            </div>
-          </div>
-        </div>
-
-        {/* Closest Approach Details (when coming from search) */}
-        {searchContext.lat && searchContext.lng && (
-          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">
-              Closest Approach to Search Location
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              <div>
-                <span className="text-blue-700 dark:text-blue-300">Distance:</span>
-                <div className="font-medium text-blue-900 dark:text-blue-100">
-                  {searchContext.closestDistance ? (
-                    searchContext.closestDistance * 0.000621371 < 0.5 ?
-                      `${Math.round(searchContext.closestDistance * 3.28084)} ft` :
-                      `${(searchContext.closestDistance * 0.000621371).toFixed(2)} mi`
-                  ) : calculatedClosest ? (
-                    calculatedClosest.distance * 0.000621371 < 0.5 ?
-                      `${Math.round(calculatedClosest.distance * 3.28084)} ft` :
-                      `${(calculatedClosest.distance * 0.000621371).toFixed(2)} mi`
-                  ) : 'Calculating...'}
-                </div>
-              </div>
-              <div>
-                <span className="text-blue-700 dark:text-blue-300">Speed:</span>
-                <div className="font-medium text-blue-900 dark:text-blue-100">
-                  {searchContext.closestSpeed ?
-                    `${Math.round(searchContext.closestSpeed * 1.15078)} mph (${Math.round(searchContext.closestSpeed)} kts)` :
-                    calculatedClosest?.ground_speed_knots ?
-                      `${Math.round(calculatedClosest.ground_speed_knots * 1.15078)} mph (${Math.round(calculatedClosest.ground_speed_knots)} kts)` :
-                      'N/A'}
-                </div>
-              </div>
-              <div>
-                <span className="text-blue-700 dark:text-blue-300">Altitude:</span>
-                <div>
-                  {(searchContext.closestAltitudeAGL || calculatedClosest?.altitude_agl_feet) ? (
-                    <div className="font-medium text-blue-900 dark:text-blue-100">
-                      {(searchContext.closestAltitudeAGL || calculatedClosest.altitude_agl_feet).toLocaleString()} ft AGL
-                    </div>
-                  ) : (searchContext.closestAltitude || calculatedClosest?.altitude_feet) ? (
-                    <div className="font-medium text-blue-900 dark:text-blue-100">
-                      {(searchContext.closestAltitude || calculatedClosest.altitude_feet).toLocaleString()} ft
-                    </div>
-                  ) : (
-                    <div className="font-medium text-blue-900 dark:text-blue-100">N/A</div>
-                  )}
-                </div>
-              </div>
-              <div>
-                <span className="text-blue-700 dark:text-blue-300">Heading:</span>
-                <div className="font-medium text-blue-900 dark:text-blue-100">
-                  {searchContext.closestBearing ?
-                    `${Math.round(searchContext.closestBearing)}°` :
-                    calculatedClosest?.track_degrees ?
-                      `${Math.round(calculatedClosest.track_degrees)}°` :
-                      'N/A'}
-                  {(searchContext.closestBearing || calculatedClosest?.track_degrees) && (
-                    <div className="text-xs text-blue-600 dark:text-blue-400">
-                      {getCompassDirection(searchContext.closestBearing || calculatedClosest.track_degrees)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            {searchContext.closestTime && (
-              <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-                Time: {formatLocalTime(searchContext.closestTime)}
-                {searchContext.isHovering && (
-                  <span className="ml-2 px-2 py-0.5 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 rounded">
-                    Hovering for {searchContext.hoverDuration}s
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Total Time in Search Radius */}
-            {searchContext.radius && (
-              <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                    ⏱ Total Time in Search Radius:
-                  </span>
-                  <span className="text-base font-bold font-mono text-red-700 dark:text-red-400">
-                    {(() => {
-                      // Calculate total time in radius from positions using actual timestamps
-                      if (!positions || positions.length === 0) return '0:00';
-                      let timeInRadius = 0;
-                      const searchRadiusMiles = searchContext.radius / 1609.34;
-                      const R = 3959; // Earth's radius in miles
-
-                      let prevTimestamp: Date | null = null;
-
-                      positions.forEach((pos: any) => {
-                        const lat1 = searchContext.lat * Math.PI / 180;
-                        const lat2 = pos.latitude * Math.PI / 180;
-                        const dLat = (pos.latitude - searchContext.lat) * Math.PI / 180;
-                        const dLng = (pos.longitude - searchContext.lng) * Math.PI / 180;
-
-                        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                                 Math.cos(lat1) * Math.cos(lat2) *
-                                 Math.sin(dLng / 2) * Math.sin(dLng / 2);
-                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                        const distance = R * c;
-
-                        if (distance <= searchRadiusMiles) {
-                          if (prevTimestamp) {
-                            const currentTimestamp = new Date(pos.timestamp);
-                            const timeDiff = (currentTimestamp.getTime() - prevTimestamp.getTime()) / 1000; // Convert to seconds
-                            timeInRadius += timeDiff;
-                          }
-                          prevTimestamp = new Date(pos.timestamp);
-                        } else {
-                          prevTimestamp = null; // Reset when out of radius
-                        }
-                      });
-
-                      const mins = Math.floor(timeInRadius / 60);
-                      const secs = Math.floor(timeInRadius % 60);
-                      return `${mins}:${secs.toString().padStart(2, '0')}`;
-                    })()}
-                  </span>
-                </div>
-                <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                  Total surveillance time within {(searchContext.radius / 1609.34).toFixed(2)} mile radius
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-            {/* Surveillance Alert */}
-            {flight.surveillance_likelihood > 0.5 && (
-              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
-                  <div>
-                    <div className="font-medium text-red-900 dark:text-red-200">
-                      High Surveillance Likelihood ({(flight.surveillance_likelihood * 100).toFixed(0)}%)
-                    </div>
-                    <div className="text-sm text-red-700 dark:text-red-300 mt-1">
-                      {flight.pattern_notes}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+              }, 800);
+            }
+          }}
+          onSpeedChange={(speed) => setPlaybackSpeed(speed)}
+          searchContext={searchContext}
+        />
       </div>
 
       {/* Map */}
@@ -1286,11 +1048,7 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
             onStopAnimationRef={stopAnimationRef}
             onAnimationStateChange={setIs3DAnimating}
             onHudDataChange={setHudData}
-            searchContext={searchContext.lat && searchContext.lng ? {
-              lat: searchContext.lat,
-              lng: searchContext.lng,
-              radius: searchContext.radius || 1000
-            } : undefined}
+            searchContext={searchContextFor3D}
             hoverLocations={patterns?.hover_locations || []}
           />
         ) : (

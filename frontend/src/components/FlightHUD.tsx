@@ -1,22 +1,20 @@
 /**
  * Flight HUD Component
  *
- * Division-inspired holographic heads-up display showing flight metrics
- * without obstructing the visual field.
+ * Compact, draggable heads-up display showing essential flight metrics
  *
  * Features:
- * - Positioned in top 20% of screen
+ * - Compact design (3 metrics only)
+ * - Draggable positioning
  * - Semi-transparent with holographic effects
- * - Scanline animations
  * - Progressive reveal on data changes
- * - Semantic color coding
  */
 
 import React, { useEffect, useState, useRef } from 'react';
 import { HolographicColors } from '../utils/holographicMaterials';
 
 export interface FlightHUDData {
-  speed: number;                    // knots
+  speed: number;                    // mph
   altitude: number;                 // feet MSL
   heading: number;                  // degrees
   groundElevation: number;          // feet MSL
@@ -45,25 +43,7 @@ function getCardinalDirection(degrees: number): string {
 }
 
 /**
- * Format timestamp to readable time
- */
-function formatTimestamp(timestamp: string | undefined): string {
-  if (!timestamp) return '--:--:--';
-  try {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-  } catch {
-    return '--:--:--';
-  }
-}
-
-/**
- * Metric display component with progressive reveal
+ * Compact metric display component
  */
 interface MetricProps {
   label: string;
@@ -74,34 +54,16 @@ interface MetricProps {
 }
 
 const Metric: React.FC<MetricProps> = ({ label, value, unit, color = '#00D4FF', animate = true }) => {
-  const [displayValue, setDisplayValue] = useState(value);
-  const [isChanging, setIsChanging] = useState(false);
-  const prevValueRef = useRef(value);
-
-  useEffect(() => {
-    if (animate && prevValueRef.current !== value) {
-      setIsChanging(true);
-      const timer = setTimeout(() => {
-        setDisplayValue(value);
-        setIsChanging(false);
-      }, 100);
-      prevValueRef.current = value;
-      return () => clearTimeout(timer);
-    } else {
-      setDisplayValue(value);
-    }
-  }, [value, animate]);
-
   return (
     <div className="flex flex-col items-center">
-      <div className="text-xs text-gray-400 uppercase tracking-wider mb-1 font-semibold">
+      <div className="text-xs text-gray-300 uppercase tracking-widest mb-1 font-bold">
         {label}
       </div>
       <div
-        className={`text-2xl font-mono font-bold tabular-nums transition-all duration-200 ${isChanging ? 'scale-110 brightness-150' : ''}`}
-        style={{ color, textShadow: `0 0 10px ${color}, 0 0 20px ${color}40` }}
+        className="text-2xl font-mono font-bold tabular-nums"
+        style={{ color, textShadow: `0 0 8px ${color}, 0 0 15px ${color}40` }}
       >
-        {displayValue}
+        {value}
         {unit && <span className="text-sm ml-1 opacity-80">{unit}</span>}
       </div>
     </div>
@@ -109,7 +71,7 @@ const Metric: React.FC<MetricProps> = ({ label, value, unit, color = '#00D4FF', 
 };
 
 /**
- * FlightHUD Component
+ * FlightHUD Component - Compact & Draggable
  */
 export const FlightHUD: React.FC<FlightHUDProps> = ({
   data,
@@ -117,6 +79,9 @@ export const FlightHUD: React.FC<FlightHUDProps> = ({
   className = ''
 }) => {
   const hudRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState<{ x: number | null; y: number }>({ x: null, y: 16 }); // null = centered
+  const dragOffset = useRef({ x: 0, y: 0 });
 
   // Convert colors to CSS hex
   const colors = {
@@ -126,70 +91,128 @@ export const FlightHUD: React.FC<FlightHUDProps> = ({
     red: `rgb(${HolographicColors.CRITICAL_ALERT.r * 255}, ${HolographicColors.CRITICAL_ALERT.g * 255}, ${HolographicColors.CRITICAL_ALERT.b * 255})`, // #FF4466
   };
 
+  // Handle drag start
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!hudRef.current) return;
+
+    // Get the actual rendered position on screen
+    const rect = hudRef.current.getBoundingClientRect();
+
+    // Calculate offset from where the mouse clicked within the element
+    dragOffset.current = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+
+    // If currently centered, immediately set to absolute position at current location
+    // This prevents the jump when transitioning from centered to dragging
+    if (position.x === null) {
+      setPosition({
+        x: rect.left,
+        y: rect.top
+      });
+    }
+
+    setIsDragging(true);
+    e.preventDefault();
+  };
+
+  // Handle drag move
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging) return;
+
+      const newX = e.clientX - dragOffset.current.x;
+      const newY = e.clientY - dragOffset.current.y;
+
+      setPosition({ x: newX, y: newY });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging]);
+
   return (
     <div
       ref={hudRef}
-      className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none ${className}`}
+      className={`absolute z-40 ${className}`}
+      style={{
+        left: position.x === null ? '50%' : `${position.x}px`,
+        top: `${position.y}px`,
+        transform: position.x === null ? 'translateX(-50%)' : 'none',
+        cursor: isDragging ? 'grabbing' : 'grab',
+        pointerEvents: 'auto'
+      }}
+      onMouseDown={handleMouseDown}
     >
-      {/* Main HUD Container */}
+      {/* Compact HUD Container */}
       <div
-        className="relative bg-black/40 backdrop-blur-md border border-cyan-400/30 rounded-lg overflow-hidden"
+        className="relative bg-black/50 backdrop-blur-sm border border-cyan-400/30 rounded overflow-hidden w-[500px]"
         style={{
-          boxShadow: `0 0 20px ${colors.cyan}40, inset 0 0 20px ${colors.cyan}10`,
+          boxShadow: `0 0 15px ${colors.cyan}30, inset 0 0 15px ${colors.cyan}08`,
         }}
       >
         {/* Scanline overlay */}
         <div
-          className="absolute inset-0 pointer-events-none opacity-20"
+          className="absolute inset-0 pointer-events-none opacity-15"
           style={{
             backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 212, 255, 0.1) 2px, rgba(0, 212, 255, 0.1) 4px)',
             animation: 'scanline 8s linear infinite',
           }}
         />
 
-        {/* Corner accents (Division-style) */}
-        <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-cyan-400/60" />
-        <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-cyan-400/60" />
-        <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-cyan-400/60" />
-        <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-cyan-400/60" />
+        {/* Corner accents */}
+        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-cyan-400/60" />
+        <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-cyan-400/60" />
+        <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-cyan-400/60" />
+        <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-cyan-400/60" />
 
         {/* Content */}
-        <div className="relative px-6 py-4">
-          {/* Top row: Time and Status */}
-          <div className="flex items-center justify-between mb-4 pb-3 border-b border-cyan-400/20">
-            <div className="flex items-center gap-2">
-              <div
-                className="w-2 h-2 rounded-full animate-pulse"
-                style={{ backgroundColor: colors.green, boxShadow: `0 0 8px ${colors.green}` }}
-              />
-              <span className="text-xs text-cyan-300 uppercase tracking-wider font-semibold">
-                FLIGHT REPLAY
-              </span>
+        <div className="relative px-3 py-2">
+          {/* Timestamp header */}
+          {data.timestamp && (
+            <div className="mb-2 pb-2 border-b border-cyan-400/20 text-center">
+              <div className="text-xs text-cyan-300/80 uppercase tracking-wider font-bold">
+                {new Date(data.timestamp).toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: true
+                })}
+              </div>
             </div>
-            <div
-              className="text-sm font-mono font-bold"
-              style={{ color: colors.cyan }}
-            >
-              {formatTimestamp(data.timestamp)}
-            </div>
-          </div>
+          )}
 
-          {/* Main metrics grid */}
-          <div className="grid grid-cols-4 gap-6">
+          {/* Compact metrics - 3 columns only */}
+          <div className="grid grid-cols-3 gap-3">
             {/* Speed */}
             <Metric
               label="SPEED"
               value={Math.round(data.speed)}
-              unit="KTS"
+              unit="MPH"
               color={colors.cyan}
             />
 
-            {/* Altitude MSL */}
+            {/* Altitude AGL (renamed from "AGL" to "ALTITUDE") */}
             <Metric
               label="ALTITUDE"
-              value={Math.round(data.altitude).toLocaleString()}
+              value={Math.round(data.altitudeAGL).toLocaleString()}
               unit="FT"
-              color={colors.cyan}
+              color={data.altitudeAGL < 400 ? colors.amber : colors.green}
             />
 
             {/* Heading */}
@@ -198,38 +221,30 @@ export const FlightHUD: React.FC<FlightHUDProps> = ({
               value={`${Math.round(data.heading)}° ${getCardinalDirection(data.heading)}`}
               color={colors.cyan}
             />
-
-            {/* Altitude AGL */}
-            <Metric
-              label="AGL"
-              value={Math.round(data.altitudeAGL).toLocaleString()}
-              unit="FT"
-              color={data.altitudeAGL < 400 ? colors.amber : colors.green}
-            />
           </div>
 
           {/* Search radius info (if applicable) */}
           {showSearchInfo && data.distanceFromSearch !== undefined && (
-            <div className="mt-4 pt-3 border-t border-cyan-400/20">
-              <div className="flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-gray-400 uppercase tracking-wider mr-2">Distance to Search:</span>
+            <div className="mt-3 pt-3 border-t border-cyan-400/20">
+              <div className="flex items-center justify-between text-xs gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-300 uppercase tracking-wider font-bold">Search:</span>
                   <span
-                    className="font-mono font-bold"
+                    className="font-mono font-bold text-base"
                     style={{
                       color: data.isWithinSearchRadius ? colors.red : colors.amber,
-                      textShadow: data.isWithinSearchRadius ? `0 0 8px ${colors.red}` : 'none'
+                      textShadow: data.isWithinSearchRadius ? `0 0 6px ${colors.red}` : 'none'
                     }}
                   >
                     {data.distanceFromSearch.toFixed(2)} mi
                   </span>
                 </div>
                 {data.isWithinSearchRadius && data.timeRemaining !== undefined && (
-                  <div>
-                    <span className="text-gray-400 uppercase tracking-wider mr-2">Time in Radius:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-300 uppercase tracking-wider font-bold">Time:</span>
                     <span
-                      className="font-mono font-bold animate-pulse"
-                      style={{ color: colors.red, textShadow: `0 0 8px ${colors.red}` }}
+                      className="font-mono font-bold text-base animate-pulse"
+                      style={{ color: colors.red, textShadow: `0 0 6px ${colors.red}` }}
                     >
                       {Math.floor(data.timeRemaining / 60)}:{String(Math.floor(data.timeRemaining % 60)).padStart(2, '0')}
                     </span>
@@ -238,21 +253,14 @@ export const FlightHUD: React.FC<FlightHUDProps> = ({
               </div>
             </div>
           )}
-
-          {/* Ground elevation info */}
-          <div className="mt-3 text-center">
-            <span className="text-xs text-gray-500 font-mono">
-              Ground Elev: {Math.round(data.groundElevation).toLocaleString()} ft
-            </span>
-          </div>
         </div>
 
         {/* Bottom accent line */}
         <div
-          className="h-1 w-full"
+          className="h-0.5 w-full"
           style={{
-            background: `linear-gradient(90deg, transparent, ${colors.cyan}60, transparent)`,
-            boxShadow: `0 0 10px ${colors.cyan}60`,
+            background: `linear-gradient(90deg, transparent, ${colors.cyan}50, transparent)`,
+            boxShadow: `0 0 8px ${colors.cyan}50`,
           }}
         />
       </div>
