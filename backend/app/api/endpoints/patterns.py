@@ -160,13 +160,6 @@ def get_pattern_analysis(
         logging.error(f"Error generating neighborhood distribution: {e}")
         neighborhood_distribution = []
 
-    # Generate violation types
-    violation_types = [
-        {"name": "Hovering", "count": constitutional_violations * 0.6},
-        {"name": "Low Altitude", "count": constitutional_violations * 0.25},
-        {"name": "Repeated Passes", "count": constitutional_violations * 0.15},
-    ]
-
     # Calculate additional metrics from actual data
     excessive_hovering_events = sum(
         1
@@ -180,6 +173,17 @@ def get_pattern_analysis(
     # geographic clustering and pattern matching which we don't have implemented
     discriminatory_ratio = 0
     systematic_patrol_routes = 0
+
+    # Violation-type breakdown from REAL computed counts. (Previously this was a fabricated
+    # fixed split — 0.6/0.25/0.15 of the total — which invented the proportions and produced
+    # fractional "violation" counts. Use the actual per-type counts instead.)
+    violation_types = [
+        {"name": "Excessive Hovering", "count": excessive_hovering_events},
+        {"name": "Low Altitude", "count": low_altitude_violations},
+        # Route-clustering for repeated passes isn't implemented yet; report the real (0)
+        # value rather than a fabricated share.
+        {"name": "Repeated Passes", "count": systematic_patrol_routes},
+    ]
 
     return {
         "constitutional_violations": constitutional_violations,
