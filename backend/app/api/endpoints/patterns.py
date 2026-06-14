@@ -174,9 +174,17 @@ def get_pattern_analysis(
     discriminatory_ratio = 0
     systematic_patrol_routes = 0
 
-    # Violation-type breakdown from REAL computed counts. (Previously this was a fabricated
+    # Per-type indicator counts from REAL computed values. (Previously this was a fabricated
     # fixed split — 0.6/0.25/0.15 of the total — which invented the proportions and produced
-    # fractional "violation" counts. Use the actual per-type counts instead.)
+    # fractional "violation" counts.)
+    #
+    # NOTE: these are INDEPENDENT indicators measured on different dimensions
+    # (excessive_hovering_events = duration > 90 min; low_altitude_violations =
+    # min altitude < 400 ft). They are NOT a mutually-exclusive partition: a single
+    # flight can satisfy more than one, and they do NOT sum to
+    # constitutional_violations (flights > 120 min). The frontend renders them as
+    # independent bars (not a pie) and labels them "Surveillance Indicators by Type"
+    # with a note to that effect, so the breakdown isn't read as a share of the total.
     violation_types = [
         {"name": "Excessive Hovering", "count": excessive_hovering_events},
         {"name": "Low Altitude", "count": low_altitude_violations},
