@@ -1093,8 +1093,18 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         // Also store globally for testing
         (window as any).cesiumViewer = viewer;
 
-        // Hide credits
-        // viewer.cesiumWidget.creditContainer.style.display = "none";
+        // Keep the Google / Cesium ion attribution visible (required by their
+        // terms — it must not be hidden or obscured) but move it from Cesium's
+        // default bottom-left to the bottom-right, freeing the bottom-left
+        // corner for the minimap. Inline styles override widgets.css.
+        const creditContainer = (viewer as any).cesiumWidget?.creditContainer as
+          | HTMLElement
+          | undefined;
+        if (creditContainer) {
+          creditContainer.style.left = "auto";
+          creditContainer.style.right = "8px";
+          creditContainer.style.textAlign = "right";
+        }
 
         // Configure scene - completely hide the globe to avoid grid
         // viewer.scene.globe.show = false; // Hide globe completely from the start
@@ -2930,42 +2940,43 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           </div>
         )}
 
-        {/* Right-side overlay stack: the locations panel flex-fills the space
-            above the fixed-size minimap, so the two can never overlap at any
-            viewport size without hand-maintained pixel offsets. top-44 keeps the
-            stack clear of the HUD's default position (the HUD is independently
-            draggable; collisions from dragging it here are the user's choice).
-            pointer-events-none on the wrapper + auto on children keeps the gaps
-            click-through to the Cesium canvas for camera dragging. */}
+        {/* Right-side locations panel. top-44 clears the HUD's default position
+            (the HUD is independently draggable; dragging it here is the user's
+            choice); bottom-10 clears the relocated bottom-right attribution
+            strip so the expanded card never covers it. pointer-events-none on
+            the wrapper + auto on the card keeps the gaps click-through for
+            camera dragging. */}
         {!isLoading && positions.length > 0 && (
-          <div className="absolute right-4 top-44 bottom-4 z-30 flex flex-col items-end gap-3 pointer-events-none">
+          <div className="absolute right-4 top-44 bottom-10 z-30 flex flex-col items-end pointer-events-none">
             {/* 2D Street Label List - Shows nearby streets and areas */}
             <StreetLabelList labels={nearbyLabels} className="flex-1 min-h-0" />
-
-            {/* Phoenix Area Minimap - Division-inspired overview map */}
-            {viewerRef.current && (
-              <PhoenixMinimap
-                viewer={viewerRef.current}
-                flightPath={positions.map(p => ({ latitude: p.latitude, longitude: p.longitude }))}
-                currentPosition={positions[Math.floor(sliderPosition / 100 * (positions.length - 1))] ? {
-                  latitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].latitude,
-                  longitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].longitude,
-                } : undefined}
-                className="relative flex-shrink-0 pointer-events-auto z-[9999]"
-                size={200}
-                onClick={(latitude, longitude) => {
-                  // Navigate camera to clicked location
-                  if (viewerRef.current && window.Cesium) {
-                    const Cesium = window.Cesium;
-                    viewerRef.current.camera.flyTo({
-                      destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, 5000),
-                      duration: 1.5,
-                    });
-                  }
-                }}
-              />
-            )}
           </div>
+        )}
+
+        {/* Phoenix Area Minimap - moved to the bottom-left (the corner the
+            Cesium/Google attribution used to occupy; we relocated that to the
+            bottom-right at viewer init). */}
+        {!isLoading && positions.length > 0 && viewerRef.current && (
+          <PhoenixMinimap
+            viewer={viewerRef.current}
+            flightPath={positions.map(p => ({ latitude: p.latitude, longitude: p.longitude }))}
+            currentPosition={positions[Math.floor(sliderPosition / 100 * (positions.length - 1))] ? {
+              latitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].latitude,
+              longitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].longitude,
+            } : undefined}
+            className="absolute bottom-4 left-4 z-[9999]"
+            size={200}
+            onClick={(latitude, longitude) => {
+              // Navigate camera to clicked location
+              if (viewerRef.current && window.Cesium) {
+                const Cesium = window.Cesium;
+                viewerRef.current.camera.flyTo({
+                  destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, 5000),
+                  duration: 1.5,
+                });
+              }
+            }}
+          />
         )}
       </div>
 
