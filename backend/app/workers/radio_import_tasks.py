@@ -48,37 +48,51 @@ def import_transcriptions_from_json(
     try:
         with SessionLocal() as db:
             imported_count = 0
+            reimported_count = 0
             skipped_count = 0
             errors = []
 
-            # Get list of JSON transcription files
-            json_files = list(Path(directory_path).glob("*.json"))
-            logger.info(f"Found {len(json_files)} JSON transcription files")
+            # Map existing archives by filename so we can (a) skip unchanged files,
+            # (b) make progress through ALL files instead of only the first
+            # batch_size (the old slice-before-filter logic stalled the backfill),
+            # and (c) re-import files whose JSON changed after it was imported
+            # (e.g. re-transcribed with an improved pipeline).
+            existing = {a.filename: a for a in db.query(RadioArchive).all()}
 
-            # Limit to batch size
-            json_files = json_files[:batch_size]
+            all_json = list(Path(directory_path).glob("*.json"))
+            logger.info(f"Found {len(all_json)} JSON transcription files")
 
-            for json_file in json_files:
+            worklist = []  # list of (json_file, existing_archive_or_None)
+            for jf in all_json:
+                fn = jf.with_suffix(".mp3").name
+                arch = existing.get(fn)
+                if arch is None:
+                    worklist.append((jf, None))  # new -> insert
+                else:
+                    dl_epoch = (
+                        arch.downloaded_at.timestamp() if arch.downloaded_at else 0
+                    )
+                    try:
+                        changed = jf.stat().st_mtime > dl_epoch
+                    except OSError:
+                        changed = False
+                    if changed:
+                        worklist.append((jf, arch))  # re-transcribed -> re-import
+
+            # Unchanged, already-imported files are skipped this run.
+            skipped_count = len(all_json) - len(worklist)
+            # Cap work per run AFTER filtering, so each run makes real progress.
+            worklist = worklist[:batch_size]
+
+            for json_file, existing_archive in worklist:
                 try:
                     # Load transcription data
                     with open(json_file, "r") as f:
                         data = json.load(f)
 
-                    filename = data.get("filename")
-                    if not filename:
-                        logger.warning(f"No filename in {json_file}, skipping")
-                        continue
-
-                    # Check if already imported
-                    existing_archive = (
-                        db.query(RadioArchive)
-                        .filter(RadioArchive.filename == filename)
-                        .first()
+                    filename = (
+                        data.get("filename") or json_file.with_suffix(".mp3").name
                     )
-
-                    if existing_archive:
-                        skipped_count += 1
-                        continue
 
                     # Extract metadata
                     recording_time_str = data.get("recording_time")
@@ -106,24 +120,45 @@ def import_transcriptions_from_json(
                         mp3_file.stat().st_size if mp3_file.exists() else 0
                     )
 
-                    # Create RadioArchive record
-                    archive = RadioArchive(
-                        filename=filename,
-                        file_path=file_path,
-                        file_size_bytes=file_size_bytes,
-                        feed_id=data.get("metadata", {}).get("feed_id", "12145"),
-                        feed_name=data.get("metadata", {}).get(
-                            "feed_name", "Phoenix Police"
-                        ),
-                        recording_start=recording_start,
-                        recording_end=recording_end,
-                        duration_seconds=duration,
-                        download_source="imported",
-                        downloaded_at=datetime.now(),
-                        transcribed=True,
-                    )
-                    db.add(archive)
-                    db.flush()  # Get archive ID
+                    if existing_archive is not None:
+                        # Re-import: drop the stale transcription (cascade deletes its
+                        # segments + keywords) and refresh the archive in place.
+                        for old in (
+                            db.query(RadioTranscription)
+                            .filter(
+                                RadioTranscription.archive_id == existing_archive.id
+                            )
+                            .all()
+                        ):
+                            db.delete(old)
+                        db.flush()
+                        archive = existing_archive
+                        archive.file_path = file_path
+                        archive.file_size_bytes = file_size_bytes
+                        archive.recording_start = recording_start
+                        archive.recording_end = recording_end
+                        archive.duration_seconds = duration
+                        archive.transcribed = True
+                        archive.downloaded_at = datetime.now()  # mark re-import time
+                    else:
+                        # Create RadioArchive record
+                        archive = RadioArchive(
+                            filename=filename,
+                            file_path=file_path,
+                            file_size_bytes=file_size_bytes,
+                            feed_id=data.get("metadata", {}).get("feed_id", "12145"),
+                            feed_name=data.get("metadata", {}).get(
+                                "feed_name", "Phoenix Police"
+                            ),
+                            recording_start=recording_start,
+                            recording_end=recording_end,
+                            duration_seconds=duration,
+                            download_source="imported",
+                            downloaded_at=datetime.now(),
+                            transcribed=True,
+                        )
+                        db.add(archive)
+                        db.flush()  # Get archive ID
 
                     # Create RadioTranscription record
                     transcribed_at_str = data.get("transcribed_at")
@@ -181,12 +216,14 @@ def import_transcriptions_from_json(
                         db.add(segment)
 
                     db.commit()
-                    imported_count += 1
+                    if existing_archive is not None:
+                        reimported_count += 1
+                    else:
+                        imported_count += 1
 
-                    if imported_count % 10 == 0:
-                        logger.info(
-                            f"Imported {imported_count} transcriptions so far..."
-                        )
+                    done = imported_count + reimported_count
+                    if done % 10 == 0:
+                        logger.info(f"Processed {done} transcriptions so far...")
 
                 except Exception as e:
                     db.rollback()
@@ -197,15 +234,17 @@ def import_transcriptions_from_json(
 
             logger.info(
                 f"Import complete: {imported_count} imported, "
-                f"{skipped_count} skipped, {len(errors)} errors"
+                f"{reimported_count} re-imported, {skipped_count} skipped, "
+                f"{len(errors)} errors"
             )
 
             return {
                 "success": True,
                 "imported": imported_count,
+                "reimported": reimported_count,
                 "skipped": skipped_count,
                 "errors": errors,
-                "total_files": len(json_files),
+                "total_files": len(all_json),
             }
 
     except Exception as e:
