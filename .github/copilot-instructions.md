@@ -14,9 +14,11 @@ Compose. See `CLAUDE.md` for the full architecture and the canonical convention 
 ## Instruction File Layout
 
 This file holds the **cross-cutting review standards**. It overlaps deliberately with
-`CLAUDE.md` (developer-facing conventions). When a convention changes — queue routing,
-schema/migration sync, data-safety rules, service-wrapper usage — update **both**
-`CLAUDE.md` and this file. A rule in one but not the other is a bug; flag it.
+`CLAUDE.md` (developer-facing conventions) and `AGENTS.md` (agent workflow + pre-PR policy).
+When a convention changes — queue routing, schema/migration sync, data-safety rules,
+service-wrapper usage — update `CLAUDE.md`, `AGENTS.md`, **and** this file, plus the pre-PR
+reviewer agents (`.claude/agents/*-pre-pr-reviewer.md`) that encode the same checklist. A
+rule in one but not the others is a bug; flag it.
 
 (If language-specific volume grows, split into path-scoped
 `.github/instructions/*.instructions.md` files — e.g. `python` for `backend/**/*.py`,

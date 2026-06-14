@@ -103,14 +103,20 @@ worker's `--queues` list governs what it actually consumes. See Common Pitfalls 
 ## Development Commands
 
 ### Backend
+Dev uses **Poetry** on **Python 3.12** (pinned by the repo `.python-version` = `3.12.3`; the
+Docker build uses `requirements.txt`). If `poetry install` fails building `asyncpg`, you're on
+the wrong interpreter — confirm `python3 --version` is 3.12.x, then `poetry env use 3.12.3`.
+
 ```bash
 cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 9000   # dev server (container port)
-pytest                                                     # tests
-black .                                                    # format
-ruff check .                                               # lint (ruff 0.1.5; config in backend/pyproject.toml)
-ruff check . --select F,ASYNC --ignore F401,F841           # the enforced bug+async gate (see below)
+poetry install                                             # dev deps (pip install -r requirements.txt is the Docker path)
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 9000   # dev server (container port)
+poetry run pytest                                          # tests
+poetry run black .                                         # format
+poetry run ruff check .                                    # lint (ruff 0.1.5; config in backend/pyproject.toml)
+poetry run ruff check . --select F,ASYNC --ignore F401,F841   # the enforced bug+async gate (see below)
+poetry run bandit -r app -ll -ii -x app/tests,tests        # security SAST (bandit; see Common Pitfalls / AGENTS.md)
+poetry run pip-audit                                       # dependency CVE scan
 ```
 
 ### Frontend
@@ -223,10 +229,12 @@ Repo-specific gotchas drawn from real bugs. Check a diff against these before op
    uninstall PostgreSQL/PostGIS without explicit user confirmation. If an operation
    might delete flight data, require the user to type:
    `I understand this may DELETE flight data`.
-5. **Keep instruction files in sync.** This file and
+5. **Keep instruction files in sync.** This file, [`AGENTS.md`](AGENTS.md), and
    [`.github/copilot-instructions.md`](.github/copilot-instructions.md) cover overlapping
-   ground (conventions, queue routing, schema sync, data safety). Change a rule in one →
-   apply the equivalent change in the other. A rule in one but not the other is a bug.
+   ground (conventions, queue routing, schema sync, data safety, the pre-PR review
+   checklist). Change a rule in one → apply the equivalent change in the others. A rule in
+   one but not the others is a bug. The pre-PR reviewer agents
+   (`.claude/agents/*-pre-pr-reviewer.md`) encode the same checklist — update them too.
 
 ## Environment Setup
 
