@@ -1,0 +1,73 @@
+name: Claude PR Review
+
+# Runs the project's OWN review agents (.claude/agents) as an automated PR-review group.
+# They encode project-specific rules GitHub/Copilot don't know (Celery queue routing, FR24
+# credit/rate-limit + wrapper discipline, SQLAlchemy/Alembic data-loss safety, evidence
+# integrity, tactical-HUD legibility). Complements Copilot's own review, which is taught the
+# same rules via .github/copilot-instructions.md + .github/instructions/*.instructions.md.
+#
+# PREREQUISITE: add an `ANTHROPIC_API_KEY` repo secret (Settings → Secrets → Actions). Until
+# then this workflow is inert (no runs, no cost). It also needs the Claude GitHub App installed
+# to post comments — run `/install-github-app` once in Claude Code if comments don't appear.
+#
+# COST: ~one Claude review per PR (tokens scale with diff size; bug-hunter uses opus). Scope it
+# below — by path, by draft state, or by the `claude-review` label (see the `if:` note).
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'scripts/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: read
+
+# Cancel a superseded run when the PR is updated.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Skip drafts. To make it OPT-IN per PR instead of automatic, append:
+    #   && contains(github.event.pull_request.labels.*.name, 'claude-review')
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (loads .claude/ agents + commands)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history so agents can diff against the base branch
+
+      - name: Tech review via project agents
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Perform a technical review of THIS pull request's diff (against the base branch) for
+            the phx-helicopter-tracker project. Use the project's own review agents — they encode
+            project-specific rules a generic reviewer would miss:
+
+            - backend-pre-pr-reviewer  → backend/**/*.py: custom Celery task-name routing that
+              bypasses task_routes, blocking I/O in async, SQLAlchemy session/txn bugs, naive
+              datetimes, FR24 wrapper bypass, missing tests.
+            - db-migration-reviewer    → models/migrations/query changes: data-loss safety on the
+              big evidence tables, online-migration locking, index/plan quality.
+            - frontend-pre-pr-reviewer + hud-ux-reviewer → frontend/**: React Query v4 idioms,
+              hooks, tsc/eslint, plus HUD/UX legibility and evidentiary honesty of any viz.
+            - fr24-api-cost-expert / fr24-api-capabilities-expert → if FR24 code changed:
+              credit/rate-limit cost and data-acquisition correctness (incl. gov-aircraft filtering).
+            - bug-hunter → an adversarial pass, weighting EVIDENCE/DATA-INTEGRITY defects highest
+              (non-idempotent ingestion, partial writes, timestamp corruption, silent purges).
+
+            Dispatch the agents relevant to the changed paths (in parallel). Consolidate findings
+            by severity ([Will Block] → [Should Address] → [Nit]), de-duplicated, each citing
+            file:line and the agent that raised it. Only report HIGH-CONFIDENCE issues — prefer
+            silence over noise. Post the consolidated result as a PR review. Do NOT modify code.
+          claude_args: |
+            --max-turns 25
+            --model claude-sonnet-4-6
