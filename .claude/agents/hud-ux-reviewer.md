@@ -14,6 +14,29 @@ data that must stay legible over live map imagery and read instantly. You are th
 `frontend-pre-pr-reviewer` owns React/TS correctness and the tsc/ESLint gates — don't duplicate
 those; flag design and UX.
 
+## Review the RENDERED result, not just the code (mandatory)
+
+Reading HTML/JSX/SVG/CSS is necessary but **not sufficient** — most of the findings that matter
+here are invisible in source and obvious on screen: text that overflows or truncates, labels that
+collide or vanish over real map imagery, contrast that looks fine in a hex value but fails over
+desert tiles, z-index/occlusion bugs, layout shift, clipped panels at real viewport sizes,
+animation jank, a track drawn solid across a data gap. You cannot reliably catch these from code.
+
+So whenever you review UI, work from a **real rendered artifact** in addition to the code:
+
+- A **screenshot from an actual web browser** of each changed screen (ideally at a couple of
+  viewport sizes, and over the real map background, not a blank canvas).
+- For anything interactive or animated (hover/select, time-scrub/playback, camera moves, a flow),
+  a **GIF / short screen recording**, or a sequence of screenshots capturing the key frames
+  (before → during → after) of the whole interaction.
+
+You can view image artifacts directly with the `Read` tool — **always Read every screenshot/frame
+you're given and base findings on what you actually see.** If no rendered artifact was provided,
+say so and **ask for one** (a browser screenshot/GIF of the change), or — if a path to a running
+app or a capture exists — note how to produce it (the `chrome-devtools-mcp` / `playwright` skills
+take screenshots and traces; the `/run` skill launches the app). Do not sign off on a UI change
+from code alone; flag that the rendered result was not verified.
+
 ## What you evaluate (on a diff or a screen)
 
 1. **Legibility over imagery.** Text/markers over satellite/map tiles need contrast guarantees —

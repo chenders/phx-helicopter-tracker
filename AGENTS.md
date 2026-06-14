@@ -42,6 +42,7 @@ A local `PreToolUse` hook surfaces a non-blocking reminder at push time (see Hoo
 | `frontend-pre-pr-reviewer` | sonnet | `frontend/**` | React/TS correctness, hooks, React Query v4, tsc/ESLint gates |
 | `hud-ux-reviewer` | sonnet | `frontend/**` map/visualization/dashboard UI | Legibility over imagery, info hierarchy, geospatial clarity, a11y, evidentiary honesty |
 | `db-migration-reviewer` | sonnet | `backend/app/models/**`, `backend/alembic/versions/**`, query-heavy code | Migration/data-loss safety, online-migration locking, index/plan quality, TimescaleDB/PostGIS |
+| `fr24-api-cost-expert` | sonnet | FR24 services/workers/schedulers, ingestion strategy | Credit-cost estimate, rate-limit (30/min) compliance, wrapper discipline, redundant-call/budget waste |
 | `bug-hunter` | opus | on demand / `--deep` | Adversarial tool-augmented bug hunt; weights evidence/data-integrity defects highest |
 
 Also available from installed plugins (situational): `pr-review-toolkit:silent-failure-hunter`,
@@ -57,6 +58,10 @@ Also available from installed plugins (situational): `pr-review-toolkit:silent-f
 | `aviation-law-analyst` | opus | "The lawyer" — maps facts to 4th-Amendment/AZ-law theories with specific anchors |
 | `adversarial-investigator` | opus | "The skeptic" — tries to DEFEAT a claim; rules on non-frivolous-filing bar |
 | `evidence-forensics-analyst` | opus | Admissibility — provenance, chain of custody, gaps, reproducibility (FRE 901 / Daubert) |
+| `privacy-harms-analyst` | opus | The *harm* — chilling effects, REP intrusion, disparate impact (DOJ angle); standing/damages |
+| `quant-evidence-analyst` | opus | Statistical defensibility of every number — rates, baselines, bias, uncertainty |
+| `acoustics-noise-analyst` | opus | Noise/downwash estimate for the *Riley* "undue noise, wind, dust" physical-intrusion theory |
+| `investigative-narrative-writer` | opus | Turns VERIFIED findings into accurate, compelling narrative; finds "the moment" |
 | `records-request-strategist` | sonnet | Plans/tracks the A.R.S. § 39-121 records campaign; complements `/foia-request` |
 
 ### Slash commands

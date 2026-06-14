@@ -152,10 +152,14 @@ technical-review agents by area), `/pre-pr-review` (fast pre-push subset), `/evi
 the va lesson: opus for synthesis/judgment (the bug-hunter and most personas), sonnet for the
 checklist reviewers.
 
-**Held back (propose, not built):** `privacy-harms-analyst` (chilling-effects / disparate-impact
-framing, DOJ angle), `quant-evidence-analyst` (statistical defensibility of rate/baseline claims),
-`acoustics-noise-analyst` (the *Riley* "undue noise/wind" physical-intrusion theory), and an
-investigative-narrative/"the moment" persona. Add if the case work calls for them.
+Later additions (now built): `privacy-harms-analyst` (chilling-effects / disparate-impact, DOJ
+angle), `quant-evidence-analyst` (statistical defensibility of rate/baseline claims),
+`acoustics-noise-analyst` (the *Riley* "undue noise/wind" physical-intrusion theory),
+`investigative-narrative-writer` ("the moment" / accurate persuasive framing of verified findings),
+and `fr24-api-cost-expert` (FR24 credit-cost / rate-limit / wrapper-discipline review). The UI
+review path (`hud-ux-reviewer` + `/ui-ux-review`, `/design-review`, `/3d-view-review`) requires a
+**real browser screenshot/GIF** of the change, not just the code — most UI defects are invisible
+in source and obvious on screen.
 
 ## Keeping it calibrated
 
