@@ -80,7 +80,10 @@ export const themeColors = {
   }
 }
 
+// Color-scheme keys that expose an `accent` (excludes alertBox/statusDot groups)
+type ThemeColorKey = 'success' | 'error' | 'warning' | 'info' | 'purple' | 'orange' | 'indigo'
+
 // Helper function to get theme-aware card classes
-export function getCardClasses(color: keyof typeof themeColors = 'info') {
+export function getCardClasses(color: ThemeColorKey = 'info') {
   return `bg-white dark:bg-gray-800 border ${themeColors[color].accent} rounded-lg p-6 transition-all shadow-sm hover:shadow-md`
 }

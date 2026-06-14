@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
 test.describe('Ground Labels Debugging', () => {
   test('verify ground labels are created and 2D list is populated', async ({ page }) => {

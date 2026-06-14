@@ -19,6 +19,7 @@ export interface FlightPosition {
   ground_speed_knots?: number;
   ground_elevation_feet?: number;
   altitude_agl_feet?: number;
+  over_private_property?: boolean;
 }
 
 /**

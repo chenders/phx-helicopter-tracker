@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, TrendingUp, Activity, DollarSign } from 'lucide-react';
 
@@ -13,17 +13,15 @@ interface CreditUsageData {
 }
 
 const CreditUsageWidget: React.FC = () => {
-  const { data, isLoading, error } = useQuery<CreditUsageData>(
-    'creditUsage',
-    async () => {
+  const { data, isLoading, error } = useQuery<CreditUsageData>({
+    queryKey: ['creditUsage'],
+    queryFn: async () => {
       const response = await fetch('/api/v1/tracking/sources/fr24/credits');
       if (!response.ok) throw new Error('Failed to fetch credit usage');
       return response.json();
     },
-    {
-      refetchInterval: 60000, // Refresh every minute
-    }
-  );
+    refetchInterval: 60000, // Refresh every minute
+  });
 
   if (isLoading) {
     return (

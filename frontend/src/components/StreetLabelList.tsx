@@ -6,7 +6,6 @@
  */
 
 import React from 'react';
-import { HolographicColors } from '../utils/holographicMaterials';
 
 interface StreetLabel {
   name: string;

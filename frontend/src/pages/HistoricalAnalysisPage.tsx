@@ -1252,7 +1252,7 @@ export function HistoricalAnalysisPage() {
             <h3 className="font-semibold mb-2 text-gray-900 dark:text-white">Data Sources</h3>
             <ul className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
               {historicalData?.sources && Object.entries(historicalData.sources).map(([source, count]) => (
-                <li key={source}>• {source.replace('_', ' ')}: {count} flights</li>
+                <li key={source}>• {source.replace('_', ' ')}: {count as number} flights</li>
               ))}
               {(!historicalData?.sources || Object.keys(historicalData.sources).length === 0) && (
                 <li>• No source data available</li>

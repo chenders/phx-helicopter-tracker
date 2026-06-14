@@ -225,7 +225,7 @@ export const AbnormalPatternsPage: React.FC = () => {
     refetchOnReconnect: false,
     refetchInterval: false,
     staleTime: Infinity,
-    gcTime: Infinity,
+    cacheTime: Infinity,
     retry: false,
   });
 
@@ -247,7 +247,7 @@ export const AbnormalPatternsPage: React.FC = () => {
     refetchOnReconnect: false,
     refetchInterval: false,
     staleTime: 30 * 60 * 1000, // Consider data fresh for 30 minutes
-    gcTime: 60 * 60 * 1000, // Keep in cache for 1 hour
+    cacheTime: 60 * 60 * 1000, // Keep in cache for 1 hour
     retry: false, // Don't retry on error
   });
 
@@ -265,7 +265,7 @@ export const AbnormalPatternsPage: React.FC = () => {
     refetchOnReconnect: false,
     refetchInterval: false,
     staleTime: 30 * 60 * 1000, // Cache pattern details for 30 minutes
-    gcTime: 60 * 60 * 1000, // Keep in cache for 1 hour
+    cacheTime: 60 * 60 * 1000, // Keep in cache for 1 hour
     retry: false,
   });
 
@@ -904,8 +904,8 @@ export const AbnormalPatternsPage: React.FC = () => {
                           onClick={() => setSelectedMarker('end')}
                           icon={{
                             url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-                            scaledSize: isGoogleMapsLoaded && window.google?.maps ? new window.google.maps.Size(48, 48) : undefined,
-                            anchor: isGoogleMapsLoaded && window.google?.maps ? new window.google.maps.Point(24, 48) : undefined,
+                            scaledSize: window.google?.maps ? new window.google.maps.Size(48, 48) : undefined,
+                            anchor: window.google?.maps ? new window.google.maps.Point(24, 48) : undefined,
                           }}
                           animation={window.google?.maps ? window.google.maps.Animation.DROP : undefined}
                         />

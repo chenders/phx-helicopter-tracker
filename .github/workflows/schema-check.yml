@@ -6,7 +6,7 @@ on:
       - 'backend/app/models/**'
       - 'backend/alembic/versions/**'
   push:
-    branches: [main]
+    branches: [main, dev]
 
 jobs:
   check-schema:

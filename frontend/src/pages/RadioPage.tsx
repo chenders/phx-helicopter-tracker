@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import axios from '@/lib/axios'
 import { Play, Pause, Download, Search, Mic, Clock, Database, FileText, Volume2, TrendingUp, Loader2, ScrollText } from 'lucide-react'
 
@@ -233,9 +233,9 @@ export function RadioPage() {
       const feedId = parts[2] // 12145
       
       // Calculate time from timestamp (if it's a proper Unix timestamp)
-      let startTime = null
-      let endTime = null
-      let date = null
+      let startTime: Date | null = null
+      let endTime: Date | null = null
+      let date: Date | null = null
 
       if (timestamp > 1000000000) { // Likely a Unix timestamp
         startTime = new Date(timestamp * 1000)
@@ -417,7 +417,7 @@ export function RadioPage() {
     
     if (isCurrentlyPlaying) {
       // Pause the audio if this segment is currently playing
-      audioRef.current.pause()
+      audioRef.current?.pause()
       setPlayingSegment(null)
       return
     }

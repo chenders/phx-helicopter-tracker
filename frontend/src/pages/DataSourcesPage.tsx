@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useDataSources } from '../hooks/useDataSources'
-import { formatLocalTime } from '../utils/dateUtils'
 import { usePublicRecordsRequest } from '../hooks/usePublicRecordsRequest'
 
 export function DataSourcesPage() {
