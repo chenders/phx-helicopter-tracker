@@ -417,8 +417,13 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           window.CESIUM_BASE_URL =
           "https://cesium.com/downloads/cesiumjs/releases/1.134/Build/Cesium/";
 
-        // Set Cesium Ion default access token (your personal token)
+        // Cesium Ion access token. Prefer the VITE_CESIUM_API_KEY env var (set
+        // per-environment via the gitignored .env, matching the other 3D
+        // components); fall back to the previously-committed token so existing
+        // deploys keep working. NOTE: that fallback token is already in git
+        // history and should be rotated and moved fully to env.
         Cesium.Ion.defaultAccessToken =
+          import.meta.env.VITE_CESIUM_API_KEY ||
           "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiM2FlZDAyOS00ZjE4LTQ0NjItOTY4ZC0xNzQyNGIzNjhhOTkiLCJpZCI6MzQ2MjQ4LCJpYXQiOjE3NTkzMDkyMjl9.zkS_2D4Y8scZkqmS_lckpl2G_7c8sGaFwMazm26eAT0";
 
         // Initialize the Cesium Viewer with mobile-optimized settings
