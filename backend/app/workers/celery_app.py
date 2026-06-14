@@ -54,6 +54,11 @@ celery_app.conf.update(
         "app.workers.radio_tasks.*": {"queue": "radio"},
         "app.workers.radio_analysis_tasks.*": {"queue": "analysis"},
         "app.workers.radio_import_tasks.*": {"queue": "data_import"},
+        # radio_import_tasks register custom task names, so the glob above does
+        # not match them — route them explicitly so they stay on data_import
+        # instead of falling through to the default `celery` queue.
+        "import_transcriptions_from_json": {"queue": "data_import"},
+        "batch_import_and_extract": {"queue": "data_import"},
         "app.workers.fr24_scheduler.*": {"queue": "scheduler"},
         # TRANSCRIPTION TASKS - ONLY processed by dedicated GPU workers
         # DO NOT process these on the main server

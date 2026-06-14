@@ -100,7 +100,8 @@ services:
         condition: service_started
     # NOTE: transcription is handled by the GPU worker on the separate transcription-worker
     # box (faster-whisper on CUDA). This worker does NOT consume the `transcription` queue —
-    # faster-whisper is not installed in this image, so it would fail every transcribe task.
+    # although faster-whisper is installed in this image, it's CPU-only here (no CUDA), so
+    # transcription is offloaded to the dedicated GPU worker rather than run on this box.
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 --queues=celery,tracking,analysis,legal,data_import,radio,scheduler
 
   celery-beat:
