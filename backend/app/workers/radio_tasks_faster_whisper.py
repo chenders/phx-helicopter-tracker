@@ -456,10 +456,10 @@ def transcribe_phoenix_pd_archives_faster(
                         "feed_id": PHOENIX_PD_FEED_ID,
                         "feed_name": "Phoenix Police",
                         "duration": info.duration if info is not None else audio_duration,
-                        "language": info.language if info is not None else "en",
-                        "language_probability": (
-                            info.language_probability if info is not None else 1.0
-                        ),
+                        # Feed is always English; language is forced in transcribe() so no
+                        # detection ever runs. Hardcode rather than echo info.language.
+                        "language": "en",
+                        "language_probability": 1.0,
                     },
                 }
 
