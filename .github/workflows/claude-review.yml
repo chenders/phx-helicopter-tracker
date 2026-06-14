@@ -26,6 +26,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: read
+  id-token: write   # required by claude-code-action@v1 for its OIDC token exchange
 
 # Cancel a superseded run when the PR is updated.
 concurrency:
