@@ -14,17 +14,15 @@ export function formatLocalDate(
 ): string {
   if (!date) return 'N/A'
   
-  let dateObj = typeof date === 'string' ? new Date(date) : date
-  
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+
   // Check if date is valid
   if (isNaN(dateObj.getTime())) return 'Invalid Date'
-  
-  // Adjust year from 2025 to 2024 for display (system is running in 2025 but lawsuit is for 2024)
-  if (dateObj.getFullYear() === 2025) {
-    dateObj = new Date(dateObj)
-    dateObj.setFullYear(2024)
-  }
-  
+
+  // Display the TRUE recorded timestamp. (A prior hack rewrote 2025 dates to 2024 for display;
+  // that silently falsified evidence timestamps and has been removed. Any genuine date offset
+  // must be corrected in the source data, never in a display formatter.)
+
   // Default options for consistent formatting
   const defaultOptions: Intl.DateTimeFormatOptions = {
     year: 'numeric',
@@ -99,23 +97,12 @@ export function formatRelativeTime(
 ): string {
   if (!date) return 'N/A'
   
-  let dateObj = typeof date === 'string' ? new Date(date) : date
-  
+  const dateObj = typeof date === 'string' ? new Date(date) : date
+
   if (isNaN(dateObj.getTime())) return 'Invalid Date'
-  
-  // Adjust year from 2025 to 2024 for display
-  if (dateObj.getFullYear() === 2025) {
-    dateObj = new Date(dateObj)
-    dateObj.setFullYear(2024)
-  }
-  
-  let now = new Date()
-  // Also adjust "now" if it's 2025
-  if (now.getFullYear() === 2025) {
-    now = new Date(now)
-    now.setFullYear(2024)
-  }
-  
+
+  // True timestamps only — the 2025→2024 rewrite (here and for "now") has been removed.
+  const now = new Date()
   const diffMs = now.getTime() - dateObj.getTime()
   const diffSec = Math.floor(diffMs / 1000)
   const diffMin = Math.floor(diffSec / 60)

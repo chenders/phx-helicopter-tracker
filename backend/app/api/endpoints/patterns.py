@@ -160,13 +160,6 @@ def get_pattern_analysis(
         logging.error(f"Error generating neighborhood distribution: {e}")
         neighborhood_distribution = []
 
-    # Generate violation types
-    violation_types = [
-        {"name": "Hovering", "count": constitutional_violations * 0.6},
-        {"name": "Low Altitude", "count": constitutional_violations * 0.25},
-        {"name": "Repeated Passes", "count": constitutional_violations * 0.15},
-    ]
-
     # Calculate additional metrics from actual data
     excessive_hovering_events = sum(
         1
@@ -180,6 +173,25 @@ def get_pattern_analysis(
     # geographic clustering and pattern matching which we don't have implemented
     discriminatory_ratio = 0
     systematic_patrol_routes = 0
+
+    # Per-type indicator counts from REAL computed values. (Previously this was a fabricated
+    # fixed split — 0.6/0.25/0.15 of the total — which invented the proportions and produced
+    # fractional "violation" counts.)
+    #
+    # NOTE: these are INDEPENDENT indicators measured on different dimensions
+    # (excessive_hovering_events = duration > 90 min; low_altitude_violations =
+    # min altitude < 400 ft). They are NOT a mutually-exclusive partition: a single
+    # flight can satisfy more than one, and they do NOT sum to
+    # constitutional_violations (flights > 120 min). The frontend renders them as
+    # independent bars (not a pie) and labels them "Surveillance Indicators by Type"
+    # with a note to that effect, so the breakdown isn't read as a share of the total.
+    violation_types = [
+        {"name": "Excessive Hovering", "count": excessive_hovering_events},
+        {"name": "Low Altitude", "count": low_altitude_violations},
+        # Route-clustering for repeated passes isn't implemented yet; report the real (0)
+        # value rather than a fabricated share.
+        {"name": "Repeated Passes", "count": systematic_patrol_routes},
+    ]
 
     return {
         "constitutional_violations": constitutional_violations,

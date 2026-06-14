@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { usePatternAnalysis } from '../hooks/usePatternAnalysis'
 import { useSurveillanceHotspots } from '../hooks/useSurveillanceHotspots'
 
@@ -276,27 +276,28 @@ export function PatternAnalysisPage() {
 
       {analysisType === 'constitutional' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Constitutional Violation Types */}
+          {/* Surveillance indicators by type. These are INDEPENDENT counts across
+              different criteria (hover duration vs. minimum altitude), so a flight
+              can appear in more than one and they do NOT sum to the violations
+              total. Shown as bars, not a pie, to avoid implying a share-of-whole
+              breakdown. */}
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Constitutional Violation Types</h3>
+          <h3 className="text-lg font-semibold mb-1 text-gray-900 dark:text-gray-100">Surveillance Indicators by Type</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            Independent counts by criterion (hover duration, altitude). A flight may match more than one, so these do not sum to the total above.
+          </p>
           <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={patternData?.violation_types || []}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="count"
-              >
+            <BarChart data={patternData?.violation_types || []}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="count">
                 {(patternData?.violation_types || []).map((entry: any, index: number) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
           </div>
 
