@@ -20,7 +20,6 @@ import FlightVisualization3DCesium, { HudData } from '../components/FlightVisual
 import { FlightDetailHeader } from '../components/FlightDetailHeader'
 
 interface FlightDetails {
-  id: number
   public_id: string
   aircraft_id: string
   flight_id: string

@@ -5,7 +5,6 @@ import axios from '@/lib/axios'
 import { useNavigate, Link } from 'react-router-dom'
 
 interface FlightResult {
-  id: number
   public_id: string
   aircraft_id: string
   flight_id?: string
@@ -490,7 +489,7 @@ export function FlightSearchPage() {
       const grouped = new Map<string, FlightResult[]>()
 
       results.forEach(flight => {
-        const key = flight.flight_id || `single_${flight.id}`
+        const key = flight.flight_id || `single_${flight.public_id}`
         if (!grouped.has(key)) {
           grouped.set(key, [])
         }
@@ -686,7 +685,7 @@ export function FlightSearchPage() {
               <div className="divide-y divide-gray-200 dark:divide-gray-700">
                 {processedResults.map((flight) => (
                   <div
-                    key={flight.id}
+                    key={flight.public_id}
                     onClick={(e) => {
                       e.preventDefault()
                       e.stopPropagation()
@@ -694,9 +693,9 @@ export function FlightSearchPage() {
                       fetchFlightDetails(flight)
                     }}
                     className={`p-4 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-all ${
-                      selectedFlight?.id === flight.id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500' : ''
+                      selectedFlight?.public_id === flight.public_id ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500' : ''
                     }`}
-                    data-id={`search-result-item-${flight.id}`}
+                    data-id={`search-result-item-${flight.public_id}`}
                   >
                     {/* Header with Registration and Type */}
                     <div className="flex items-start justify-between mb-3">
@@ -954,7 +953,7 @@ export function FlightSearchPage() {
             {searchResults.map((flight) =>
               flight.closest_position && (
                 <MarkerF
-                  key={flight.id}
+                  key={flight.public_id}
                   position={{
                     lat: flight.closest_position.latitude,
                     lng: flight.closest_position.longitude
@@ -963,7 +962,7 @@ export function FlightSearchPage() {
                   icon={{
                     path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
                     scale: 6,
-                    fillColor: selectedFlight?.id === flight.id ? '#EF4444' : '#10B981',
+                    fillColor: selectedFlight?.public_id === flight.public_id ? '#EF4444' : '#10B981',
                     fillOpacity: 1,
                     strokeColor: '#ffffff',
                     strokeWeight: 2,

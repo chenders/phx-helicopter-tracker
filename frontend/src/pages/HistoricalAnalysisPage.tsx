@@ -121,7 +121,7 @@ export function HistoricalAnalysisPage() {
   const [map, setMap] = useState<google.maps.Map | null>(null)
   const [pathsReady, setPathsReady] = useState(false)
   const [showSidebar, setShowSidebar] = useState(true)
-  const [selectedFlightIds, setSelectedFlightIds] = useState<Set<number>>(new Set())
+  const [selectedFlightIds, setSelectedFlightIds] = useState<Set<string>>(new Set())
   const [flightSortBy, setFlightSortBy] = useState<'surveillance' | 'date' | 'duration' | 'neighborhood'>('surveillance')
   const [showOnlySurveillance, setShowOnlySurveillance] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
@@ -200,13 +200,13 @@ export function HistoricalAnalysisPage() {
   }, [timeRange, selectedAircraft, showOnlySurveillance, flightSortBy])
 
   // Toggle flight selection
-  const toggleFlight = (flightId: number) => {
+  const toggleFlight = (publicId: string) => {
     setSelectedFlightIds(prev => {
       const newSet = new Set(prev)
-      if (newSet.has(flightId)) {
-        newSet.delete(flightId)
+      if (newSet.has(publicId)) {
+        newSet.delete(publicId)
       } else {
-        newSet.add(flightId)
+        newSet.add(publicId)
       }
       return newSet
     })
@@ -214,7 +214,7 @@ export function HistoricalAnalysisPage() {
 
   // Select/deselect all flights (all pages)
   const selectAll = () => {
-    const allIds = new Set<number>(filteredFlights.map((f: any) => f.id as number))
+    const allIds = new Set<string>(filteredFlights.map((f: any) => f.public_id as string))
     setSelectedFlightIds(allIds)
   }
 
@@ -226,7 +226,7 @@ export function HistoricalAnalysisPage() {
   const selectCurrentPage = () => {
     setSelectedFlightIds(prev => {
       const newSet = new Set(prev)
-      paginatedFlights.forEach((f: any) => newSet.add(f.id))
+      paginatedFlights.forEach((f: any) => newSet.add(f.public_id))
       return newSet
     })
   }
@@ -234,7 +234,7 @@ export function HistoricalAnalysisPage() {
   const deselectCurrentPage = () => {
     setSelectedFlightIds(prev => {
       const newSet = new Set(prev)
-      paginatedFlights.forEach((f: any) => newSet.delete(f.id))
+      paginatedFlights.forEach((f: any) => newSet.delete(f.public_id))
       return newSet
     })
   }
@@ -258,7 +258,7 @@ export function HistoricalAnalysisPage() {
 
   // Filter flight paths to only show selected flights
   const visibleFlightPaths = historicalData?.flight_paths?.filter((path: any) =>
-    selectedFlightIds.has(path.id)
+    selectedFlightIds.has(path.public_id)
   ) || []
 
   // Auto-zoom map to fit selected flight paths
@@ -543,7 +543,7 @@ export function HistoricalAnalysisPage() {
               {/* Flight List */}
               <div className="space-y-2">
                 {paginatedFlights.map((flight: any) => {
-                  const isSelected = selectedFlightIds.has(flight.id)
+                  const isSelected = selectedFlightIds.has(flight.public_id)
                   const likelihood = flight.surveillance_likelihood || 0
                   const isSurveillance = flight.is_surveillance
 
@@ -556,8 +556,8 @@ export function HistoricalAnalysisPage() {
 
                   return (
                     <div
-                      key={flight.id}
-                      onClick={() => toggleFlight(flight.id)}
+                      key={flight.public_id}
+                      onClick={() => toggleFlight(flight.public_id)}
                       className={`p-2 border-l-4 rounded cursor-pointer transition-all ${borderColor} ${
                         isSelected
                           ? 'bg-blue-50 dark:bg-blue-900/20 shadow-sm'
@@ -576,7 +576,7 @@ export function HistoricalAnalysisPage() {
                         <input
                           type="checkbox"
                           checked={isSelected}
-                          onChange={() => toggleFlight(flight.id)}
+                          onChange={() => toggleFlight(flight.public_id)}
                           className="ml-2 mt-1"
                           onClick={(e) => e.stopPropagation()}
                         />
@@ -722,7 +722,7 @@ export function HistoricalAnalysisPage() {
 
                 return (
                   <Marker
-                    key={flight.id}
+                    key={flight.public_id}
                     position={{ lat: flight.start_lat, lng: flight.start_lng }}
                     icon={{
                       path: helicopterPath,
