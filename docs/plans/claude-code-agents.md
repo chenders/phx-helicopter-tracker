@@ -125,6 +125,38 @@ because the data is irreplaceable lawsuit evidence — and (4) verifies every fi
 on disk before reporting (borrowed from the va-mobile-apps citation-integrity discipline). Model:
 opus, because subtle-bug synthesis is the high-cognition case.
 
+## Domain persona agents + review commands
+
+Beyond the dev-tooling reviewers, a roster of **domain persona agents** serves the project's
+actual mission (building a defensible record of helicopter surveillance for a lawsuit). These
+apply the va-mobile-apps-analysis insight — *diverse perspectives + adversarial verification before
+a claim is trusted* — to the legal domain rather than security audits:
+
+- **Generators:** `surveillance-pattern-analyst` (quantifies patterns in the data),
+  `helicopter-ops-analyst` ("the pilot" — explained vs anomalous), `aviation-law-analyst`
+  ("the lawyer" — facts → 4th-Amendment/AZ-law theories with specific anchors).
+- **Adversarial verifiers (the wall):** `adversarial-investigator` ("the skeptic" — tries to
+  *defeat* a claim and rule on the non-frivolous-filing bar) and `evidence-forensics-analyst`
+  (admissibility / chain of custody / FRE 901 / Daubert). Default-skeptical, like va's verifier
+  wall — better to kill a weak claim here than in front of a judge.
+- **Support:** `records-request-strategist` (FOIA campaign), plus the `/foia-request` and
+  `scripts/evidence_manifest.py` tooling.
+
+`/case-review` orchestrates them as a pipeline: facts → independent ops+legal reads →
+adversarial verification → a balanced FILING-READY / NEEDS-DEVELOPMENT / NOT-SUPPORTED verdict.
+
+Review commands (the `/` entry points): `/tech-review` (umbrella code review → dispatches the
+technical-review agents by area), `/pre-pr-review` (fast pre-push subset), `/evidence-review`
+(data-integrity for pipeline/migration changes), `/ui-ux-review` · `/design-review` ·
+`/3d-view-review` (UI/HUD), `/case-review` (legal/operational, not code). Model tiering follows
+the va lesson: opus for synthesis/judgment (the bug-hunter and most personas), sonnet for the
+checklist reviewers.
+
+**Held back (propose, not built):** `privacy-harms-analyst` (chilling-effects / disparate-impact
+framing, DOJ angle), `quant-evidence-analyst` (statistical defensibility of rate/baseline claims),
+`acoustics-noise-analyst` (the *Riley* "undue noise/wind" physical-intrusion theory), and an
+investigative-narrative/"the moment" persona. Add if the case work calls for them.
+
 ## Keeping it calibrated
 
 When a Copilot review (or a production incident) surfaces a bug class the reviewer *didn't*
