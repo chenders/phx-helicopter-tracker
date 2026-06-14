@@ -2940,7 +2940,7 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         {!isLoading && positions.length > 0 && (
           <div className="absolute right-4 top-44 bottom-4 z-30 flex flex-col items-end gap-3 pointer-events-none">
             {/* 2D Street Label List - Shows nearby streets and areas */}
-            <StreetLabelList labels={nearbyLabels} className="flex-1 min-h-0 pointer-events-auto" />
+            <StreetLabelList labels={nearbyLabels} className="flex-1 min-h-0" />
 
             {/* Phoenix Area Minimap - Division-inspired overview map */}
             {viewerRef.current && (

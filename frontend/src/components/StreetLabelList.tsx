@@ -5,7 +5,7 @@
  * Replaces 3D floating labels with a clean sidebar interface
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 
 interface StreetLabel {
   name: string;
@@ -21,6 +21,8 @@ interface StreetLabelListProps {
 }
 
 export const StreetLabelList: React.FC<StreetLabelListProps> = ({ labels, className = '' }) => {
+  const [collapsed, setCollapsed] = useState(false);
+
   // Group labels by tier
   const areas = labels.filter(l => l.tier === 0 || l.alwaysShow);
   const streets = labels.filter(l => l.tier >= 1 && !l.alwaysShow);
@@ -41,20 +43,51 @@ export const StreetLabelList: React.FC<StreetLabelListProps> = ({ labels, classN
   };
 
   return (
-    <div className={`w-64 flex flex-col min-h-0 ${className}`}>
+    // Outer reserves the flex space (keeps the minimap pinned at the bottom) but
+    // is transparent + click-through; the card inside shrinks to its content so
+    // collapsing it leaves the minimap where it is. max-h-full caps the card to
+    // the available space so a long list scrolls instead of reaching the minimap.
+    <div className={`w-64 flex flex-col min-h-0 pointer-events-none ${className}`}>
       <div
-        className="bg-black/60 backdrop-blur-sm border border-cyan-400/30 rounded-lg overflow-hidden w-64 flex flex-col flex-1 min-h-0"
+        className="bg-black/60 backdrop-blur-sm border border-cyan-400/30 rounded-lg overflow-hidden w-64 flex flex-col max-h-full pointer-events-auto"
         style={{
           boxShadow: `0 0 15px rgba(0, 212, 255, 0.2)`,
         }}
       >
         {/* Header */}
-        <div className="px-3 py-2 border-b border-cyan-400/30">
+        <div
+          className={`px-3 py-2 flex items-center justify-between gap-2 shrink-0 ${
+            collapsed ? '' : 'border-b border-cyan-400/30'
+          }`}
+        >
           <div className="text-xs text-cyan-300 uppercase tracking-wider font-bold">
             Nearby Locations
           </div>
+          <button
+            type="button"
+            onClick={() => setCollapsed(c => !c)}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? 'Expand nearby locations' : 'Minimize nearby locations'}
+            title={collapsed ? 'Expand' : 'Minimize'}
+            className="-mr-1 p-0.5 rounded text-cyan-300/80 hover:text-cyan-100 hover:bg-cyan-400/10 transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="7" x2="11" y2="7" />
+              {/* The vertical stroke turns the minus into a plus when collapsed */}
+              {collapsed && <line x1="7" y1="3" x2="7" y2="11" />}
+            </svg>
+          </button>
         </div>
 
+        {/* Collapsible region — grid-rows 1fr→0fr animates to the true content
+            height without measuring pixels. It flex-shrinks (no flex-grow) so it
+            fits the capped card and the inner list scrolls when content overflows. */}
+        <div
+          className={`grid min-h-0 transition-[grid-template-rows] duration-300 ease-out ${
+            collapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'
+          }`}
+        >
+          <div className="min-h-0 overflow-hidden flex flex-col">
         {/* Content */}
         <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-cyan-400/30 scrollbar-track-transparent">
           {/* Areas */}
@@ -147,6 +180,8 @@ export const StreetLabelList: React.FC<StreetLabelListProps> = ({ labels, classN
             background: `linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.3), transparent)`,
           }}
         />
+          </div>
+        </div>
       </div>
     </div>
   );
