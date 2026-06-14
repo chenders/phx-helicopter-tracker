@@ -5,46 +5,20 @@ on:
     branches: [ main, dev ]
     paths:
       - 'backend/**'
+      - 'scripts/check.sh'
       - '.github/workflows/backend-ci.yml'
   pull_request:
     branches: [ main, dev ]
     paths:
       - 'backend/**'
+      - 'scripts/check.sh'
       - '.github/workflows/backend-ci.yml'
 
+# One job, ONE setup, then all checks run in parallel inside scripts/check.sh
+# (blocking: ruff, black, pytest; advisory: mypy, bandit, pip-audit). This is the same
+# script developers run locally — single source of truth, no per-check setup tax.
 jobs:
-  lint-and-format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          cd backend
-          pip install --upgrade pip
-          # Skip transcription-only whisper packages (they pull torch/CUDA, ~2.5 min).
-          # The API/tests/migrations don't transcribe; the worker installs them.
-          grep -ivE 'openai-whisper|faster-whisper' requirements.txt > "$RUNNER_TEMP/reqs-ci.txt"
-          pip install -r "$RUNNER_TEMP/reqs-ci.txt"
-          pip install black==23.10.1 ruff==0.1.5
-
-      - name: Check code formatting with Black
-        run: |
-          cd backend
-          black --check --diff .
-
-      - name: Lint with Ruff
-        run: |
-          cd backend
-          ruff check .
-
-  test:
+  backend:
     runs-on: ubuntu-latest
 
     services:
@@ -61,7 +35,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
       redis:
         image: redis:7-alpine
         ports:
@@ -72,6 +45,16 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+      REDIS_URL: redis://localhost:6379/0
+      SECRET_KEY: test-secret-key-for-ci
+      ENVIRONMENT: test
+      # FR24 in sandbox for tests (never production); a dummy key is enough.
+      FR24_API_ENVIRONMENT: sandbox
+      FR24_API_KEY_SANDBOX: test-sandbox-key
+
     steps:
       - uses: actions/checkout@v4
 
@@ -81,7 +64,7 @@ jobs:
           python-version: '3.12'
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install dependencies (once)
         run: |
           cd backend
           pip install --upgrade pip
@@ -89,53 +72,18 @@ jobs:
           # The API/tests/migrations don't transcribe; the worker installs them.
           grep -ivE 'openai-whisper|faster-whisper' requirements.txt > "$RUNNER_TEMP/reqs-ci.txt"
           pip install -r "$RUNNER_TEMP/reqs-ci.txt"
+          # Quality tools (versions pinned where CI relied on them).
+          pip install black==23.10.1 ruff==0.1.5 mypy bandit pip-audit
 
-      - name: Run tests with pytest
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-          # conftest.py reads TEST_DATABASE_URL (defaults to the docker port 5433)
-          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379/0
-          SECRET_KEY: test-secret-key-for-ci
-          ENVIRONMENT: test
-          # Run FR24 in sandbox for tests (never production); a dummy key is enough.
-          FR24_API_ENVIRONMENT: sandbox
-          FR24_API_KEY_SANDBOX: test-sandbox-key
-        run: |
-          cd backend
-          pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=xml
+      - name: Quality gates (parallel)
+        # ruff + black + pytest block the build; mypy + bandit + pip-audit are advisory.
+        run: bash scripts/check.sh --backend --tests --audit --jobs 4
 
-      - name: Upload coverage reports to Codecov
+      - name: Upload coverage to Codecov
+        if: always()
         uses: codecov/codecov-action@v4
         with:
           file: ./backend/coverage.xml
           flags: backend
           fail_ci_if_error: false
-        continue-on-error: true
-
-  type-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: 'pip'
-
-      - name: Install dependencies
-        run: |
-          cd backend
-          pip install --upgrade pip
-          # Skip transcription-only whisper packages (they pull torch/CUDA, ~2.5 min).
-          # The API/tests/migrations don't transcribe; the worker installs them.
-          grep -ivE 'openai-whisper|faster-whisper' requirements.txt > "$RUNNER_TEMP/reqs-ci.txt"
-          pip install -r "$RUNNER_TEMP/reqs-ci.txt"
-          pip install mypy
-
-      - name: Type check with mypy
-        run: |
-          cd backend
-          mypy app --ignore-missing-imports || true
         continue-on-error: true
