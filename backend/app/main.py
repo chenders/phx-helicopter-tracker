@@ -24,6 +24,18 @@ setup_logging(
 
 logger = logging.getLogger(__name__)
 
+# Ensure Postgres extensions required by the schema exist before create_all.
+# pg_trgm powers the radio transcription search index. Idempotent and best-effort
+# (in production the Alembic migration also creates it; if it already exists this
+# is a no-op even for non-superusers).
+try:
+    from sqlalchemy import text as _text
+
+    with engine.begin() as _conn:
+        _conn.execute(_text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+except Exception as _exc:  # pragma: no cover - non-fatal startup safeguard
+    logger.warning(f"Could not ensure pg_trgm extension: {_exc}")
+
 # Create database tables
 Base.metadata.create_all(bind=engine)
 logger.info("Database tables created/verified")

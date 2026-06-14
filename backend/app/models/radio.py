@@ -225,6 +225,13 @@ class RadioSegment(Base):
             "contains_incident_code",
         ),
         Index("idx_radio_segments_urgency", "urgency_score"),
+        # GIN trigram index powering /api/v1/radio/search (migration b7e2f1a9c4d3)
+        Index(
+            "idx_radio_segments_text_trgm",
+            "text",
+            postgresql_using="gin",
+            postgresql_ops={"text": "gin_trgm_ops"},
+        ),
     )
 
     def __repr__(self):

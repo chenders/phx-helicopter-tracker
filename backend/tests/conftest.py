@@ -45,6 +45,12 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
     """Set up the test database once per test session."""
+    # pg_trgm is required by the radio_segments trigram search index.
+    if "postgres" in TEST_DATABASE_URL:
+        from sqlalchemy import text as _text
+
+        with test_engine.begin() as conn:
+            conn.execute(_text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
     # Create all tables at the start of the test session
     Base.metadata.create_all(bind=test_engine)
     yield

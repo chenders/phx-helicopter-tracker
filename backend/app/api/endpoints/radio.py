@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from pathlib import Path
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, text as sql_text
 import json
 import os
 import re
@@ -310,47 +310,139 @@ async def get_transcription(
 
 @router.get("/search")
 async def search_transcriptions(
-    query: str = Query(..., description="Search query"),
-    limit: int = Query(50, description="Maximum results"),
-) -> List[Dict[str, Any]]:
+    query: str = Query(..., min_length=1, description="Search query"),
+    limit: int = Query(50, ge=1, le=200, description="Max files returned"),
+    per_file: int = Query(5, ge=1, le=25, description="Max matching segments per file"),
+    fuzzy: float = Query(
+        0.3, ge=0.0, le=1.0, description="Trigram threshold for typo tolerance (0=off)"
+    ),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
     """
-    Search through transcriptions
+    Full-text-ish search over radio transcription segments, backed by Postgres
+    pg_trgm (GIN-indexed). Supports:
+      - exact case-insensitive substring (ranked highest),
+      - multi-term: every whitespace-separated term must appear in a segment,
+      - typo tolerance via trigram word_similarity,
+    and returns ranked results grouped by archive plus total counts so the
+    caller can show how many matched and whether the list was truncated.
     """
     try:
-        results = []
-        json_files = RADIO_DATA_PATH.glob("*.json")
+        q = query.strip()
+        if not q:
+            return {
+                "results": [],
+                "total_files": 0,
+                "total_segments": 0,
+                "returned_files": 0,
+                "truncated": False,
+                "limit": limit,
+            }
 
-        for json_file in json_files:
-            if len(results) >= limit:
-                break
+        terms = [t for t in q.split() if t]
+        params: Dict[str, Any] = {"q": q, "like_q": f"%{q}%"}
+        term_clauses = []
+        for i, t in enumerate(terms):
+            term_clauses.append(f"s.text ILIKE :t{i}")
+            params[f"t{i}"] = f"%{t}%"
+        all_terms_clause = " AND ".join(term_clauses) if term_clauses else "TRUE"
 
-            try:
-                async with aiofiles.open(json_file, "r") as f:
-                    data = json.loads(await f.read())
-                    text = data.get("text", "").lower()
+        where = (
+            "(s.text ILIKE :like_q "  # exact phrase substring (trigram-indexed)
+            "OR (:q <% s.text) "  # fuzzy / typo tolerant (word_similarity, indexed)
+            f"OR ({all_terms_clause}))"  # all terms present (multi-term AND)
+        )
+        base_from = (
+            "FROM radio_segments s "
+            "JOIN radio_transcriptions t ON s.transcription_id = t.id "
+            "JOIN radio_archives a ON t.archive_id = a.id"
+        )
+        score_expr = (
+            "GREATEST(CASE WHEN s.text ILIKE :like_q THEN 1.0 ELSE 0 END, "
+            "word_similarity(:q, s.text))"
+        )
 
-                    if query.lower() in text:
-                        # Find matching segments
-                        matching_segments = []
-                        for segment in data.get("segments", []):
-                            if query.lower() in segment.get("text", "").lower():
-                                matching_segments.append(segment)
+        # Honor the fuzzy threshold for the `<%` operator (transaction-local).
+        db.execute(
+            sql_text(
+                "SELECT set_config('pg_trgm.word_similarity_threshold', :f, true)"
+            ),
+            {"f": str(fuzzy)},
+        )
 
-                        results.append(
-                            {
-                                "filename": data.get("filename"),
-                                "transcribed_at": data.get("transcribed_at"),
-                                "model": data.get("model"),
-                                "matching_segments": matching_segments[
-                                    :5
-                                ],  # Limit to first 5 matches
-                                "total_matches": len(matching_segments),
-                            }
-                        )
-            except Exception:
-                continue
+        totals = (
+            db.execute(
+                sql_text(
+                    f"SELECT COUNT(*) AS segs, COUNT(DISTINCT a.id) AS files "
+                    f"{base_from} WHERE {where}"
+                ),
+                params,
+            )
+            .mappings()
+            .first()
+        )
+        total_segments = int(totals["segs"]) if totals else 0
+        total_files = int(totals["files"]) if totals else 0
 
-        return results
+        rows = (
+            db.execute(
+                sql_text(
+                    f"SELECT a.filename, a.recording_start, t.model_name, "
+                    f"t.transcribed_at, s.start_time, s.end_time, s.text, "
+                    f"{score_expr} AS score "
+                    f"{base_from} WHERE {where} "
+                    f"ORDER BY score DESC, a.recording_start DESC NULLS LAST, "
+                    f"s.start_time ASC LIMIT :max_rows"
+                ),
+                {**params, "max_rows": limit * per_file},
+            )
+            .mappings()
+            .all()
+        )
+
+        grouped: Dict[str, Dict[str, Any]] = {}
+        order: List[str] = []
+        for r in rows:
+            fn = r["filename"]
+            if fn not in grouped:
+                if len(order) >= limit:
+                    continue
+                grouped[fn] = {
+                    "filename": fn,
+                    "transcribed_at": r["transcribed_at"].isoformat()
+                    if r["transcribed_at"]
+                    else None,
+                    "model": r["model_name"],
+                    "recording_start": r["recording_start"].isoformat()
+                    if r["recording_start"]
+                    else None,
+                    "score": round(float(r["score"]), 3),
+                    "matching_segments": [],
+                }
+                order.append(fn)
+            seg_list = grouped[fn]["matching_segments"]
+            if len(seg_list) < per_file:
+                seg_list.append(
+                    {
+                        "start": r["start_time"],
+                        "end": r["end_time"],
+                        "text": r["text"],
+                        "score": round(float(r["score"]), 3),
+                    }
+                )
+
+        results = [grouped[fn] for fn in order]
+        for g in results:
+            g["total_matches"] = len(g["matching_segments"])
+
+        return {
+            "results": results,
+            "total_files": total_files,
+            "total_segments": total_segments,
+            "returned_files": len(results),
+            "truncated": total_files > len(results),
+            "limit": limit,
+        }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
