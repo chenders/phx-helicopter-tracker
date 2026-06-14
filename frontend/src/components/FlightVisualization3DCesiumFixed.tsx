@@ -1364,10 +1364,18 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           if (i > 0) {
             const prevTs = displayPositions[i - 1].timestamp;
             const curTs = displayPositions[i].timestamp;
+            const prevMs = prevTs ? new Date(prevTs).getTime() : NaN;
+            const curMs = curTs ? new Date(curTs).getTime() : NaN;
+            // If either timestamp is missing or unparseable we can't verify the
+            // two positions are contiguous in time. Treat that as a gap (break
+            // the line) rather than asserting a continuity we can't support —
+            // bridging an unknown interval with a solid line would fabricate a
+            // path. (Mirrors the animation sample loop, which skips positions
+            // without a usable timestamp.)
             const gapSeconds =
-              prevTs && curTs
-                ? (new Date(curTs).getTime() - new Date(prevTs).getTime()) / 1000
-                : 0;
+              Number.isFinite(prevMs) && Number.isFinite(curMs)
+                ? (curMs - prevMs) / 1000
+                : Infinity;
             if (gapSeconds > GAP_THRESHOLD_SECONDS) {
               flushSegment();
             }
