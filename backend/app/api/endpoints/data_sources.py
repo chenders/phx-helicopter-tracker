@@ -16,9 +16,11 @@ import os
 import logging
 import json
 import csv
+import aiofiles
 from pathlib import Path
 
 from app.api.deps import get_db
+
 # Web scraping downloader removed - using API instead
 # from app.services.flightradar24_downloader import fr24_downloader, DownloadRequest
 from app.workers.data_import_tasks import (
@@ -154,8 +156,8 @@ async def import_multiple_files(
         file_path = import_dir / file.filename
         content = await file.read()
 
-        with open(file_path, "wb") as f:
-            f.write(content)
+        async with aiofiles.open(file_path, "wb") as f:
+            await f.write(content)
 
         saved_file_paths.append(str(file_path))
 

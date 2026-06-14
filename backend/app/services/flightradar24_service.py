@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 import csv
 import json
 import logging
+import aiofiles
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
@@ -231,25 +232,23 @@ class FlightRadar24Service:
         errors = []
 
         try:
-            with open(file_path, "r", encoding="utf-8") as file:
-                # Try to detect CSV format
-                sample = file.read(1024)
-                file.seek(0)
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as file:
+                content = await file.read()
 
-                # Common FlightRadar24 CSV headers
-                if "Timestamp" in sample or "Time" in sample:
-                    reader = csv.DictReader(file)
+            # Common FlightRadar24 CSV headers
+            if "Timestamp" in content or "Time" in content:
+                reader = csv.DictReader(io.StringIO(content))
 
-                    for row_num, row in enumerate(reader, 1):
-                        try:
-                            position = self._parse_csv_row(row)
-                            if position:
-                                position.aircraft_registration = aircraft_registration
-                                positions.append(position)
-                        except Exception as e:
-                            errors.append(f"Error parsing row {row_num}: {e}")
-                else:
-                    errors.append("Unrecognized CSV format")
+                for row_num, row in enumerate(reader, 1):
+                    try:
+                        position = self._parse_csv_row(row)
+                        if position:
+                            position.aircraft_registration = aircraft_registration
+                            positions.append(position)
+                    except Exception as e:
+                        errors.append(f"Error parsing row {row_num}: {e}")
+            else:
+                errors.append("Unrecognized CSV format")
 
             flight = FlightRadar24Flight(
                 flight_id=f"fr24_csv_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}",
@@ -345,8 +344,8 @@ class FlightRadar24Service:
         """Import JSON flight data"""
 
         try:
-            with open(file_path, "r", encoding="utf-8") as file:
-                data = json.load(file)
+            async with aiofiles.open(file_path, "r", encoding="utf-8") as file:
+                data = json.loads(await file.read())
 
             positions = []
             errors = []

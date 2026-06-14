@@ -50,6 +50,7 @@ class TestWebSocketManager:
         """Test broadcasting a message to all connections."""
         # Add websocket to active connections
         await ws_manager.connect(mock_websocket)
+        mock_websocket.send_text.reset_mock()  # ignore connect-confirmation message
 
         test_message = {"type": "aircraft_update", "data": {"registration": "N624FB"}}
         await ws_manager.broadcast(test_message)
@@ -69,6 +70,8 @@ class TestWebSocketManager:
 
         await ws_manager.connect(mock_ws1)
         await ws_manager.connect(mock_ws2)
+        mock_ws1.send_text.reset_mock()
+        mock_ws2.send_text.reset_mock()
 
         test_message = {"type": "flight_update", "flight_id": "FL_001"}
         await ws_manager.broadcast(test_message)
@@ -81,9 +84,11 @@ class TestWebSocketManager:
         """Test that broadcast handles disconnected WebSockets gracefully."""
         mock_websocket = AsyncMock()
         mock_websocket.accept = AsyncMock()
-        mock_websocket.send_text = AsyncMock(side_effect=Exception("Connection closed"))
+        mock_websocket.send_text = AsyncMock()
 
         await ws_manager.connect(mock_websocket)
+        # Simulate the connection dropping on the next send
+        mock_websocket.send_text.side_effect = Exception("Connection closed")
 
         test_message = {"type": "test", "data": "test"}
 
@@ -143,6 +148,8 @@ class TestWebSocketManager:
 
         # Connect second websocket but don't subscribe to area
         await ws_manager.connect(mock_ws2)
+        mock_ws1.send_text.reset_mock()  # ignore connect + subscribe confirmations
+        mock_ws2.send_text.reset_mock()
 
         test_message = {"type": "area_update", "area": area, "aircraft": ["N624FB"]}
         await ws_manager.broadcast_to_area(area, test_message)

@@ -30,33 +30,51 @@ logger = logging.getLogger(__name__)
 
 # Known Phoenix PD helicopter tail numbers
 PHOENIX_PD_TAIL_NUMBERS = [
-    "N621FB", "N623FB", "N624FB", "N625FB",  # Active fleet
-    "N626FB", "N627FB", "N628FB",  # Former/inactive
+    "N621FB",
+    "N623FB",
+    "N624FB",
+    "N625FB",  # Active fleet
+    "N626FB",
+    "N627FB",
+    "N628FB",  # Former/inactive
 ]
 
 # Common incident codes and patterns
 INCIDENT_CODE_PATTERNS = [
-    r'\b10-\d{1,2}\b',  # 10-codes (10-4, 10-33, etc.)
-    r'\bCode\s+[123]\b',  # Code 1, Code 2, Code 3
-    r'\b11-\d{1,2}\b',  # 11-codes
-    r'\b211\b', r'\b459\b', r'\b484\b', r'\b187\b',  # Common penal codes
-    r'\b415\b', r'\b417\b', r'\b245\b',  # Disturbance, weapons, assault
+    r"\b10-\d{1,2}\b",  # 10-codes (10-4, 10-33, etc.)
+    r"\bCode\s+[123]\b",  # Code 1, Code 2, Code 3
+    r"\b11-\d{1,2}\b",  # 11-codes
+    r"\b211\b",
+    r"\b459\b",
+    r"\b484\b",
+    r"\b187\b",  # Common penal codes
+    r"\b415\b",
+    r"\b417\b",
+    r"\b245\b",  # Disturbance, weapons, assault
 ]
 
 # Phoenix street/road patterns
 LOCATION_PATTERNS = [
-    r'\b\d{1,3}(?:st|nd|rd|th)\s+(?:Street|St|Avenue|Ave)\b',  # Numbered streets
-    r'\b(?:Central|7th|19th|24th|32nd|43rd|51st)\s+(?:Avenue|Ave)\b',  # Major avenues
-    r'\b(?:Camelback|Indian School|Thomas|McDowell|Van Buren|Buckeye|Broadway|Baseline)\s+(?:Road|Rd)\b',  # Major roads
-    r'\b(?:I-10|I-17|Loop 101|Loop 202|US-60)\b',  # Freeways
-    r'\b(?:North|South|East|West)\s+\w+\s+(?:Street|Avenue|Road|Boulevard)\b',  # Directional streets
+    r"\b\d{1,3}(?:st|nd|rd|th)\s+(?:Street|St|Avenue|Ave)\b",  # Numbered streets
+    r"\b(?:Central|7th|19th|24th|32nd|43rd|51st)\s+(?:Avenue|Ave)\b",  # Major avenues
+    r"\b(?:Camelback|Indian School|Thomas|McDowell|Van Buren|Buckeye|Broadway|Baseline)\s+(?:Road|Rd)\b",  # Major roads
+    r"\b(?:I-10|I-17|Loop 101|Loop 202|US-60)\b",  # Freeways
+    r"\b(?:North|South|East|West)\s+\w+\s+(?:Street|Avenue|Road|Boulevard)\b",  # Directional streets
 ]
 
 # Urgency keywords for scoring
 URGENCY_KEYWORDS = {
-    'high': ['emergency', 'urgent', 'code 3', 'shots fired', 'officer down', 'pursuit', 'in progress'],
-    'medium': ['code 2', 'respond', 'backup', 'assist', 'priority'],
-    'low': ['code 1', 'routine', 'check', 'patrol'],
+    "high": [
+        "emergency",
+        "urgent",
+        "code 3",
+        "shots fired",
+        "officer down",
+        "pursuit",
+        "in progress",
+    ],
+    "medium": ["code 2", "respond", "backup", "assist", "priority"],
+    "low": ["code 1", "routine", "check", "patrol"],
 }
 
 
@@ -70,7 +88,7 @@ def extract_tail_numbers(text: str) -> List[str]:
     tail_numbers = []
 
     # Pattern for N-numbers
-    n_number_pattern = r'\bN\d{3,5}[A-Z]{0,2}\b'
+    n_number_pattern = r"\bN\d{3,5}[A-Z]{0,2}\b"
     matches = re.findall(n_number_pattern, text.upper())
 
     for match in matches:
@@ -96,7 +114,7 @@ def extract_locations(text: str) -> List[str]:
         locations.extend(matches)
 
     # Look for intersections (e.g., "7th Street and Camelback")
-    intersection_pattern = r'\b([\w\s]+(?:Street|Avenue|Road|Boulevard))\s+(?:and|at|near)\s+([\w\s]+(?:Street|Avenue|Road|Boulevard))\b'
+    intersection_pattern = r"\b([\w\s]+(?:Street|Avenue|Road|Boulevard))\s+(?:and|at|near)\s+([\w\s]+(?:Street|Avenue|Road|Boulevard))\b"
     intersections = re.findall(intersection_pattern, text, re.IGNORECASE)
     for intersection in intersections:
         locations.append(f"{intersection[0]} and {intersection[1]}")
@@ -128,17 +146,17 @@ def calculate_urgency_score(text: str) -> float:
     score = 0.0
 
     # High urgency keywords
-    for keyword in URGENCY_KEYWORDS['high']:
+    for keyword in URGENCY_KEYWORDS["high"]:
         if keyword in text_lower:
             score += 0.3
 
     # Medium urgency keywords
-    for keyword in URGENCY_KEYWORDS['medium']:
+    for keyword in URGENCY_KEYWORDS["medium"]:
         if keyword in text_lower:
             score += 0.15
 
     # Low urgency keywords (actually decrease score)
-    for keyword in URGENCY_KEYWORDS['low']:
+    for keyword in URGENCY_KEYWORDS["low"]:
         if keyword in text_lower:
             score -= 0.1
 
@@ -174,18 +192,20 @@ def extract_entities_from_transcription(
             if not transcription:
                 return {
                     "success": False,
-                    "error": f"Transcription {transcription_id} not found"
+                    "error": f"Transcription {transcription_id} not found",
                 }
 
             # Get associated archive for timestamp calculation
-            archive = db.query(RadioArchive).filter(
-                RadioArchive.id == transcription.archive_id
-            ).first()
+            archive = (
+                db.query(RadioArchive)
+                .filter(RadioArchive.id == transcription.archive_id)
+                .first()
+            )
 
             if not archive:
                 return {
                     "success": False,
-                    "error": f"Archive not found for transcription {transcription_id}"
+                    "error": f"Archive not found for transcription {transcription_id}",
                 }
 
             segments_updated = 0
@@ -202,7 +222,9 @@ def extract_entities_from_transcription(
 
                 # Calculate absolute timestamp
                 if archive.recording_start:
-                    absolute_timestamp = archive.recording_start + timedelta(seconds=segment.start_time)
+                    absolute_timestamp = archive.recording_start + timedelta(
+                        seconds=segment.start_time
+                    )
                 else:
                     absolute_timestamp = None
 
@@ -220,34 +242,34 @@ def extract_entities_from_transcription(
 
                 # Track keywords for keyword table
                 for tail in tail_numbers:
-                    key = ('tail_number', tail)
+                    key = ("tail_number", tail)
                     if key not in keyword_tracker:
                         keyword_tracker[key] = {
-                            'count': 0,
-                            'first_time': segment.start_time,
-                            'context': segment.text[:200]
+                            "count": 0,
+                            "first_time": segment.start_time,
+                            "context": segment.text[:200],
                         }
-                    keyword_tracker[key]['count'] += 1
+                    keyword_tracker[key]["count"] += 1
 
                 for loc in locations:
-                    key = ('location', loc)
+                    key = ("location", loc)
                     if key not in keyword_tracker:
                         keyword_tracker[key] = {
-                            'count': 0,
-                            'first_time': segment.start_time,
-                            'context': segment.text[:200]
+                            "count": 0,
+                            "first_time": segment.start_time,
+                            "context": segment.text[:200],
                         }
-                    keyword_tracker[key]['count'] += 1
+                    keyword_tracker[key]["count"] += 1
 
                 for code in incident_codes:
-                    key = ('incident_code', code)
+                    key = ("incident_code", code)
                     if key not in keyword_tracker:
                         keyword_tracker[key] = {
-                            'count': 0,
-                            'first_time': segment.start_time,
-                            'context': segment.text[:200]
+                            "count": 0,
+                            "first_time": segment.start_time,
+                            "context": segment.text[:200],
                         }
-                    keyword_tracker[key]['count'] += 1
+                    keyword_tracker[key]["count"] += 1
 
             # Create keyword records
             for (kw_type, kw_text), data in keyword_tracker.items():
@@ -255,9 +277,9 @@ def extract_entities_from_transcription(
                     transcription_id=transcription_id,
                     keyword=kw_text,
                     keyword_type=kw_type,
-                    occurrence_count=data['count'],
-                    first_occurrence_time=data['first_time'],
-                    context_snippet=data['context'],
+                    occurrence_count=data["count"],
+                    first_occurrence_time=data["first_time"],
+                    context_snippet=data["context"],
                     confidence=0.8,  # Default confidence for regex extraction
                 )
                 db.add(keyword)
@@ -282,7 +304,9 @@ def extract_entities_from_transcription(
             }
 
     except Exception as e:
-        logger.error(f"Error extracting entities from transcription {transcription_id}: {str(e)}")
+        logger.error(
+            f"Error extracting entities from transcription {transcription_id}: {str(e)}"
+        )
         return {
             "success": False,
             "error": str(e),
@@ -325,7 +349,9 @@ def correlate_radio_with_flights(
                 .all()
             )
 
-            logger.info(f"Found {len(segments_with_tail_numbers)} segments with tail numbers")
+            logger.info(
+                f"Found {len(segments_with_tail_numbers)} segments with tail numbers"
+            )
 
             # For each segment with tail numbers, find matching flights
             for segment in segments_with_tail_numbers:
@@ -334,9 +360,11 @@ def correlate_radio_with_flights(
 
                 for tail_number in segment.tail_numbers:
                     # Find aircraft by registration
-                    aircraft = db.query(Aircraft).filter(
-                        Aircraft.registration == tail_number
-                    ).first()
+                    aircraft = (
+                        db.query(Aircraft)
+                        .filter(Aircraft.registration == tail_number)
+                        .first()
+                    )
 
                     if not aircraft:
                         continue
@@ -350,8 +378,10 @@ def correlate_radio_with_flights(
                             or_(
                                 # Flight was active during radio mention
                                 and_(
-                                    FlightLog.departure_time <= segment.absolute_timestamp + time_window,
-                                    FlightLog.arrival_time >= segment.absolute_timestamp - time_window,
+                                    FlightLog.departure_time
+                                    <= segment.absolute_timestamp + time_window,
+                                    FlightLog.arrival_time
+                                    >= segment.absolute_timestamp - time_window,
                                 ),
                             ),
                         )
@@ -360,17 +390,25 @@ def correlate_radio_with_flights(
 
                     for flight in flights:
                         # Check if correlation already exists
-                        existing = db.query(FlightRadioCorrelation).filter(
-                            FlightRadioCorrelation.flight_log_id == flight.id,
-                            FlightRadioCorrelation.radio_segment_id == segment.id,
-                        ).first()
+                        existing = (
+                            db.query(FlightRadioCorrelation)
+                            .filter(
+                                FlightRadioCorrelation.flight_log_id == flight.id,
+                                FlightRadioCorrelation.radio_segment_id == segment.id,
+                            )
+                            .first()
+                        )
 
                         if existing:
                             continue
 
                         # Calculate time difference
                         if flight.departure_time:
-                            time_diff = abs((segment.absolute_timestamp - flight.departure_time).total_seconds())
+                            time_diff = abs(
+                                (
+                                    segment.absolute_timestamp - flight.departure_time
+                                ).total_seconds()
+                            )
                         else:
                             time_diff = 0
 
@@ -388,7 +426,7 @@ def correlate_radio_with_flights(
                         correlation = FlightRadioCorrelation(
                             flight_log_id=flight.id,
                             radio_segment_id=segment.id,
-                            correlation_type='tail_number_mention',
+                            correlation_type="tail_number_mention",
                             correlation_strength=strength,
                             time_difference_seconds=time_diff,
                             matched_keywords=[tail_number],
@@ -443,7 +481,7 @@ def process_untranscribed_archives(
                 return {
                     "success": True,
                     "processed": 0,
-                    "message": "No unprocessed transcriptions"
+                    "message": "No unprocessed transcriptions",
                 }
 
             logger.info(f"Found {len(unprocessed)} unprocessed transcriptions")

@@ -13,8 +13,7 @@ import argparse
 
 # Setup logging for this script
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,9 @@ def get_file_age_days(file_path: Path) -> int:
     return age.days
 
 
-def cleanup_old_logs(retention_days: int = DEFAULT_RETENTION_DAYS, dry_run: bool = False):
+def cleanup_old_logs(
+    retention_days: int = DEFAULT_RETENTION_DAYS, dry_run: bool = False
+):
     """
     Remove log files older than retention period
 
@@ -38,7 +39,9 @@ def cleanup_old_logs(retention_days: int = DEFAULT_RETENTION_DAYS, dry_run: bool
         retention_days: Number of days to retain logs
         dry_run: If True, only show what would be deleted without actually deleting
     """
-    logger.info(f"Starting log cleanup - Retention: {retention_days} days, Dry run: {dry_run}")
+    logger.info(
+        f"Starting log cleanup - Retention: {retention_days} days, Dry run: {dry_run}"
+    )
 
     if not LOG_DIR.exists():
         logger.warning(f"Log directory {LOG_DIR} does not exist")
@@ -60,9 +63,13 @@ def cleanup_old_logs(retention_days: int = DEFAULT_RETENTION_DAYS, dry_run: bool
                 file_size = log_file.stat().st_size
 
                 if dry_run:
-                    logger.info(f"Would delete: {log_file} (Age: {age_days} days, Size: {file_size / 1024:.1f} KB)")
+                    logger.info(
+                        f"Would delete: {log_file} (Age: {age_days} days, Size: {file_size / 1024:.1f} KB)"
+                    )
                 else:
-                    logger.info(f"Deleting: {log_file} (Age: {age_days} days, Size: {file_size / 1024:.1f} KB)")
+                    logger.info(
+                        f"Deleting: {log_file} (Age: {age_days} days, Size: {file_size / 1024:.1f} KB)"
+                    )
                     log_file.unlink()
 
                 total_size_freed += file_size
@@ -73,9 +80,13 @@ def cleanup_old_logs(retention_days: int = DEFAULT_RETENTION_DAYS, dry_run: bool
 
     # Summary
     if dry_run:
-        logger.info(f"Dry run complete - Would delete {files_deleted} files, freeing {total_size_freed / (1024 * 1024):.2f} MB")
+        logger.info(
+            f"Dry run complete - Would delete {files_deleted} files, freeing {total_size_freed / (1024 * 1024):.2f} MB"
+        )
     else:
-        logger.info(f"Cleanup complete - Deleted {files_deleted} files, freed {total_size_freed / (1024 * 1024):.2f} MB")
+        logger.info(
+            f"Cleanup complete - Deleted {files_deleted} files, freed {total_size_freed / (1024 * 1024):.2f} MB"
+        )
 
 
 def compress_old_logs(age_days: int = 7, dry_run: bool = False):
@@ -100,7 +111,7 @@ def compress_old_logs(age_days: int = 7, dry_run: bool = False):
 
     for log_file in LOG_DIR.glob("**/*.log"):
         # Skip already compressed files
-        if log_file.suffix == '.gz':
+        if log_file.suffix == ".gz":
             continue
 
         try:
@@ -108,14 +119,16 @@ def compress_old_logs(age_days: int = 7, dry_run: bool = False):
 
             if file_age > age_days:
                 original_size = log_file.stat().st_size
-                compressed_path = log_file.with_suffix('.log.gz')
+                compressed_path = log_file.with_suffix(".log.gz")
 
                 if dry_run:
-                    logger.info(f"Would compress: {log_file} ({original_size / 1024:.1f} KB)")
+                    logger.info(
+                        f"Would compress: {log_file} ({original_size / 1024:.1f} KB)"
+                    )
                 else:
                     logger.info(f"Compressing: {log_file}")
-                    with open(log_file, 'rb') as f_in:
-                        with gzip.open(compressed_path, 'wb') as f_out:
+                    with open(log_file, "rb") as f_in:
+                        with gzip.open(compressed_path, "wb") as f_out:
                             shutil.copyfileobj(f_in, f_out)
 
                     compressed_size = compressed_path.stat().st_size
@@ -123,7 +136,9 @@ def compress_old_logs(age_days: int = 7, dry_run: bool = False):
                     log_file.unlink()
                     files_compressed += 1
 
-                    logger.debug(f"Compressed {original_size / 1024:.1f} KB -> {compressed_size / 1024:.1f} KB")
+                    logger.debug(
+                        f"Compressed {original_size / 1024:.1f} KB -> {compressed_size / 1024:.1f} KB"
+                    )
 
         except Exception as e:
             logger.error(f"Error compressing {log_file}: {e}")
@@ -131,7 +146,9 @@ def compress_old_logs(age_days: int = 7, dry_run: bool = False):
     if dry_run:
         logger.info(f"Dry run complete - Would compress {files_compressed} files")
     else:
-        logger.info(f"Compression complete - Compressed {files_compressed} files, saved {space_saved / (1024 * 1024):.2f} MB")
+        logger.info(
+            f"Compression complete - Compressed {files_compressed} files, saved {space_saved / (1024 * 1024):.2f} MB"
+        )
 
 
 def archive_logs(archive_days: int = 90, dry_run: bool = False):
@@ -206,20 +223,36 @@ def get_log_statistics():
 
 def main():
     parser = argparse.ArgumentParser(description="Log file cleanup and maintenance")
-    parser.add_argument('--retention-days', type=int, default=DEFAULT_RETENTION_DAYS,
-                        help=f"Number of days to retain logs (default: {DEFAULT_RETENTION_DAYS})")
-    parser.add_argument('--compress-age', type=int, default=7,
-                        help="Compress logs older than this many days (default: 7)")
-    parser.add_argument('--archive-age', type=int, default=90,
-                        help="Archive logs older than this many days (default: 90)")
-    parser.add_argument('--dry-run', action='store_true',
-                        help="Show what would be done without actually doing it")
-    parser.add_argument('--stats-only', action='store_true',
-                        help="Only show log statistics")
-    parser.add_argument('--no-compress', action='store_true',
-                        help="Skip compression step")
-    parser.add_argument('--no-archive', action='store_true',
-                        help="Skip archival step")
+    parser.add_argument(
+        "--retention-days",
+        type=int,
+        default=DEFAULT_RETENTION_DAYS,
+        help=f"Number of days to retain logs (default: {DEFAULT_RETENTION_DAYS})",
+    )
+    parser.add_argument(
+        "--compress-age",
+        type=int,
+        default=7,
+        help="Compress logs older than this many days (default: 7)",
+    )
+    parser.add_argument(
+        "--archive-age",
+        type=int,
+        default=90,
+        help="Archive logs older than this many days (default: 90)",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without actually doing it",
+    )
+    parser.add_argument(
+        "--stats-only", action="store_true", help="Only show log statistics"
+    )
+    parser.add_argument(
+        "--no-compress", action="store_true", help="Skip compression step"
+    )
+    parser.add_argument("--no-archive", action="store_true", help="Skip archival step")
 
     args = parser.parse_args()
 

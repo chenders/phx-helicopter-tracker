@@ -387,7 +387,7 @@ I have a Gold subscription to https://www.flightradar24.com/. It appears that I 
 Please also assume that we obtain everything listed as possible to get under Arizona's Open Records Law.
 
 Assuming that 
-- **Backend**: FastAPI (Python 3.11) with PostgreSQL database
+- **Backend**: FastAPI (Python 3.12) with PostgreSQL database
 - **Frontend**: React 18 with TypeScript, Vite, and Tailwind CSS
 - **Infrastructure**: Docker containers with docker compose orchestration
 
@@ -410,8 +410,13 @@ pytest
 # Format code
 black .
 
-# Lint code
-ruff .
+# Lint code (ruff 0.1.5; config in backend/pyproject.toml [tool.ruff])
+ruff check .
+
+# Bug-class gate — logic + async bugs only (F821 undefined names, F811
+# redefinitions, F601 dup keys, ASYNC blocking-I/O). Enforced by CI and the
+# pre-push hook; must stay green. Does NOT enforce F401/F841/E* (style/noise).
+ruff check . --select F,ASYNC --ignore F401,F841
 ```
 
 ### Frontend Development
@@ -550,6 +555,16 @@ Database initialization handled by `init.sql` script.
 
 - **Backend**: Black (formatting), Ruff (linting), pytest (testing)
 - **Frontend**: ESLint (linting), TypeScript (type checking), Vitest (testing)
+
+#### Lint gate (logic + async bugs)
+
+A scoped ruff gate runs in CI (`.github/workflows/lint.yml`) and at **pre-push**
+(`.pre-commit-config.yaml`): `ruff check . --select F,ASYNC --ignore F401,F841`.
+It blocks real bugs — undefined names (F821), redefinitions (F811), duplicate
+dict keys (F601), and sync/async mismatches (ASYNC, e.g. blocking `open`/`sleep`
+in `async` functions) — without nagging about unused imports/vars or style.
+Ruff config lives in `backend/pyproject.toml`. Activate locally once with:
+`pip install pre-commit && pre-commit install`.
 
 ## Environment Setup
 

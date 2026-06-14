@@ -330,16 +330,16 @@ class FlightRadar24APIService:
             else:
                 logger.error(f"FR24 API limit reached: {reason}")
                 return None
-            
+
             # Recheck after waiting
             can_request, reason = fr24_rate_limiter.can_make_request()
             if not can_request:
                 logger.error(f"Still rate limited after waiting: {reason}")
                 return None
-        
+
         # Enforce minimum delay between requests
         fr24_rate_limiter._wait_if_needed()
-        
+
         # Make API request
         url = f"{self.base_url}/{endpoint}"
 
@@ -350,7 +350,7 @@ class FlightRadar24APIService:
 
                     # Record credit usage
                     await self.credit_manager.record_usage(credit_type)
-                    
+
                     # Update rate limiter counters
                     fr24_rate_limiter._increment_counter("minute")
                     fr24_rate_limiter._increment_counter("hour")
@@ -412,7 +412,9 @@ class FlightRadar24APIService:
             params["registrations"] = ",".join(registrations)
 
         # Use live flight positions endpoint - this is the correct FR24 API endpoint
-        data = await self._make_api_request("live/flight-positions/light", params, "live_positions_light")
+        data = await self._make_api_request(
+            "live/flight-positions/light", params, "live_positions_light"
+        )
 
         if not data:
             return []
@@ -468,26 +470,35 @@ class FlightRadar24APIService:
         """Search for recent flights by aircraft registration"""
         end_date = datetime.now(timezone.utc)
         start_date = end_date - timedelta(days=days_back)
-        
+
         params = {
             "registration": registration,
             "from": start_date.strftime("%Y-%m-%d"),
             "to": end_date.strftime("%Y-%m-%d"),
-            "limit": 100
+            "limit": 100,
         }
-        
-        logger.info(f"Searching flights for {registration} from {params['from']} to {params['to']}")
-        
+
+        logger.info(
+            f"Searching flights for {registration} from {params['from']} to {params['to']}"
+        )
+
         data = await self._make_api_request("flights", params, "flights")
-        
+
         if not data:
             return []
-            
-        flights = data.get('data', []) if isinstance(data, dict) else data
+
+        flights = data.get("data", []) if isinstance(data, dict) else data
         logger.info(f"Found {len(flights)} flights for {registration}")
         return flights
 
-    async def get_flight_summary(self, registration: str, page: int = 1, days_back: int = 14, start_date: datetime = None, end_date: datetime = None) -> Dict[str, Any]:
+    async def get_flight_summary(
+        self,
+        registration: str,
+        page: int = 1,
+        days_back: int = 14,
+        start_date: datetime = None,
+        end_date: datetime = None,
+    ) -> Dict[str, Any]:
         """
         Get flight summary for a specific registration
         Returns list of all flights with their IDs for later track download
@@ -498,30 +509,34 @@ class FlightRadar24APIService:
             # Ensure we don't exceed 14-day limit
             date_diff = (end_date - start_date).days
             if date_diff > 14:
-                raise ValueError(f"Date range cannot exceed 14 days (got {date_diff} days)")
+                raise ValueError(
+                    f"Date range cannot exceed 14 days (got {date_diff} days)"
+                )
         else:
             # Use days_back parameter
             days_back = min(days_back, 14)
             end_date = datetime.now(timezone.utc)
             start_date = end_date - timedelta(days=days_back)
-        
+
         params = {
             "registrations": registration,  # Note: plural 'registrations'
             "flight_datetime_from": start_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "flight_datetime_to": end_date.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "page": page,
-            "limit": 100  # Max results per page
+            "limit": 100,  # Max results per page
         }
-        
-        logger.info(f"Getting flight summary for {registration}, page {page}, from {start_date.date()} to {end_date.date()}")
-        
+
+        logger.info(
+            f"Getting flight summary for {registration}, page {page}, from {start_date.date()} to {end_date.date()}"
+        )
+
         data = await self._make_api_request(
             "flight-summary/light", params, "flight_summary"
         )
-        
+
         if not data:
             return {"data": []}
-            
+
         # Ensure consistent format
         if isinstance(data, list):
             return {"data": data}
@@ -535,23 +550,21 @@ class FlightRadar24APIService:
 
         # Use flight-tracks endpoint with flight_id as parameter
         params = {"flight_id": flight_id}
-        data = await self._make_api_request(
-            "flight-tracks", params, "flight_tracks"
-        )
+        data = await self._make_api_request("flight-tracks", params, "flight_tracks")
 
         if not data:
             return []
 
         positions = []
-        
+
         # Response is a list with flight data
         if isinstance(data, list) and len(data) > 0:
             flight_data = data[0]
             fr24_id = flight_data.get("fr24_id", flight_id)
             tracks = flight_data.get("tracks", [])
-            
+
             logger.info(f"Processing {len(tracks)} track points for flight {fr24_id}")
-            
+
             for track_point in tracks:
                 try:
                     # Parse timestamp
@@ -559,15 +572,20 @@ class FlightRadar24APIService:
                     if timestamp_str:
                         # Handle ISO format with Z
                         if isinstance(timestamp_str, str):
-                            timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
+                            timestamp = datetime.fromisoformat(
+                                timestamp_str.replace("Z", "+00:00")
+                            )
                         else:
-                            timestamp = datetime.fromtimestamp(timestamp_str, tz=timezone.utc)
+                            timestamp = datetime.fromtimestamp(
+                                timestamp_str, tz=timezone.utc
+                            )
                     else:
                         timestamp = datetime.now(timezone.utc)
-                    
+
                     position = FR24Position(
                         flight_id=fr24_id,
-                        registration=track_point.get("callsign") or fr24_id,  # Use callsign if available
+                        registration=track_point.get("callsign")
+                        or fr24_id,  # Use callsign if available
                         callsign=track_point.get("callsign", ""),
                         aircraft_type=None,  # Not in track data
                         latitude=float(track_point.get("lat", 0)),

@@ -32,7 +32,10 @@ def _detect_hovering(positions: List[FlightPosition]) -> List[Dict[str, Any]]:
     MIN_HOVER_DURATION = 120  # 2 minutes in seconds
 
     for i, pos in enumerate(positions):
-        is_slow = pos.ground_speed_knots is not None and pos.ground_speed_knots < HOVER_SPEED_THRESHOLD
+        is_slow = (
+            pos.ground_speed_knots is not None
+            and pos.ground_speed_knots < HOVER_SPEED_THRESHOLD
+        )
 
         if is_slow:
             if current_segment is None:
@@ -42,7 +45,7 @@ def _detect_hovering(positions: List[FlightPosition]) -> List[Dict[str, Any]]:
                     "start_time": pos.timestamp.isoformat() if pos.timestamp else None,
                     "start_lat": pos.latitude,
                     "start_lon": pos.longitude,
-                    "positions": [pos]
+                    "positions": [pos],
                 }
             else:
                 # Continue hover segment
@@ -54,22 +57,32 @@ def _detect_hovering(positions: List[FlightPosition]) -> List[Dict[str, Any]]:
                 last_pos = current_segment["positions"][-1]
 
                 if first_pos.timestamp and last_pos.timestamp:
-                    duration = (last_pos.timestamp - first_pos.timestamp).total_seconds()
+                    duration = (
+                        last_pos.timestamp - first_pos.timestamp
+                    ).total_seconds()
 
                     if duration >= MIN_HOVER_DURATION:
                         # Calculate center point
                         lats = [p.latitude for p in current_segment["positions"]]
                         lons = [p.longitude for p in current_segment["positions"]]
 
-                        hovering_segments.append({
-                            "start_time": current_segment["start_time"],
-                            "end_time": last_pos.timestamp.isoformat() if last_pos.timestamp else None,
-                            "duration_seconds": duration,
-                            "center_lat": sum(lats) / len(lats),
-                            "center_lon": sum(lons) / len(lons),
-                            "position_count": len(current_segment["positions"]),
-                            "avg_altitude": sum(p.altitude_feet or 0 for p in current_segment["positions"]) / len(current_segment["positions"])
-                        })
+                        hovering_segments.append(
+                            {
+                                "start_time": current_segment["start_time"],
+                                "end_time": last_pos.timestamp.isoformat()
+                                if last_pos.timestamp
+                                else None,
+                                "duration_seconds": duration,
+                                "center_lat": sum(lats) / len(lats),
+                                "center_lon": sum(lons) / len(lons),
+                                "position_count": len(current_segment["positions"]),
+                                "avg_altitude": sum(
+                                    p.altitude_feet or 0
+                                    for p in current_segment["positions"]
+                                )
+                                / len(current_segment["positions"]),
+                            }
+                        )
 
                 current_segment = None
 
@@ -85,15 +98,22 @@ def _detect_hovering(positions: List[FlightPosition]) -> List[Dict[str, Any]]:
                 lats = [p.latitude for p in current_segment["positions"]]
                 lons = [p.longitude for p in current_segment["positions"]]
 
-                hovering_segments.append({
-                    "start_time": current_segment["start_time"],
-                    "end_time": last_pos.timestamp.isoformat() if last_pos.timestamp else None,
-                    "duration_seconds": duration,
-                    "center_lat": sum(lats) / len(lats),
-                    "center_lon": sum(lons) / len(lons),
-                    "position_count": len(current_segment["positions"]),
-                    "avg_altitude": sum(p.altitude_feet or 0 for p in current_segment["positions"]) / len(current_segment["positions"])
-                })
+                hovering_segments.append(
+                    {
+                        "start_time": current_segment["start_time"],
+                        "end_time": last_pos.timestamp.isoformat()
+                        if last_pos.timestamp
+                        else None,
+                        "duration_seconds": duration,
+                        "center_lat": sum(lats) / len(lats),
+                        "center_lon": sum(lons) / len(lons),
+                        "position_count": len(current_segment["positions"]),
+                        "avg_altitude": sum(
+                            p.altitude_feet or 0 for p in current_segment["positions"]
+                        )
+                        / len(current_segment["positions"]),
+                    }
+                )
 
     return hovering_segments
 
@@ -114,7 +134,7 @@ def _detect_low_altitude(positions: List[FlightPosition]) -> List[Dict[str, Any]
 
     for i, pos in enumerate(positions):
         # Prefer AGL altitude if available, fallback to MSL
-        if hasattr(pos, 'altitude_agl_feet') and pos.altitude_agl_feet is not None:
+        if hasattr(pos, "altitude_agl_feet") and pos.altitude_agl_feet is not None:
             is_low = pos.altitude_agl_feet < LOW_ALTITUDE_THRESHOLD_AGL
             altitude_value = pos.altitude_agl_feet
             altitude_type = "AGL"
@@ -136,7 +156,7 @@ def _detect_low_altitude(positions: List[FlightPosition]) -> List[Dict[str, Any]
                     "start_lat": pos.latitude,
                     "start_lon": pos.longitude,
                     "positions": [pos],
-                    "altitude_type": altitude_type
+                    "altitude_type": altitude_type,
                 }
             else:
                 # Continue low altitude segment
@@ -148,7 +168,9 @@ def _detect_low_altitude(positions: List[FlightPosition]) -> List[Dict[str, Any]
                 last_pos = current_segment["positions"][-1]
 
                 if first_pos.timestamp and last_pos.timestamp:
-                    duration = (last_pos.timestamp - first_pos.timestamp).total_seconds()
+                    duration = (
+                        last_pos.timestamp - first_pos.timestamp
+                    ).total_seconds()
 
                     if duration >= MIN_SEGMENT_DURATION:
                         # Calculate path center and stats
@@ -156,21 +178,36 @@ def _detect_low_altitude(positions: List[FlightPosition]) -> List[Dict[str, Any]
                         lons = [p.longitude for p in current_segment["positions"]]
 
                         if current_segment["altitude_type"] == "AGL":
-                            altitudes = [p.altitude_agl_feet for p in current_segment["positions"] if hasattr(p, 'altitude_agl_feet') and p.altitude_agl_feet is not None]
+                            altitudes = [
+                                p.altitude_agl_feet
+                                for p in current_segment["positions"]
+                                if hasattr(p, "altitude_agl_feet")
+                                and p.altitude_agl_feet is not None
+                            ]
                         else:
-                            altitudes = [p.altitude_feet for p in current_segment["positions"] if p.altitude_feet is not None]
+                            altitudes = [
+                                p.altitude_feet
+                                for p in current_segment["positions"]
+                                if p.altitude_feet is not None
+                            ]
 
-                        low_alt_segments.append({
-                            "start_time": current_segment["start_time"],
-                            "end_time": last_pos.timestamp.isoformat() if last_pos.timestamp else None,
-                            "duration_seconds": duration,
-                            "center_lat": sum(lats) / len(lats),
-                            "center_lon": sum(lons) / len(lons),
-                            "position_count": len(current_segment["positions"]),
-                            "min_altitude": min(altitudes) if altitudes else None,
-                            "avg_altitude": sum(altitudes) / len(altitudes) if altitudes else None,
-                            "altitude_type": current_segment["altitude_type"]
-                        })
+                        low_alt_segments.append(
+                            {
+                                "start_time": current_segment["start_time"],
+                                "end_time": last_pos.timestamp.isoformat()
+                                if last_pos.timestamp
+                                else None,
+                                "duration_seconds": duration,
+                                "center_lat": sum(lats) / len(lats),
+                                "center_lon": sum(lons) / len(lons),
+                                "position_count": len(current_segment["positions"]),
+                                "min_altitude": min(altitudes) if altitudes else None,
+                                "avg_altitude": sum(altitudes) / len(altitudes)
+                                if altitudes
+                                else None,
+                                "altitude_type": current_segment["altitude_type"],
+                            }
+                        )
 
                 current_segment = None
 
@@ -187,21 +224,36 @@ def _detect_low_altitude(positions: List[FlightPosition]) -> List[Dict[str, Any]
                 lons = [p.longitude for p in current_segment["positions"]]
 
                 if current_segment["altitude_type"] == "AGL":
-                    altitudes = [p.altitude_agl_feet for p in current_segment["positions"] if hasattr(p, 'altitude_agl_feet') and p.altitude_agl_feet is not None]
+                    altitudes = [
+                        p.altitude_agl_feet
+                        for p in current_segment["positions"]
+                        if hasattr(p, "altitude_agl_feet")
+                        and p.altitude_agl_feet is not None
+                    ]
                 else:
-                    altitudes = [p.altitude_feet for p in current_segment["positions"] if p.altitude_feet is not None]
+                    altitudes = [
+                        p.altitude_feet
+                        for p in current_segment["positions"]
+                        if p.altitude_feet is not None
+                    ]
 
-                low_alt_segments.append({
-                    "start_time": current_segment["start_time"],
-                    "end_time": last_pos.timestamp.isoformat() if last_pos.timestamp else None,
-                    "duration_seconds": duration,
-                    "center_lat": sum(lats) / len(lats),
-                    "center_lon": sum(lons) / len(lons),
-                    "position_count": len(current_segment["positions"]),
-                    "min_altitude": min(altitudes) if altitudes else None,
-                    "avg_altitude": sum(altitudes) / len(altitudes) if altitudes else None,
-                    "altitude_type": current_segment["altitude_type"]
-                })
+                low_alt_segments.append(
+                    {
+                        "start_time": current_segment["start_time"],
+                        "end_time": last_pos.timestamp.isoformat()
+                        if last_pos.timestamp
+                        else None,
+                        "duration_seconds": duration,
+                        "center_lat": sum(lats) / len(lats),
+                        "center_lon": sum(lons) / len(lons),
+                        "position_count": len(current_segment["positions"]),
+                        "min_altitude": min(altitudes) if altitudes else None,
+                        "avg_altitude": sum(altitudes) / len(altitudes)
+                        if altitudes
+                        else None,
+                        "altitude_type": current_segment["altitude_type"],
+                    }
+                )
 
     return low_alt_segments
 
@@ -231,7 +283,7 @@ def reanalyze_all_flights(self, batch_size: int = 100) -> Dict[str, Any]:
         "total_hover_segments": 0,
         "total_low_alt_segments": 0,
         "flights_skipped": 0,
-        "errors": []
+        "errors": [],
     }
 
     try:
@@ -245,7 +297,12 @@ def reanalyze_all_flights(self, batch_size: int = 100) -> Dict[str, Any]:
             "hover_locations IS NULL OR low_altitude_segments IS NULL)"
         )
 
-        flights_query = db.query(FlightLog).filter(json_null_filter).order_by(FlightLog.id).limit(batch_size)
+        flights_query = (
+            db.query(FlightLog)
+            .filter(json_null_filter)
+            .order_by(FlightLog.id)
+            .limit(batch_size)
+        )
         flights = flights_query.all()
 
         total_remaining = db.query(FlightLog).filter(json_null_filter).count()
@@ -256,18 +313,23 @@ def reanalyze_all_flights(self, batch_size: int = 100) -> Dict[str, Any]:
                 meta={
                     "current": 0,
                     "total": len(flights),
-                    "status": f"Analyzing {len(flights)} flights (est. {total_remaining} remaining)..."
-                }
+                    "status": f"Analyzing {len(flights)} flights (est. {total_remaining} remaining)...",
+                },
             )
 
-        logger.info(f"Starting reanalysis of {len(flights)} flights (estimated {total_remaining} total remaining)")
+        logger.info(
+            f"Starting reanalysis of {len(flights)} flights (estimated {total_remaining} total remaining)"
+        )
 
         for idx, flight in enumerate(flights):
             try:
                 # Get all positions for this flight
-                positions = db.query(FlightPosition).filter(
-                    FlightPosition.flight_log_id == flight.id
-                ).order_by(FlightPosition.timestamp).all()
+                positions = (
+                    db.query(FlightPosition)
+                    .filter(FlightPosition.flight_log_id == flight.id)
+                    .order_by(FlightPosition.timestamp)
+                    .all()
+                )
 
                 if len(positions) < 5:
                     # Not enough data to analyze
@@ -275,9 +337,10 @@ def reanalyze_all_flights(self, batch_size: int = 100) -> Dict[str, Any]:
                     # Still mark as analyzed (empty arrays) to avoid reprocessing
                     flight_update = FlightLogUpdate(
                         hover_locations={"segments": []},
-                        low_altitude_segments={"segments": []}
+                        low_altitude_segments={"segments": []},
                     )
                     from app.crud.flights import flight_log_crud
+
                     flight_log_crud.update(db, db_obj=flight, obj_in=flight_update)
                     continue
 
@@ -290,10 +353,11 @@ def reanalyze_all_flights(self, batch_size: int = 100) -> Dict[str, Any]:
                 # Update flight record
                 flight_update = FlightLogUpdate(
                     hover_locations={"segments": hover_segments},
-                    low_altitude_segments={"segments": low_alt_segments}
+                    low_altitude_segments={"segments": low_alt_segments},
                 )
 
                 from app.crud.flights import flight_log_crud
+
                 flight_log_crud.update(db, db_obj=flight, obj_in=flight_update)
 
                 # Update statistics
@@ -312,8 +376,8 @@ def reanalyze_all_flights(self, batch_size: int = 100) -> Dict[str, Any]:
                         meta={
                             "current": idx + 1,
                             "total": len(flights),
-                            "status": f"Analyzed {idx + 1}/{len(flights)} flights..."
-                        }
+                            "status": f"Analyzed {idx + 1}/{len(flights)} flights...",
+                        },
                     )
 
                 # Commit every 20 flights to avoid large transactions
@@ -332,12 +396,20 @@ def reanalyze_all_flights(self, batch_size: int = 100) -> Dict[str, Any]:
         results["summary"] = {
             "batch_completed": len(flights),
             "estimated_remaining": total_remaining - results["flights_analyzed"],
-            "success_rate": f"{(results['flights_analyzed'] / len(flights) * 100):.1f}%" if flights else "0%",
-            "hovering_detection_rate": f"{(results['flights_with_hovering'] / results['flights_analyzed'] * 100):.1f}%" if results["flights_analyzed"] > 0 else "0%",
-            "low_altitude_detection_rate": f"{(results['flights_with_low_altitude'] / results['flights_analyzed'] * 100):.1f}%" if results["flights_analyzed"] > 0 else "0%"
+            "success_rate": f"{(results['flights_analyzed'] / len(flights) * 100):.1f}%"
+            if flights
+            else "0%",
+            "hovering_detection_rate": f"{(results['flights_with_hovering'] / results['flights_analyzed'] * 100):.1f}%"
+            if results["flights_analyzed"] > 0
+            else "0%",
+            "low_altitude_detection_rate": f"{(results['flights_with_low_altitude'] / results['flights_analyzed'] * 100):.1f}%"
+            if results["flights_analyzed"] > 0
+            else "0%",
         }
 
-        logger.info(f"Reanalysis complete: {results['flights_analyzed']} flights processed")
+        logger.info(
+            f"Reanalysis complete: {results['flights_analyzed']} flights processed"
+        )
 
         if current_task:
             current_task.update_state(
@@ -345,8 +417,8 @@ def reanalyze_all_flights(self, batch_size: int = 100) -> Dict[str, Any]:
                 meta={
                     "current": len(flights),
                     "total": len(flights),
-                    "status": "Analysis complete!"
-                }
+                    "status": "Analysis complete!",
+                },
             )
 
     except Exception as e:
@@ -377,7 +449,7 @@ def reanalyze_flight_by_id(self, flight_id: int) -> Dict[str, Any]:
         "success": False,
         "hover_segments": 0,
         "low_alt_segments": 0,
-        "error": None
+        "error": None,
     }
 
     try:
@@ -389,9 +461,12 @@ def reanalyze_flight_by_id(self, flight_id: int) -> Dict[str, Any]:
             return results
 
         # Get positions
-        positions = db.query(FlightPosition).filter(
-            FlightPosition.flight_log_id == flight.id
-        ).order_by(FlightPosition.timestamp).all()
+        positions = (
+            db.query(FlightPosition)
+            .filter(FlightPosition.flight_log_id == flight.id)
+            .order_by(FlightPosition.timestamp)
+            .all()
+        )
 
         if len(positions) < 5:
             results["error"] = "Not enough position data (need at least 5 positions)"
@@ -404,10 +479,11 @@ def reanalyze_flight_by_id(self, flight_id: int) -> Dict[str, Any]:
         # Update flight
         flight_update = FlightLogUpdate(
             hover_locations={"segments": hover_segments},
-            low_altitude_segments={"segments": low_alt_segments}
+            low_altitude_segments={"segments": low_alt_segments},
         )
 
         from app.crud.flights import flight_log_crud
+
         flight_log_crud.update(db, db_obj=flight, obj_in=flight_update)
         db.commit()
 
@@ -415,7 +491,9 @@ def reanalyze_flight_by_id(self, flight_id: int) -> Dict[str, Any]:
         results["hover_segments"] = len(hover_segments)
         results["low_alt_segments"] = len(low_alt_segments)
 
-        logger.info(f"Reanalyzed flight {flight_id}: {len(hover_segments)} hover segments, {len(low_alt_segments)} low altitude segments")
+        logger.info(
+            f"Reanalyzed flight {flight_id}: {len(hover_segments)} hover segments, {len(low_alt_segments)} low altitude segments"
+        )
 
     except Exception as e:
         logger.error(f"Error reanalyzing flight {flight_id}: {e}")

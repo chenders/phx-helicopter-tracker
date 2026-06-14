@@ -37,9 +37,9 @@ celery_app.conf.update(
     task_track_started=True,
     # Broker heartbeat settings - prevent "missed heartbeat" errors on long tasks
     broker_transport_options={
-        'visibility_timeout': 7200,  # 2 hours - how long task can run before broker reclaims it
-        'fanout_prefix': True,
-        'fanout_patterns': True,
+        "visibility_timeout": 7200,  # 2 hours - how long task can run before broker reclaims it
+        "fanout_prefix": True,
+        "fanout_patterns": True,
     },
     broker_heartbeat=0,  # Disable broker heartbeat checks (workers send task updates instead)
     worker_send_task_events=True,  # Send task events for monitoring
@@ -47,23 +47,23 @@ celery_app.conf.update(
     # IMPORTANT: Transcription queue is handled by dedicated GPU workers (WSL2/M1 Mac)
     # Main workers MUST exclude the 'transcription' queue
     task_routes={
-        'app.workers.tracking_tasks.*': {'queue': 'tracking'},
-        'app.workers.analysis_tasks.*': {'queue': 'analysis'},
-        'app.workers.legal_tasks.*': {'queue': 'legal'},
-        'app.workers.data_import_tasks.*': {'queue': 'data_import'},
-        'app.workers.radio_tasks.*': {'queue': 'radio'},
-        'app.workers.radio_analysis_tasks.*': {'queue': 'analysis'},
-        'app.workers.radio_import_tasks.*': {'queue': 'data_import'},
-        'app.workers.fr24_scheduler.*': {'queue': 'scheduler'},
+        "app.workers.tracking_tasks.*": {"queue": "tracking"},
+        "app.workers.analysis_tasks.*": {"queue": "analysis"},
+        "app.workers.legal_tasks.*": {"queue": "legal"},
+        "app.workers.data_import_tasks.*": {"queue": "data_import"},
+        "app.workers.radio_tasks.*": {"queue": "radio"},
+        "app.workers.radio_analysis_tasks.*": {"queue": "analysis"},
+        "app.workers.radio_import_tasks.*": {"queue": "data_import"},
+        "app.workers.fr24_scheduler.*": {"queue": "scheduler"},
         # TRANSCRIPTION TASKS - ONLY processed by dedicated GPU workers
         # DO NOT process these on the main server
-        'transcribe_phoenix_pd_archives': {'queue': 'transcription'},
-        'transcribe_phoenix_pd_archives_faster': {'queue': 'transcription'},
-        'transcribe_audio_file': {'queue': 'transcription'},
-        'batch_transcribe_directory': {'queue': 'transcription'},
+        "transcribe_phoenix_pd_archives": {"queue": "transcription"},
+        "transcribe_phoenix_pd_archives_faster": {"queue": "transcription"},
+        "transcribe_audio_file": {"queue": "transcription"},
+        "batch_transcribe_directory": {"queue": "transcription"},
         # Ensure radio download tasks stay on radio queue
-        'download_phoenix_pd_archives': {'queue': 'radio'},
-        'download_broadcastify_archives': {'queue': 'radio'},
+        "download_phoenix_pd_archives": {"queue": "radio"},
+        "download_broadcastify_archives": {"queue": "radio"},
     },
     worker_prefetch_multiplier=1,
     task_acks_late=True,
@@ -74,11 +74,13 @@ celery_app.conf.update(
         # Analysis tasks
         "analyze-recent-patterns": {
             "task": "app.workers.analysis_tasks.analyze_recent_patterns",
-            "schedule": crontab(minute='0,30'),  # Every 30 minutes at :00 and :30
+            "schedule": crontab(minute="0,30"),  # Every 30 minutes at :00 and :30
         },
         "analyze-and-score-flights": {
             "task": "app.workers.analysis_tasks.analyze_and_score_flights",
-            "schedule": crontab(minute='15,45'),  # Every 30 minutes at :15 and :45 (offset by 15 min)
+            "schedule": crontab(
+                minute="15,45"
+            ),  # Every 30 minutes at :15 and :45 (offset by 15 min)
             "options": {
                 "expires": 1700,  # Expire if not started within ~28 minutes
             },
@@ -203,11 +205,11 @@ celery_app.conf.update(
         "download-discovered-tracks-1": {
             "task": "download_tracks_for_discovered_flights",
             "schedule": 900.0,  # Every 15 minutes (balanced)
-            "kwargs": {"batch_size": 10}  # 10 flights per batch
+            "kwargs": {"batch_size": 10},  # 10 flights per batch
         },
         # Additional parallel task for faster downloads (disabled for now, enable if needed)
         # "download-discovered-tracks-2": {
-        #     "task": "download_tracks_for_discovered_flights", 
+        #     "task": "download_tracks_for_discovered_flights",
         #     "schedule": 60.0,  # Every minute
         #     "kwargs": {"batch_size": 10}
         # },
@@ -217,8 +219,8 @@ celery_app.conf.update(
             "schedule": 86400.0,  # Once per day (was every 30 minutes)
             "kwargs": {
                 "batch_size": 100,  # Process 100 unanalyzed flights per run (was 50)
-                "min_complexity_threshold": 2.0
-            }
+                "min_complexity_threshold": 2.0,
+            },
         },
         # Radio transcription - processes untranscribed MP3 files
         "transcribe-radio-archives-single": {
@@ -265,8 +267,8 @@ celery_app.conf.update(
             "schedule": 3600.0,  # Every hour - check for new errors
             "kwargs": {
                 "hours_back": 1,  # Check last hour
-                "auto_resolve_age_hours": 24  # Auto-resolve issues not seen in 24 hours
-            }
+                "auto_resolve_age_hours": 24,  # Auto-resolve issues not seen in 24 hours
+            },
         },
     },
 )

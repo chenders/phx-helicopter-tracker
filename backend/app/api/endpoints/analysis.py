@@ -2,7 +2,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Path, BackgroundTasks
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import and_, func
 
 from app.api.deps import get_db
 from app.schemas.analysis import (
@@ -48,6 +48,7 @@ router = APIRouter()
 # ============================================================================
 # PLACEHOLDER ENDPOINTS (for future implementation)
 # ============================================================================
+
 
 @router.post("/patterns", response_model=PatternAnalysis)
 def analyze_flight_patterns(
@@ -108,7 +109,7 @@ def analyze_flight_patterns(
 
 
 @router.get("/patterns/{analysis_id}", response_model=PatternAnalysis)
-def get_pattern_analysis(
+def get_pattern_analysis_by_id(
     *, db: Session = Depends(get_db), analysis_id: str
 ) -> PatternAnalysis:
     """
@@ -187,18 +188,24 @@ def get_pattern_analysis(
     hover_durations = []
     if surveillance_flights:
         flight_ids = [f.id for f in surveillance_flights]
-        hover_patterns = db.query(AbnormalPattern).filter(
-            AbnormalPattern.flight_log_id.in_(flight_ids),
-            AbnormalPattern.pattern_type == "excessive_hovering"
-        ).all()
+        hover_patterns = (
+            db.query(AbnormalPattern)
+            .filter(
+                AbnormalPattern.flight_log_id.in_(flight_ids),
+                AbnormalPattern.pattern_type == "excessive_hovering",
+            )
+            .all()
+        )
 
         for pattern in hover_patterns:
-            if pattern.detection_metadata and isinstance(pattern.detection_metadata, dict):
-                hovers = pattern.detection_metadata.get('hovering', [])
+            if pattern.detection_metadata and isinstance(
+                pattern.detection_metadata, dict
+            ):
+                hovers = pattern.detection_metadata.get("hovering", [])
                 if isinstance(hovers, list):
                     for hover in hovers:
-                        if isinstance(hover, dict) and 'duration_minutes' in hover:
-                            hover_durations.append(hover['duration_minutes'])
+                        if isinstance(hover, dict) and "duration_minutes" in hover:
+                            hover_durations.append(hover["duration_minutes"])
 
     avg_hover_duration = (
         int(sum(hover_durations) / len(hover_durations)) if hover_durations else 0
@@ -269,15 +276,43 @@ def get_pattern_analysis(
     # Violation types breakdown - count actual violations from flight data
     violation_types = []
     if constitutional_violations > 0:
-        hovering_count = len([f for f in surveillance_flights if f.hover_locations and f.privacy_concern_level and f.privacy_concern_level >= 4])
-        low_altitude_count = len([f for f in surveillance_flights if f.min_altitude_feet and f.min_altitude_feet < 400 and f.privacy_concern_level and f.privacy_concern_level >= 4])
-        night_count = len([f for f in surveillance_flights if f.departure_time and (f.departure_time.hour >= 22 or f.departure_time.hour <= 6) and f.privacy_concern_level and f.privacy_concern_level >= 4])
+        hovering_count = len(
+            [
+                f
+                for f in surveillance_flights
+                if f.hover_locations
+                and f.privacy_concern_level
+                and f.privacy_concern_level >= 4
+            ]
+        )
+        low_altitude_count = len(
+            [
+                f
+                for f in surveillance_flights
+                if f.min_altitude_feet
+                and f.min_altitude_feet < 400
+                and f.privacy_concern_level
+                and f.privacy_concern_level >= 4
+            ]
+        )
+        night_count = len(
+            [
+                f
+                for f in surveillance_flights
+                if f.departure_time
+                and (f.departure_time.hour >= 22 or f.departure_time.hour <= 6)
+                and f.privacy_concern_level
+                and f.privacy_concern_level >= 4
+            ]
+        )
 
         # Only include types with actual violations
         if hovering_count > 0:
             violation_types.append({"name": "Hovering", "count": hovering_count})
         if low_altitude_count > 0:
-            violation_types.append({"name": "Low Altitude", "count": low_altitude_count})
+            violation_types.append(
+                {"name": "Low Altitude", "count": low_altitude_count}
+            )
         if night_count > 0:
             violation_types.append({"name": "Night Surveillance", "count": night_count})
 
@@ -472,13 +507,18 @@ def get_cost_analysis(
 
     # Get abnormal patterns to identify surveillance flights
     from app.models.abnormal_patterns import AbnormalPattern
+
     patterns_map = {}
     if flights:
         flight_ids = [f.id for f in flights]
-        patterns = db.query(AbnormalPattern).filter(
-            AbnormalPattern.flight_log_id.in_(flight_ids),
-            AbnormalPattern.pattern_type != "normal"
-        ).all()
+        patterns = (
+            db.query(AbnormalPattern)
+            .filter(
+                AbnormalPattern.flight_log_id.in_(flight_ids),
+                AbnormalPattern.pattern_type != "normal",
+            )
+            .all()
+        )
         for pattern in patterns:
             if pattern.flight_log_id not in patterns_map:
                 patterns_map[pattern.flight_log_id] = []
@@ -486,9 +526,10 @@ def get_cost_analysis(
 
     # Identify surveillance flights
     surveillance_flights = [
-        f for f in flights
-        if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5) or
-           (f.id in patterns_map)
+        f
+        for f in flights
+        if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5)
+        or (f.id in patterns_map)
     ]
 
     # Calculate actual surveillance ratio from the data
@@ -667,19 +708,24 @@ def analyze_surveillance_patterns(
 
     # Identify surveillance flights (likelihood > 0.5 OR has abnormal patterns)
     flight_ids = [f.id for f in flights]
-    patterns = db.query(AbnormalPattern).filter(
-        AbnormalPattern.flight_log_id.in_(flight_ids),
-        AbnormalPattern.pattern_type != "normal"
-    ).all()
+    patterns = (
+        db.query(AbnormalPattern)
+        .filter(
+            AbnormalPattern.flight_log_id.in_(flight_ids),
+            AbnormalPattern.pattern_type != "normal",
+        )
+        .all()
+    )
 
     patterns_map = defaultdict(list)
     for pattern in patterns:
         patterns_map[pattern.flight_log_id].append(pattern)
 
     surveillance_flights = [
-        f for f in flights
-        if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5) or
-           (f.id in patterns_map)
+        f
+        for f in flights
+        if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5)
+        or (f.id in patterns_map)
     ]
 
     # Calculate surveillance intensity (0-1)
@@ -687,7 +733,9 @@ def analyze_surveillance_patterns(
     systematic_detected = surveillance_ratio > 0.4  # >40% surveillance is systematic
 
     # Analyze geographic areas with clustering
-    area_surveillance = defaultdict(lambda: {"flights": [], "positions": 0, "duration": 0.0})
+    area_surveillance = defaultdict(
+        lambda: {"flights": [], "positions": 0, "duration": 0.0}
+    )
 
     for flight in surveillance_flights:
         # Get positions for this flight
@@ -700,26 +748,26 @@ def analyze_surveillance_patterns(
 
                 # Add duration estimate
                 if flight.flight_duration_minutes:
-                    area_surveillance[pos.neighborhood]["duration"] += (
-                        flight.flight_duration_minutes / len(positions)
-                    )
+                    area_surveillance[pos.neighborhood][
+                        "duration"
+                    ] += flight.flight_duration_minutes / len(positions)
 
     # Build targeted areas list (areas with >10 surveillance positions)
     targeted_areas = []
     for area, data in sorted(
-        area_surveillance.items(),
-        key=lambda x: x[1]["positions"],
-        reverse=True
+        area_surveillance.items(), key=lambda x: x[1]["positions"], reverse=True
     ):
         if data["positions"] > 10:
             unique_flights = len(set(data["flights"]))
-            targeted_areas.append({
-                "area_name": area,
-                "surveillance_positions": data["positions"],
-                "unique_flights": unique_flights,
-                "total_duration_minutes": round(data["duration"], 1),
-                "concern_level": min(5, 1 + (data["positions"] // 20))
-            })
+            targeted_areas.append(
+                {
+                    "area_name": area,
+                    "surveillance_positions": data["positions"],
+                    "unique_flights": unique_flights,
+                    "total_duration_minutes": round(data["duration"], 1),
+                    "concern_level": min(5, 1 + (data["positions"] // 20)),
+                }
+            )
 
     # Identify Fourth Amendment violations
     fourth_amendment_violations = []
@@ -732,8 +780,12 @@ def analyze_surveillance_patterns(
             violations.append("Prolonged hovering over private property")
 
         # Low altitude over residential
-        if (flight.min_altitude_feet and flight.min_altitude_feet < 400 and
-            flight.privacy_concern_level and flight.privacy_concern_level >= 3):
+        if (
+            flight.min_altitude_feet
+            and flight.min_altitude_feet < 400
+            and flight.privacy_concern_level
+            and flight.privacy_concern_level >= 3
+        ):
             violations.append("Low-altitude overflight of residential area")
 
         # Night surveillance
@@ -742,23 +794,37 @@ def analyze_surveillance_patterns(
         ):
             violations.append("Night-time surveillance (heightened privacy intrusion)")
 
-        if violations and flight.privacy_concern_level and flight.privacy_concern_level >= 3:
-            fourth_amendment_violations.append({
-                "flight_id": flight.id,
-                "flight_date": flight.departure_time.isoformat() if flight.departure_time else None,
-                "violations": violations,
-                "concern_level": flight.privacy_concern_level,
-                "surveillance_likelihood": float(flight.surveillance_likelihood or 0)
-            })
+        if (
+            violations
+            and flight.privacy_concern_level
+            and flight.privacy_concern_level >= 3
+        ):
+            fourth_amendment_violations.append(
+                {
+                    "flight_id": flight.id,
+                    "flight_date": flight.departure_time.isoformat()
+                    if flight.departure_time
+                    else None,
+                    "violations": violations,
+                    "concern_level": flight.privacy_concern_level,
+                    "surveillance_likelihood": float(
+                        flight.surveillance_likelihood or 0
+                    ),
+                }
+            )
 
     # Count reasonable expectation violations (high privacy concern + high surveillance)
-    reasonable_expectation_violations = len([
-        f for f in surveillance_flights
-        if f.privacy_concern_level and f.privacy_concern_level >= 4
-    ])
+    reasonable_expectation_violations = len(
+        [
+            f
+            for f in surveillance_flights
+            if f.privacy_concern_level and f.privacy_concern_level >= 4
+        ]
+    )
 
     # Identify persistent surveillance areas (areas with flights on multiple days)
     from collections import Counter
+
     daily_area_flights = defaultdict(set)
 
     for flight in surveillance_flights:
@@ -773,18 +839,19 @@ def analyze_surveillance_patterns(
     for area, days in daily_area_flights.items():
         if len(days) >= 3:  # Surveilled on 3+ different days
             area_data = area_surveillance.get(area, {})
-            persistent_areas.append({
-                "area_name": area,
-                "days_surveilled": len(days),
-                "total_positions": area_data.get("positions", 0),
-                "pattern": "Systematic persistent surveillance",
-                "legal_concern": "High - indicates ongoing monitoring program"
-            })
+            persistent_areas.append(
+                {
+                    "area_name": area,
+                    "days_surveilled": len(days),
+                    "total_positions": area_data.get("positions", 0),
+                    "pattern": "Systematic persistent surveillance",
+                    "legal_concern": "High - indicates ongoing monitoring program",
+                }
+            )
 
     # Calculate surveillance frequency by area
     surveillance_frequency = {
-        area: len(data["flights"])
-        for area, data in area_surveillance.items()
+        area: len(data["flights"]) for area, data in area_surveillance.items()
     }
 
     # Determine applicable legal precedents
@@ -799,7 +866,16 @@ def analyze_surveillance_patterns(
             "Florida v. Riley (1989) - Helicopter surveillance causing undue "
             "noise/disturbance may violate Fourth Amendment"
         )
-    if len([f for f in surveillance_flights if f.min_altitude_feet and f.min_altitude_feet < 400]) > 0:
+    if (
+        len(
+            [
+                f
+                for f in surveillance_flights
+                if f.min_altitude_feet and f.min_altitude_feet < 400
+            ]
+        )
+        > 0
+    ):
         legal_precedents.append(
             "State v. Davis (N.M. 2015) - Low altitude helicopter surveillance "
             "constitutes unreasonable search"
@@ -835,14 +911,16 @@ def analyze_surveillance_patterns(
         systematic_surveillance_detected=systematic_detected,
         surveillance_intensity_score=round(surveillance_ratio, 3),
         targeted_areas=targeted_areas[:10],  # Top 10 targeted areas
-        fourth_amendment_violations=fourth_amendment_violations[:20],  # Top 20 violations
+        fourth_amendment_violations=fourth_amendment_violations[
+            :20
+        ],  # Top 20 violations
         reasonable_expectation_violations=reasonable_expectation_violations,
         persistent_surveillance_areas=persistent_areas,
-        surveillance_frequency=dict(sorted(
-            surveillance_frequency.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:20]),  # Top 20 areas by frequency
+        surveillance_frequency=dict(
+            sorted(surveillance_frequency.items(), key=lambda x: x[1], reverse=True)[
+                :20
+            ]
+        ),  # Top 20 areas by frequency
         legal_precedents_applicable=legal_precedents,
         recommended_legal_actions=recommended_actions,
     )
@@ -915,14 +993,18 @@ def analyze_geographic_area(
     )
 
     # Calculate night flights (22:00-06:00)
-    night_flights = len([
-        pos for pos in positions
-        if pos.timestamp and (pos.timestamp.hour >= 22 or pos.timestamp.hour <= 6)
-    ])
+    night_flights = len(
+        [
+            pos
+            for pos in positions
+            if pos.timestamp and (pos.timestamp.hour >= 22 or pos.timestamp.hour <= 6)
+        ]
+    )
 
     # Calculate total flight time
     # Group positions by flight and calculate time span for each flight
     from collections import defaultdict
+
     flight_times = defaultdict(list)
     for pos in positions:
         if pos.flight_log_id and pos.timestamp:
@@ -948,9 +1030,9 @@ def analyze_geographic_area(
         # Determine most common land use
         most_common_land_use = max(land_use_counts, key=land_use_counts.get)
 
-        if most_common_land_use in ['commercial', 'industrial']:
+        if most_common_land_use in ["commercial", "industrial"]:
             privacy_expectation_level = "medium"
-        elif most_common_land_use in ['public', 'park']:
+        elif most_common_land_use in ["public", "park"]:
             privacy_expectation_level = "low"
         else:  # residential or private
             privacy_expectation_level = "high"
@@ -972,11 +1054,16 @@ def analyze_geographic_area(
     constitutional_concern_level = min(5, concern_level)
 
     # Calculate residential density (positions over residential property / total)
-    residential_positions = len([
-        pos for pos in positions
-        if pos.over_private_property or pos.land_use_type == 'residential'
-    ])
-    residential_density = residential_positions / total_overflights if total_overflights > 0 else 0.0
+    residential_positions = len(
+        [
+            pos
+            for pos in positions
+            if pos.over_private_property or pos.land_use_type == "residential"
+        ]
+    )
+    residential_density = (
+        residential_positions / total_overflights if total_overflights > 0 else 0.0
+    )
 
     return AreaAnalysis(
         area_name=area_name,
@@ -989,7 +1076,9 @@ def analyze_geographic_area(
         hovering_events=hovering_events,
         low_altitude_events=low_altitude_events,
         night_flights=night_flights,
-        residential_density=round(residential_density, 3) if residential_density > 0 else None,
+        residential_density=round(residential_density, 3)
+        if residential_density > 0
+        else None,
         privacy_expectation_level=privacy_expectation_level,
         constitutional_concern_level=constitutional_concern_level,
     )
@@ -1033,7 +1122,7 @@ def analyze_time_patterns(
 
     # Get flight data
     from app.crud.flights import flight_log_crud
-    from app.models import Aircraft
+    from app.models import Aircraft, FlightLog
     import statistics
 
     # Build query
@@ -1065,6 +1154,7 @@ def analyze_time_patterns(
 
     # Group flights by time period
     from collections import defaultdict
+
     period_data = defaultdict(lambda: {"flights": [], "surveillance": []})
 
     for flight in flights:
@@ -1152,21 +1242,25 @@ def analyze_time_patterns(
         if len(flight_counts) > 2:
             mean_count = statistics.mean(flight_counts)
             if 0 < count < (mean_count * 0.5):
-                unusual_activity_periods.append({
-                    "period": period,
-                    "reason": "Low activity",
-                    "flight_count": count,
-                    "description": f"Only {count} flights, {int((1 - count/mean_count) * 100)}% below average"
-                })
+                unusual_activity_periods.append(
+                    {
+                        "period": period,
+                        "reason": "Low activity",
+                        "flight_count": count,
+                        "description": f"Only {count} flights, {int((1 - count/mean_count) * 100)}% below average",
+                    }
+                )
 
         # Unusually high surveillance ratio (>75%)
         if surveillance_ratio > 0.75 and count >= 3:
-            unusual_activity_periods.append({
-                "period": period,
-                "reason": "High surveillance ratio",
-                "surveillance_ratio": surveillance_ratio,
-                "description": f"{int(surveillance_ratio * 100)}% surveillance flights in this period"
-            })
+            unusual_activity_periods.append(
+                {
+                    "period": period,
+                    "reason": "High surveillance ratio",
+                    "surveillance_ratio": surveillance_ratio,
+                    "description": f"{int(surveillance_ratio * 100)}% surveillance flights in this period",
+                }
+            )
 
     return TimeAnalysis(
         analysis_type=analysis_type,
@@ -1215,10 +1309,14 @@ def get_active_alerts(
 
     # Get patterns for these flights
     flight_ids = [f.id for f in recent_flights]
-    patterns = db.query(AbnormalPattern).filter(
-        AbnormalPattern.flight_log_id.in_(flight_ids),
-        AbnormalPattern.pattern_type != "normal"
-    ).all()
+    patterns = (
+        db.query(AbnormalPattern)
+        .filter(
+            AbnormalPattern.flight_log_id.in_(flight_ids),
+            AbnormalPattern.pattern_type != "normal",
+        )
+        .all()
+    )
 
     patterns_map = {}
     for pattern in patterns:
@@ -1238,13 +1336,18 @@ def get_active_alerts(
 
     for flight in recent_flights:
         # Only create alerts for concerning behavior
-        if not (flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5):
+        if not (
+            flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5
+        ):
             # Skip if no patterns detected either
             if flight.id not in patterns_map:
                 continue
 
         # Skip if privacy concern is below threshold
-        if flight.privacy_concern_level and flight.privacy_concern_level < min_concern_level:
+        if (
+            flight.privacy_concern_level
+            and flight.privacy_concern_level < min_concern_level
+        ):
             continue
 
         # Get aircraft registration
@@ -1256,23 +1359,34 @@ def get_active_alerts(
             continue
 
         # Use most recent position
-        latest_position = max(positions, key=lambda p: p.timestamp if p.timestamp else datetime.min.replace(tzinfo=timezone.utc))
+        latest_position = max(
+            positions,
+            key=lambda p: p.timestamp
+            if p.timestamp
+            else datetime.min.replace(tzinfo=timezone.utc),
+        )
 
         # Determine alert type based on behavior
         flight_patterns = patterns_map.get(flight.id, [])
         alert_type = "surveillance"  # Default
         behavior_description = "General surveillance activity detected"
 
-        if flight.hover_locations or any(p.pattern_type == "excessive_hovering" for p in flight_patterns):
+        if flight.hover_locations or any(
+            p.pattern_type == "excessive_hovering" for p in flight_patterns
+        ):
             alert_type = "hovering"
             behavior_description = "Extended hovering over private property"
         elif flight.min_altitude_feet and flight.min_altitude_feet < 400:
             alert_type = "low_altitude"
-            behavior_description = f"Low altitude overflight ({flight.min_altitude_feet}ft)"
+            behavior_description = (
+                f"Low altitude overflight ({flight.min_altitude_feet}ft)"
+            )
         elif any(p.pattern_type == "circling" for p in flight_patterns):
             alert_type = "circling"
             behavior_description = "Circling pattern detected"
-        elif flight.departure_time and (flight.departure_time.hour >= 22 or flight.departure_time.hour <= 6):
+        elif flight.departure_time and (
+            flight.departure_time.hour >= 22 or flight.departure_time.hour <= 6
+        ):
             alert_type = "night_surveillance"
             behavior_description = "Night-time surveillance operation"
 
@@ -1287,13 +1401,15 @@ def get_active_alerts(
             aircraft_registration=aircraft_reg,
             location={
                 "latitude": latest_position.latitude,
-                "longitude": latest_position.longitude
+                "longitude": latest_position.longitude,
             },
             altitude_feet=latest_position.altitude_feet or flight.min_altitude_feet,
             behavior_description=behavior_description,
             privacy_concern_level=flight.privacy_concern_level or 3,
             active=True,
-            timestamp=latest_position.timestamp.isoformat() if latest_position.timestamp else None,
+            timestamp=latest_position.timestamp.isoformat()
+            if latest_position.timestamp
+            else None,
             flight_id=flight.id,
             surveillance_likelihood=float(flight.surveillance_likelihood or 0),
         )
@@ -1302,8 +1418,7 @@ def get_active_alerts(
 
     # Sort by privacy concern level (highest first) and timestamp (most recent first)
     alerts.sort(
-        key=lambda a: (a.privacy_concern_level, a.timestamp or ""),
-        reverse=True
+        key=lambda a: (a.privacy_concern_level, a.timestamp or ""), reverse=True
     )
 
     return alerts
@@ -1330,22 +1445,30 @@ def create_test_alert(
     from app.models import Aircraft
 
     # Validate aircraft exists
-    aircraft = db.query(Aircraft).filter(
-        Aircraft.registration == aircraft_registration
-    ).first()
+    aircraft = (
+        db.query(Aircraft)
+        .filter(Aircraft.registration == aircraft_registration)
+        .first()
+    )
 
     if not aircraft:
         raise HTTPException(
             status_code=404,
-            detail=f"Aircraft {aircraft_registration} not found in database"
+            detail=f"Aircraft {aircraft_registration} not found in database",
         )
 
     # Validate alert type
-    valid_alert_types = ["hovering", "low_altitude", "circling", "night_surveillance", "surveillance"]
+    valid_alert_types = [
+        "hovering",
+        "low_altitude",
+        "circling",
+        "night_surveillance",
+        "surveillance",
+    ]
     if alert_type not in valid_alert_types:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid alert type. Must be one of: {', '.join(valid_alert_types)}"
+            detail=f"Invalid alert type. Must be one of: {', '.join(valid_alert_types)}",
         )
 
     # Create realistic test alert based on type
@@ -1353,28 +1476,28 @@ def create_test_alert(
         "hovering": {
             "altitude": 350,
             "description": "Test hovering alert - Extended hovering over private property",
-            "concern_level": 5
+            "concern_level": 5,
         },
         "low_altitude": {
             "altitude": 250,
             "description": "Test low altitude alert - Flight below 400ft over residential area",
-            "concern_level": 4
+            "concern_level": 4,
         },
         "circling": {
             "altitude": 500,
             "description": "Test circling alert - Repeated circular pattern detected",
-            "concern_level": 4
+            "concern_level": 4,
         },
         "night_surveillance": {
             "altitude": 400,
             "description": "Test night surveillance alert - Late night surveillance operation",
-            "concern_level": 5
+            "concern_level": 5,
         },
         "surveillance": {
             "altitude": 450,
             "description": "Test surveillance alert - General surveillance activity",
-            "concern_level": 3
-        }
+            "concern_level": 3,
+        },
     }
 
     config = alert_configs.get(alert_type, alert_configs["surveillance"])
@@ -1402,8 +1525,8 @@ def create_test_alert(
         "location": {
             "latitude": latitude,
             "longitude": longitude,
-            "description": "Phoenix, AZ area"
-        }
+            "description": "Phoenix, AZ area",
+        },
     }
 
 
@@ -1468,13 +1591,18 @@ def get_historical_analysis(
 
     # Fetch abnormal patterns for these flights FIRST (needed for surveillance calculation)
     from app.models.abnormal_patterns import AbnormalPattern
+
     patterns_map = {}
     if flights:
         flight_ids = [f.id for f in flights]
-        patterns = db.query(AbnormalPattern).filter(
-            AbnormalPattern.flight_log_id.in_(flight_ids),
-            AbnormalPattern.pattern_type != "normal"  # Exclude normal patterns
-        ).all()
+        patterns = (
+            db.query(AbnormalPattern)
+            .filter(
+                AbnormalPattern.flight_log_id.in_(flight_ids),
+                AbnormalPattern.pattern_type != "normal",  # Exclude normal patterns
+            )
+            .all()
+        )
 
         # Map patterns by flight_log_id
         for pattern in patterns:
@@ -1485,9 +1613,10 @@ def get_historical_analysis(
     # Calculate metrics - use surveillance_likelihood > 0.5 OR has abnormal patterns as surveillance
     # Flights with detected patterns (like excessive hovering) are surveillance regardless of score
     surveillance_flights = [
-        f for f in flights
-        if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5) or
-           (f.id in patterns_map and len(patterns_map[f.id]) > 0)
+        f
+        for f in flights
+        if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5)
+        or (f.id in patterns_map and len(patterns_map[f.id]) > 0)
     ]
     constitutional_violations = len(
         [
@@ -1565,9 +1694,10 @@ def get_historical_analysis(
                     day_flights.append(f)
 
         day_surveillance = [
-            f for f in day_flights
-            if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5) or
-               (f.id in patterns_map and len(patterns_map[f.id]) > 0)
+            f
+            for f in day_flights
+            if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5)
+            or (f.id in patterns_map and len(patterns_map[f.id]) > 0)
         ]
 
         timeline_data.append(
@@ -1587,9 +1717,10 @@ def get_historical_analysis(
             f for f in flights if f.departure_time and f.departure_time.hour == hour
         ]
         hour_surveillance = [
-            f for f in hour_flights
-            if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5) or
-               (f.id in patterns_map and len(patterns_map[f.id]) > 0)
+            f
+            for f in hour_flights
+            if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5)
+            or (f.id in patterns_map and len(patterns_map[f.id]) > 0)
         ]
 
         hourly_pattern.append(
@@ -1662,12 +1793,15 @@ def get_historical_analysis(
     position_counts = {}
     if flights:
         flight_ids = [f.id for f in flights]
-        position_count_query = db.query(
-            FlightPosition.flight_log_id,
-            func.count(FlightPosition.id).label('count')
-        ).filter(
-            FlightPosition.flight_log_id.in_(flight_ids)
-        ).group_by(FlightPosition.flight_log_id).all()
+        position_count_query = (
+            db.query(
+                FlightPosition.flight_log_id,
+                func.count(FlightPosition.id).label("count"),
+            )
+            .filter(FlightPosition.flight_log_id.in_(flight_ids))
+            .group_by(FlightPosition.flight_log_id)
+            .all()
+        )
 
         position_counts = {row.flight_log_id: row.count for row in position_count_query}
 
@@ -1678,16 +1812,20 @@ def get_historical_analysis(
             (f.surveillance_likelihood or 0) > 0.5,  # Surveillance first
             f.surveillance_likelihood or 0,  # Then by score
             position_counts.get(f.id, 0),  # Then by number of positions (better viz)
-            f.departure_time or datetime.min.replace(tzinfo=timezone.utc)  # Then by date
+            f.departure_time
+            or datetime.min.replace(tzinfo=timezone.utc),  # Then by date
         ),
-        reverse=True
+        reverse=True,
     )[:max_flights_to_display]
 
     for flight in display_flights:
         # Get actual flight positions from database
-        positions = db.query(FlightPosition).filter(
-            FlightPosition.flight_log_id == flight.id
-        ).order_by(FlightPosition.timestamp).all()
+        positions = (
+            db.query(FlightPosition)
+            .filter(FlightPosition.flight_log_id == flight.id)
+            .order_by(FlightPosition.timestamp)
+            .all()
+        )
 
         if not positions or len(positions) < 2:
             continue
@@ -1696,12 +1834,16 @@ def get_historical_analysis(
         coordinates = []
         for pos in positions:
             if pos.latitude and pos.longitude:
-                coordinates.append({
-                    "lat": pos.latitude,
-                    "lng": pos.longitude,
-                    "alt": pos.altitude_feet,
-                    "timestamp": pos.timestamp.isoformat() if pos.timestamp else None
-                })
+                coordinates.append(
+                    {
+                        "lat": pos.latitude,
+                        "lng": pos.longitude,
+                        "alt": pos.altitude_feet,
+                        "timestamp": pos.timestamp.isoformat()
+                        if pos.timestamp
+                        else None,
+                    }
+                )
 
         if len(coordinates) < 2:
             continue
@@ -1731,29 +1873,42 @@ def get_historical_analysis(
         # Extract hover locations from patterns
         hover_locations = []
         for pattern in flight_patterns:
-            if pattern.detection_metadata and isinstance(pattern.detection_metadata, dict):
-                hovers = pattern.detection_metadata.get('hovering', [])
+            if pattern.detection_metadata and isinstance(
+                pattern.detection_metadata, dict
+            ):
+                hovers = pattern.detection_metadata.get("hovering", [])
                 if isinstance(hovers, list):
                     for hover in hovers:
-                        if isinstance(hover, dict) and 'latitude' in hover and 'longitude' in hover:
-                            hover_locations.append({
-                                'lat': hover['latitude'],
-                                'lng': hover['longitude'],
-                                'duration_minutes': hover.get('duration_minutes', 0),
-                                'position_count': hover.get('position_count', 0),
-                                'start_time': hover.get('start_time'),
-                                'end_time': hover.get('end_time'),
-                            })
+                        if (
+                            isinstance(hover, dict)
+                            and "latitude" in hover
+                            and "longitude" in hover
+                        ):
+                            hover_locations.append(
+                                {
+                                    "lat": hover["latitude"],
+                                    "lng": hover["longitude"],
+                                    "duration_minutes": hover.get(
+                                        "duration_minutes", 0
+                                    ),
+                                    "position_count": hover.get("position_count", 0),
+                                    "start_time": hover.get("start_time"),
+                                    "end_time": hover.get("end_time"),
+                                }
+                            )
 
         # Determine if this is a surveillance flight: high likelihood OR has abnormal patterns
         is_surveillance = (
-            (flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5) or
-            len(flight_patterns) > 0
-        )
+            flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5
+        ) or len(flight_patterns) > 0
 
         # Compute display surveillance likelihood that incorporates pattern detection
         # This gives flights with detected patterns appropriate color coding
-        base_likelihood = float(flight.surveillance_likelihood) if flight.surveillance_likelihood else 0.0
+        base_likelihood = (
+            float(flight.surveillance_likelihood)
+            if flight.surveillance_likelihood
+            else 0.0
+        )
         display_likelihood = base_likelihood
 
         if len(flight_patterns) > 0:
@@ -1763,38 +1918,42 @@ def get_historical_analysis(
             display_likelihood = max(0.6, base_likelihood + pattern_boost)
 
             # If excessive hovering or high confidence, make it red (0.7+)
-            if 'excessive_hovering' in pattern_types or max_confidence >= 0.8:
+            if "excessive_hovering" in pattern_types or max_confidence >= 0.8:
                 display_likelihood = max(0.75, display_likelihood)
 
-        flight_paths.append({
-            "id": flight.id,  # Add ID for matching with flights_list
-            "flight_id": flight.flight_id,
-            "aircraft_registration": aircraft_reg,
-            "coordinates": coordinates,
-            "is_surveillance": is_surveillance,
-            "surveillance_likelihood": display_likelihood,  # Use computed display value
-            "base_surveillance_likelihood": base_likelihood,  # Keep original for reference
-            "timestamp": flight.departure_time.isoformat() if flight.departure_time else None,
-            "duration_minutes": flight.flight_duration_minutes,
-            "hover_count": hover_count,
-            "patterns": pattern_types,
-            "pattern_confidence": float(max_confidence),
-            "hover_locations": hover_locations,
-        })
+        flight_paths.append(
+            {
+                "id": flight.id,  # Add ID for matching with flights_list
+                "flight_id": flight.flight_id,
+                "aircraft_registration": aircraft_reg,
+                "coordinates": coordinates,
+                "is_surveillance": is_surveillance,
+                "surveillance_likelihood": display_likelihood,  # Use computed display value
+                "base_surveillance_likelihood": base_likelihood,  # Keep original for reference
+                "timestamp": flight.departure_time.isoformat()
+                if flight.departure_time
+                else None,
+                "duration_minutes": flight.flight_duration_minutes,
+                "hover_count": hover_count,
+                "patterns": pattern_types,
+                "pattern_confidence": float(max_confidence),
+                "hover_locations": hover_locations,
+            }
+        )
 
         # Add positions to heatmap with weight based on surveillance score
         # Sample every Nth position for performance (don't need all positions in heatmap)
-        sample_rate = max(1, len(coordinates) // 50)  # Max 50 points per flight in heatmap
+        sample_rate = max(
+            1, len(coordinates) // 50
+        )  # Max 50 points per flight in heatmap
         for i, coord in enumerate(coordinates):
             if i % sample_rate == 0:
                 weight = 1
                 if flight.surveillance_likelihood:
                     weight = max(1, int(flight.surveillance_likelihood * 10))
-                heatmap_data.append({
-                    "lat": coord["lat"],
-                    "lng": coord["lng"],
-                    "weight": weight
-                })
+                heatmap_data.append(
+                    {"lat": coord["lat"], "lng": coord["lng"], "weight": weight}
+                )
 
     # Build flight list for frontend selection (aircraft_map already created above)
     flights_list = []
@@ -1824,51 +1983,66 @@ def get_historical_analysis(
         # Extract hover location coordinates from pattern metadata
         hover_areas = []
         for pattern in flight_patterns:
-            if pattern.detection_metadata and isinstance(pattern.detection_metadata, dict):
-                hovers = pattern.detection_metadata.get('hovering', [])
+            if pattern.detection_metadata and isinstance(
+                pattern.detection_metadata, dict
+            ):
+                hovers = pattern.detection_metadata.get("hovering", [])
                 if isinstance(hovers, list):
                     for hover in hovers:
-                        if isinstance(hover, dict) and 'latitude' in hover and 'longitude' in hover:
+                        if (
+                            isinstance(hover, dict)
+                            and "latitude" in hover
+                            and "longitude" in hover
+                        ):
                             # Format lat/lon as a readable string
-                            lat = hover['latitude']
-                            lon = hover['longitude']
-                            duration = hover.get('duration_minutes', 0)
-                            hover_areas.append(f"({lat:.4f}, {lon:.4f}) - {duration:.1f}min")
+                            lat = hover["latitude"]
+                            lon = hover["longitude"]
+                            duration = hover.get("duration_minutes", 0)
+                            hover_areas.append(
+                                f"({lat:.4f}, {lon:.4f}) - {duration:.1f}min"
+                            )
 
         # Determine if this is a surveillance flight: high likelihood OR has abnormal patterns
         is_surveillance = (
-            (flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5) or
-            has_patterns
-        )
+            flight.surveillance_likelihood and flight.surveillance_likelihood > 0.5
+        ) or has_patterns
 
-        flights_list.append({
-            "id": flight.id,
-            "flight_id": flight.flight_id,
-            "aircraft_registration": aircraft_reg,
-            "departure_time": flight.departure_time.isoformat() if flight.departure_time else None,
-            "arrival_time": flight.arrival_time.isoformat() if flight.arrival_time else None,
-            "duration_minutes": flight.flight_duration_minutes,
-            "surveillance_likelihood": float(flight.surveillance_likelihood) if flight.surveillance_likelihood else 0.0,
-            "is_surveillance": is_surveillance,
-            "hover_count": hover_count,
-            "min_altitude": flight.min_altitude_feet,
-            "max_altitude": flight.max_altitude_feet,
-            "privacy_concern_level": flight.privacy_concern_level or 0,
-            "patterns": pattern_types,
-            "pattern_confidence": float(max_confidence),
-            "has_patterns": has_patterns,
-            "hover_areas": hover_areas if hover_areas else None,
-        })
+        flights_list.append(
+            {
+                "id": flight.id,
+                "flight_id": flight.flight_id,
+                "aircraft_registration": aircraft_reg,
+                "departure_time": flight.departure_time.isoformat()
+                if flight.departure_time
+                else None,
+                "arrival_time": flight.arrival_time.isoformat()
+                if flight.arrival_time
+                else None,
+                "duration_minutes": flight.flight_duration_minutes,
+                "surveillance_likelihood": float(flight.surveillance_likelihood)
+                if flight.surveillance_likelihood
+                else 0.0,
+                "is_surveillance": is_surveillance,
+                "hover_count": hover_count,
+                "min_altitude": flight.min_altitude_feet,
+                "max_altitude": flight.max_altitude_feet,
+                "privacy_concern_level": flight.privacy_concern_level or 0,
+                "patterns": pattern_types,
+                "pattern_confidence": float(max_confidence),
+                "has_patterns": has_patterns,
+                "hover_areas": hover_areas if hover_areas else None,
+            }
+        )
 
     # Sort flights list by surveillance likelihood descending, then by date
     flights_list.sort(
         key=lambda f: (f["surveillance_likelihood"], f["departure_time"] or ""),
-        reverse=True
+        reverse=True,
     )
 
     # Build response
     historical_data = {
-        "time_range": time_range,
+        "time_range_requested": time_range,
         "aircraft_filter": aircraft,
         "start_date": start_date.isoformat(),
         "end_date": end_date.isoformat(),
@@ -1971,30 +2145,41 @@ def get_flight_pattern_analysis(
         raise HTTPException(status_code=404, detail="Flight not found")
 
     # Get patterns
-    patterns = db.query(AbnormalPattern).filter(
-        AbnormalPattern.flight_log_id == flight_id
-    ).all()
+    patterns = (
+        db.query(AbnormalPattern)
+        .filter(AbnormalPattern.flight_log_id == flight_id)
+        .all()
+    )
 
     # Extract hover locations from pattern metadata
     hover_locations = []
     for pattern in patterns:
         if pattern.detection_metadata and isinstance(pattern.detection_metadata, dict):
-            hovers = pattern.detection_metadata.get('hovering', [])
+            hovers = pattern.detection_metadata.get("hovering", [])
             if isinstance(hovers, list):
                 for hover in hovers:
-                    if isinstance(hover, dict) and 'latitude' in hover and 'longitude' in hover:
-                        hover_locations.append({
-                            'latitude': hover['latitude'],
-                            'longitude': hover['longitude'],
-                            'duration_minutes': hover.get('duration_minutes', 0),
-                            'position_count': hover.get('position_count', 0),
-                            'start_time': hover.get('start_time'),
-                            'end_time': hover.get('end_time'),
-                        })
+                    if (
+                        isinstance(hover, dict)
+                        and "latitude" in hover
+                        and "longitude" in hover
+                    ):
+                        hover_locations.append(
+                            {
+                                "latitude": hover["latitude"],
+                                "longitude": hover["longitude"],
+                                "duration_minutes": hover.get("duration_minutes", 0),
+                                "position_count": hover.get("position_count", 0),
+                                "start_time": hover.get("start_time"),
+                                "end_time": hover.get("end_time"),
+                            }
+                        )
 
     return {
         "flight_id": flight.id,
-        "patterns": [{"pattern_type": p.pattern_type, "confidence_score": p.confidence_score} for p in patterns],
+        "patterns": [
+            {"pattern_type": p.pattern_type, "confidence_score": p.confidence_score}
+            for p in patterns
+        ],
         "hover_locations": hover_locations,
     }
 
@@ -2042,10 +2227,14 @@ def compare_analysis_periods(
         # Get patterns for flights
         if flights:
             flight_ids = [f.id for f in flights]
-            patterns = db.query(AbnormalPattern).filter(
-                AbnormalPattern.flight_log_id.in_(flight_ids),
-                AbnormalPattern.pattern_type != "normal"
-            ).all()
+            patterns = (
+                db.query(AbnormalPattern)
+                .filter(
+                    AbnormalPattern.flight_log_id.in_(flight_ids),
+                    AbnormalPattern.pattern_type != "normal",
+                )
+                .all()
+            )
             patterns_map = defaultdict(list)
             for p in patterns:
                 patterns_map[p.flight_log_id].append(p)
@@ -2054,46 +2243,57 @@ def compare_analysis_periods(
 
         # Calculate surveillance flights
         surveillance_flights = [
-            f for f in flights
-            if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5) or
-               (f.id in patterns_map)
+            f
+            for f in flights
+            if (f.surveillance_likelihood and f.surveillance_likelihood > 0.5)
+            or (f.id in patterns_map)
         ]
 
         # Calculate metrics
         total_flights = len(flights)
         total_surveillance = len(surveillance_flights)
-        total_hours = sum(
-            (f.flight_duration_minutes or 0) / 60 for f in flights
-        )
+        total_hours = sum((f.flight_duration_minutes or 0) / 60 for f in flights)
         total_cost = sum(f.estimated_cost or 0 for f in flights)
 
         hovering_flights = len([f for f in flights if f.hover_locations])
-        low_altitude_flights = len([
-            f for f in flights
-            if f.min_altitude_feet and f.min_altitude_feet < 400
-        ])
-        night_flights = len([
-            f for f in flights
-            if f.departure_time and (f.departure_time.hour >= 22 or f.departure_time.hour <= 6)
-        ])
-        constitutional_violations = len([
-            f for f in surveillance_flights
-            if f.privacy_concern_level and f.privacy_concern_level >= 4
-        ])
+        low_altitude_flights = len(
+            [f for f in flights if f.min_altitude_feet and f.min_altitude_feet < 400]
+        )
+        night_flights = len(
+            [
+                f
+                for f in flights
+                if f.departure_time
+                and (f.departure_time.hour >= 22 or f.departure_time.hour <= 6)
+            ]
+        )
+        constitutional_violations = len(
+            [
+                f
+                for f in surveillance_flights
+                if f.privacy_concern_level and f.privacy_concern_level >= 4
+            ]
+        )
 
         return {
             "total_flights": total_flights,
             "daily_average_flights": round(total_flights / days, 2),
             "surveillance_flights": total_surveillance,
-            "surveillance_ratio": round(total_surveillance / total_flights, 3) if total_flights > 0 else 0,
+            "surveillance_ratio": round(total_surveillance / total_flights, 3)
+            if total_flights > 0
+            else 0,
             "total_hours": round(total_hours, 2),
             "total_cost": round(total_cost, 2),
             "hovering_flights": hovering_flights,
             "low_altitude_flights": low_altitude_flights,
             "night_flights": night_flights,
             "constitutional_violations": constitutional_violations,
-            "cost_per_flight": round(total_cost / total_flights, 2) if total_flights > 0 else 0,
-            "hours_per_flight": round(total_hours / total_flights, 2) if total_flights > 0 else 0,
+            "cost_per_flight": round(total_cost / total_flights, 2)
+            if total_flights > 0
+            else 0,
+            "hours_per_flight": round(total_hours / total_flights, 2)
+            if total_flights > 0
+            else 0,
         }
 
     # Calculate metrics for both periods
@@ -2110,42 +2310,67 @@ def compare_analysis_periods(
 
         # Calculate change
         absolute_change = val2 - val1
-        percentage_change = ((val2 - val1) / val1 * 100) if val1 != 0 else (100 if val2 > 0 else 0)
+        percentage_change = (
+            ((val2 - val1) / val1 * 100) if val1 != 0 else (100 if val2 > 0 else 0)
+        )
 
         changes[metric] = {
             "period1_value": val1,
             "period2_value": val2,
             "absolute_change": round(absolute_change, 2),
             "percentage_change": round(percentage_change, 2),
-            "direction": "increase" if absolute_change > 0 else ("decrease" if absolute_change < 0 else "no_change")
+            "direction": "increase"
+            if absolute_change > 0
+            else ("decrease" if absolute_change < 0 else "no_change"),
         }
 
         # Identify significant differences (>20% change or important metrics)
-        if abs(percentage_change) > 20 or metric in ["constitutional_violations", "surveillance_ratio"]:
+        if abs(percentage_change) > 20 or metric in [
+            "constitutional_violations",
+            "surveillance_ratio",
+        ]:
             if abs(percentage_change) > 5:  # Only if there's actual change
                 significance = "high" if abs(percentage_change) > 50 else "medium"
-                significant_differences.append({
-                    "metric": metric,
-                    "change_percentage": round(percentage_change, 1),
-                    "period1_value": val1,
-                    "period2_value": val2,
-                    "significance": significance,
-                    "interpretation": f"{'Increase' if absolute_change > 0 else 'Decrease'} of {abs(percentage_change):.1f}%"
-                })
+                significant_differences.append(
+                    {
+                        "metric": metric,
+                        "change_percentage": round(percentage_change, 1),
+                        "period1_value": val1,
+                        "period2_value": val2,
+                        "significance": significance,
+                        "interpretation": f"{'Increase' if absolute_change > 0 else 'Decrease'} of {abs(percentage_change):.1f}%",
+                    }
+                )
 
     # Trend analysis
     trend_analysis = {
-        "surveillance_trend": "increasing" if changes["surveillance_ratio"]["direction"] == "increase" else (
-            "decreasing" if changes["surveillance_ratio"]["direction"] == "decrease" else "stable"
+        "surveillance_trend": "increasing"
+        if changes["surveillance_ratio"]["direction"] == "increase"
+        else (
+            "decreasing"
+            if changes["surveillance_ratio"]["direction"] == "decrease"
+            else "stable"
         ),
-        "cost_efficiency_trend": "improving" if changes["cost_per_flight"]["direction"] == "decrease" else (
-            "declining" if changes["cost_per_flight"]["direction"] == "increase" else "stable"
+        "cost_efficiency_trend": "improving"
+        if changes["cost_per_flight"]["direction"] == "decrease"
+        else (
+            "declining"
+            if changes["cost_per_flight"]["direction"] == "increase"
+            else "stable"
         ),
-        "constitutional_concerns_trend": "worsening" if changes["constitutional_violations"]["direction"] == "increase" else (
-            "improving" if changes["constitutional_violations"]["direction"] == "decrease" else "stable"
+        "constitutional_concerns_trend": "worsening"
+        if changes["constitutional_violations"]["direction"] == "increase"
+        else (
+            "improving"
+            if changes["constitutional_violations"]["direction"] == "decrease"
+            else "stable"
         ),
-        "overall_activity": "increasing" if changes["total_flights"]["direction"] == "increase" else (
-            "decreasing" if changes["total_flights"]["direction"] == "decrease" else "stable"
+        "overall_activity": "increasing"
+        if changes["total_flights"]["direction"] == "increase"
+        else (
+            "decreasing"
+            if changes["total_flights"]["direction"] == "decrease"
+            else "stable"
         ),
     }
 
@@ -2167,20 +2392,20 @@ def compare_analysis_periods(
             "start": period1_start.isoformat(),
             "end": period1_end.isoformat(),
             "duration_days": (period1_end - period1_start).days,
-            "metrics": period1_metrics
+            "metrics": period1_metrics,
         },
         "period2": {
             "start": period2_start.isoformat(),
             "end": period2_end.isoformat(),
             "duration_days": (period2_end - period2_start).days,
-            "metrics": period2_metrics
+            "metrics": period2_metrics,
         },
         "comparison": {
             "changes": changes,
             "significant_differences": sorted(
                 significant_differences,
                 key=lambda x: abs(x["change_percentage"]),
-                reverse=True
+                reverse=True,
             ),
             "trend_analysis": trend_analysis,
             "legal_implications": legal_implications,
@@ -2240,9 +2465,11 @@ def export_analysis_data(
     if analysis_type == "patterns":
         from app.models.abnormal_patterns import AbnormalPattern
 
-        patterns = db.query(AbnormalPattern).filter(
-            AbnormalPattern.flight_log_id.in_([f.id for f in flights])
-        ).all()
+        patterns = (
+            db.query(AbnormalPattern)
+            .filter(AbnormalPattern.flight_log_id.in_([f.id for f in flights]))
+            .all()
+        )
 
         export_data["patterns"] = [
             {
@@ -2277,17 +2504,23 @@ def export_analysis_data(
 
     elif analysis_type == "surveillance":
         surveillance_flights = [
-            f for f in flights
+            f
+            for f in flights
             if f.surveillance_likelihood and f.surveillance_likelihood > 0.5
         ]
 
         export_data["surveillance_summary"] = {
             "total_surveillance_flights": len(surveillance_flights),
-            "surveillance_ratio": len(surveillance_flights) / len(flights) if flights else 0,
-            "constitutional_violations": len([
-                f for f in surveillance_flights
-                if f.privacy_concern_level and f.privacy_concern_level >= 4
-            ]),
+            "surveillance_ratio": len(surveillance_flights) / len(flights)
+            if flights
+            else 0,
+            "constitutional_violations": len(
+                [
+                    f
+                    for f in surveillance_flights
+                    if f.privacy_concern_level and f.privacy_concern_level >= 4
+                ]
+            ),
         }
 
         if include_raw_data:
@@ -2305,6 +2538,7 @@ def export_analysis_data(
     elif analysis_type == "time":
         # Group by day
         from collections import defaultdict
+
         daily_counts = defaultdict(int)
 
         for flight in flights:
@@ -2325,11 +2559,9 @@ def export_analysis_data(
                 if pos.neighborhood:
                     area_distribution[pos.neighborhood] += 1
 
-        export_data["area_distribution"] = dict(sorted(
-            area_distribution.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:50])  # Top 50 areas
+        export_data["area_distribution"] = dict(
+            sorted(area_distribution.items(), key=lambda x: x[1], reverse=True)[:50]
+        )  # Top 50 areas
 
     # Format-specific processing
     if format == "json":
@@ -2354,7 +2586,9 @@ def export_analysis_data(
         file_extension = "pdf"
 
     return {
-        "message": "Export completed" if format in ["json", "csv"] else "Export initiated",
+        "message": "Export completed"
+        if format in ["json", "csv"]
+        else "Export initiated",
         "export_id": export_id,
         "analysis_type": analysis_type,
         "format": format,
@@ -2362,5 +2596,7 @@ def export_analysis_data(
         "content_type": content_type,
         "file_name": f"{export_id}.{file_extension}",
         "data": export_data if format == "json" else None,
-        "estimated_completion": datetime.now(timezone.utc) + timedelta(minutes=5) if format == "pdf" else None,
+        "estimated_completion": datetime.now(timezone.utc) + timedelta(minutes=5)
+        if format == "pdf"
+        else None,
     }

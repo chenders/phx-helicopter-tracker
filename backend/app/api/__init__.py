@@ -47,10 +47,10 @@ api_router.include_router(
     manual_fr24.router, prefix="/manual-fr24", tags=["manual_fr24"]
 )
 api_router.include_router(radio.router, prefix="/radio", tags=["radio"])
-api_router.include_router(radio_analysis.router, prefix="/radio-analysis", tags=["radio_analysis"])
 api_router.include_router(
-    live_database.router, prefix="/tracking", tags=["tracking"]
+    radio_analysis.router, prefix="/radio-analysis", tags=["radio_analysis"]
 )
+api_router.include_router(live_database.router, prefix="/tracking", tags=["tracking"])
 api_router.include_router(
     abnormal_patterns.router, prefix="/abnormal-patterns", tags=["abnormal_patterns"]
 )
@@ -59,6 +59,4 @@ api_router.include_router(config.router, prefix="/app", tags=["config"])
 api_router.include_router(
     flight_redownload.router, prefix="/flight-redownload", tags=["flight_redownload"]
 )
-api_router.include_router(
-    system_health.router, tags=["system_health"]
-)
+api_router.include_router(system_health.router, tags=["system_health"])

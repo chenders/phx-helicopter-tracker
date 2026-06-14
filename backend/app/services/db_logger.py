@@ -39,7 +39,7 @@ class DatabaseLogger:
         task_id: Optional[str] = None,
         error_type: Optional[str] = None,
         error_details: Optional[str] = None,
-        context: Optional[dict] = None
+        context: Optional[dict] = None,
     ):
         """Write log entry to database"""
         try:
@@ -54,7 +54,7 @@ class DatabaseLogger:
                     task_id=task_id,
                     error_type=error_type,
                     error_details=error_details,
-                    context_metadata=json.dumps(context) if context else None
+                    context_metadata=json.dumps(context) if context else None,
                 )
                 db.add(log_entry)
                 db.commit()
@@ -72,7 +72,9 @@ class DatabaseLogger:
         self.file_logger.info(message)
         self._log_to_db(LogLevel.INFO, category, message, **kwargs)
 
-    def warning(self, message: str, category: LogCategory = LogCategory.SYSTEM, **kwargs):
+    def warning(
+        self, message: str, category: LogCategory = LogCategory.SYSTEM, **kwargs
+    ):
         """Log warning message"""
         self.file_logger.warning(message)
         self._log_to_db(LogLevel.WARNING, category, message, **kwargs)
@@ -82,7 +84,7 @@ class DatabaseLogger:
         message: str,
         category: LogCategory = LogCategory.SYSTEM,
         exception: Optional[Exception] = None,
-        **kwargs
+        **kwargs,
     ):
         """Log error message"""
         self.file_logger.error(message)
@@ -100,7 +102,7 @@ class DatabaseLogger:
             message,
             error_type=error_type,
             error_details=error_details,
-            **kwargs
+            **kwargs,
         )
 
     def critical(
@@ -108,7 +110,7 @@ class DatabaseLogger:
         message: str,
         category: LogCategory = LogCategory.SYSTEM,
         exception: Optional[Exception] = None,
-        **kwargs
+        **kwargs,
     ):
         """Log critical message"""
         self.file_logger.critical(message)
@@ -126,7 +128,7 @@ class DatabaseLogger:
             message,
             error_type=error_type,
             error_details=error_details,
-            **kwargs
+            **kwargs,
         )
 
     def anomaly(
@@ -134,7 +136,7 @@ class DatabaseLogger:
         message: str,
         flight_id: Optional[str] = None,
         registration: Optional[str] = None,
-        context: Optional[dict] = None
+        context: Optional[dict] = None,
     ):
         """Log anomaly detection"""
         self.file_logger.warning(f"ANOMALY DETECTED: {message}")
@@ -144,7 +146,7 @@ class DatabaseLogger:
             message,
             flight_id=flight_id,
             registration=registration,
-            context=context
+            context=context,
         )
 
 

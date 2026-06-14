@@ -24,7 +24,9 @@ def get_logs(
     category: Optional[LogCategory] = Query(None, description="Filter by category"),
     search: Optional[str] = Query(None, description="Search in message"),
     flight_id: Optional[str] = Query(None, description="Filter by flight ID"),
-    registration: Optional[str] = Query(None, description="Filter by aircraft registration"),
+    registration: Optional[str] = Query(
+        None, description="Filter by aircraft registration"
+    ),
     days: int = Query(30, ge=1, le=90, description="Number of days to look back"),
 ):
     """
@@ -71,7 +73,9 @@ def get_logs(
     offset = (page - 1) * page_size
 
     # Get paginated results
-    logs = query.order_by(desc(SystemLog.created_at)).offset(offset).limit(page_size).all()
+    logs = (
+        query.order_by(desc(SystemLog.created_at)).offset(offset).limit(page_size).all()
+    )
 
     # Convert to response models
     log_responses = []
@@ -85,7 +89,7 @@ def get_logs(
         page_size=page_size,
         total_pages=total_pages,
         has_next=page < total_pages,
-        has_prev=page > 1
+        has_prev=page > 1,
     )
 
 
@@ -114,36 +118,45 @@ def get_log_stats(
     cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Count by level
-    level_counts = db.query(
-        SystemLog.level,
-        func.count(SystemLog.id).label('count')
-    ).filter(
-        SystemLog.created_at >= cutoff_date
-    ).group_by(SystemLog.level).all()
+    level_counts = (
+        db.query(SystemLog.level, func.count(SystemLog.id).label("count"))
+        .filter(SystemLog.created_at >= cutoff_date)
+        .group_by(SystemLog.level)
+        .all()
+    )
 
     # Count by category
-    category_counts = db.query(
-        SystemLog.category,
-        func.count(SystemLog.id).label('count')
-    ).filter(
-        SystemLog.created_at >= cutoff_date
-    ).group_by(SystemLog.category).all()
+    category_counts = (
+        db.query(SystemLog.category, func.count(SystemLog.id).label("count"))
+        .filter(SystemLog.created_at >= cutoff_date)
+        .group_by(SystemLog.category)
+        .all()
+    )
 
     # Get recent critical errors
-    critical_errors = db.query(SystemLog).filter(
-        and_(
-            SystemLog.created_at >= cutoff_date,
-            SystemLog.level == LogLevel.CRITICAL
+    critical_errors = (
+        db.query(SystemLog)
+        .filter(
+            and_(
+                SystemLog.created_at >= cutoff_date,
+                SystemLog.level == LogLevel.CRITICAL,
+            )
         )
-    ).order_by(desc(SystemLog.created_at)).limit(5).all()
+        .order_by(desc(SystemLog.created_at))
+        .limit(5)
+        .all()
+    )
 
     # Get recent errors (not critical)
-    recent_errors = db.query(SystemLog).filter(
-        and_(
-            SystemLog.created_at >= cutoff_date,
-            SystemLog.level == LogLevel.ERROR
+    recent_errors = (
+        db.query(SystemLog)
+        .filter(
+            and_(SystemLog.created_at >= cutoff_date, SystemLog.level == LogLevel.ERROR)
         )
-    ).order_by(desc(SystemLog.created_at)).limit(10).all()
+        .order_by(desc(SystemLog.created_at))
+        .limit(10)
+        .all()
+    )
 
     return {
         "period_days": days,
@@ -151,14 +164,16 @@ def get_log_stats(
         "categories": {category.value: count for category, count in category_counts},
         "critical_errors": [SystemLogResponse.from_orm(log) for log in critical_errors],
         "recent_errors": [SystemLogResponse.from_orm(log) for log in recent_errors],
-        "total_logs": sum(count for _, count in level_counts)
+        "total_logs": sum(count for _, count in level_counts),
     }
 
 
 @router.delete("/cleanup")
 def cleanup_old_logs(
     db: Session = Depends(get_db),
-    days_to_keep: int = Query(30, ge=7, le=90, description="Keep logs for this many days"),
+    days_to_keep: int = Query(
+        30, ge=7, le=90, description="Keep logs for this many days"
+    ),
     dry_run: bool = Query(True, description="If true, only show what would be deleted"),
 ):
     """
@@ -179,7 +194,7 @@ def cleanup_old_logs(
             "dry_run": True,
             "logs_to_delete": count,
             "cutoff_date": cutoff_date.isoformat(),
-            "message": f"Would delete {count} logs older than {cutoff_date.strftime('%Y-%m-%d')}"
+            "message": f"Would delete {count} logs older than {cutoff_date.strftime('%Y-%m-%d')}",
         }
     else:
         # Actually delete the logs
@@ -190,5 +205,5 @@ def cleanup_old_logs(
             "dry_run": False,
             "logs_deleted": count,
             "cutoff_date": cutoff_date.isoformat(),
-            "message": f"Deleted {count} logs older than {cutoff_date.strftime('%Y-%m-%d')}"
+            "message": f"Deleted {count} logs older than {cutoff_date.strftime('%Y-%m-%d')}",
         }

@@ -19,10 +19,7 @@ from app.models.flight_logs import FlightLog
 from app.services.flightradar24_api_service import FlightRadar24APIService
 import logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -39,22 +36,28 @@ async def continue_track_downloads(batch_size: int = 30):
             # Get active aircraft registrations
             result = session.execute(
                 select(Aircraft.registration).where(
-                    (Aircraft.is_phoenix_pd == True) &
-                    (Aircraft.is_active == True)
+                    (Aircraft.is_phoenix_pd == True) & (Aircraft.is_active == True)
                 )
             )
             active_registrations = [r[0] for r in result.fetchall()]
 
             # Get flights that need track downloads (excluding those with errors)
-            flights_to_download = session.query(FlightDiscovery).filter(
-                and_(
-                    FlightDiscovery.track_downloaded == False,
-                    FlightDiscovery.registration.in_(active_registrations),
-                    FlightDiscovery.track_download_error.is_(None)
+            flights_to_download = (
+                session.query(FlightDiscovery)
+                .filter(
+                    and_(
+                        FlightDiscovery.track_downloaded == False,
+                        FlightDiscovery.registration.in_(active_registrations),
+                        FlightDiscovery.track_download_error.is_(None),
+                    )
                 )
-            ).limit(batch_size).all()
+                .limit(batch_size)
+                .all()
+            )
 
-            logger.info(f"Found {len(flights_to_download)} flights needing track downloads")
+            logger.info(
+                f"Found {len(flights_to_download)} flights needing track downloads"
+            )
             logger.info("=" * 60)
 
             downloaded_count = 0
@@ -62,15 +65,21 @@ async def continue_track_downloads(batch_size: int = 30):
 
             for i, flight in enumerate(flights_to_download, 1):
                 try:
-                    logger.info(f"[{i}/{len(flights_to_download)}] Downloading track for {flight.registration} flight {flight.fr24_id}...")
+                    logger.info(
+                        f"[{i}/{len(flights_to_download)}] Downloading track for {flight.registration} flight {flight.fr24_id}..."
+                    )
 
                     # Get aircraft ID
-                    aircraft = session.query(Aircraft).filter(
-                        Aircraft.registration == flight.registration
-                    ).first()
+                    aircraft = (
+                        session.query(Aircraft)
+                        .filter(Aircraft.registration == flight.registration)
+                        .first()
+                    )
 
                     if not aircraft:
-                        logger.error(f"  Aircraft {flight.registration} not found in database")
+                        logger.error(
+                            f"  Aircraft {flight.registration} not found in database"
+                        )
                         continue
 
                     # Download the track
@@ -78,9 +87,11 @@ async def continue_track_downloads(batch_size: int = 30):
 
                     if positions and len(positions) > 0:
                         # Check if flight log already exists
-                        existing_log = session.query(FlightLog).filter(
-                            FlightLog.flight_id == flight.fr24_id
-                        ).first()
+                        existing_log = (
+                            session.query(FlightLog)
+                            .filter(FlightLog.flight_id == flight.fr24_id)
+                            .first()
+                        )
 
                         if not existing_log:
                             # Create flight log record
@@ -93,21 +104,30 @@ async def continue_track_downloads(batch_size: int = 30):
                                 flight_duration_minutes=flight.flight_duration_minutes,
                                 departure_airport=flight.origin_airport,
                                 arrival_airport=flight.destination_airport,
-                                data_source='fr24_api',
-                                raw_data={'fr24_id': flight.fr24_id, 'positions_count': len(positions)}
+                                data_source="fr24_api",
+                                raw_data={
+                                    "fr24_id": flight.fr24_id,
+                                    "positions_count": len(positions),
+                                },
                             )
 
                             # Calculate altitude statistics from positions
-                            altitudes = [p.altitude_feet for p in positions if p.altitude_feet]
+                            altitudes = [
+                                p.altitude_feet for p in positions if p.altitude_feet
+                            ]
                             if altitudes:
                                 flight_log.max_altitude_feet = max(altitudes)
                                 flight_log.min_altitude_feet = min(altitudes)
-                                flight_log.avg_altitude_feet = sum(altitudes) / len(altitudes)
+                                flight_log.avg_altitude_feet = sum(altitudes) / len(
+                                    altitudes
+                                )
 
                             session.add(flight_log)
-                            logger.info(f"  Created flight log with {len(positions)} positions")
+                            logger.info(
+                                f"  Created flight log with {len(positions)} positions"
+                            )
                         else:
-                            logger.info(f"  Flight log already exists, updating...")
+                            logger.info("  Flight log already exists, updating...")
 
                         # Update discovery record
                         flight.track_downloaded = True
@@ -124,7 +144,7 @@ async def continue_track_downloads(batch_size: int = 30):
                         flight.track_download_error = "No position data returned"
                         session.commit()
                         error_count += 1
-                        logger.info(f"  ✗ No position data available")
+                        logger.info("  ✗ No position data available")
 
                     # Respect rate limits
                     await asyncio.sleep(3)
@@ -132,7 +152,9 @@ async def continue_track_downloads(batch_size: int = 30):
                 except Exception as e:
                     logger.error(f"  ✗ Error: {e}")
                     flight.track_download_attempted_at = datetime.now(timezone.utc)
-                    flight.track_download_error = str(e)[:500]  # Limit error message length
+                    flight.track_download_error = str(e)[
+                        :500
+                    ]  # Limit error message length
                     session.commit()
                     error_count += 1
                     await asyncio.sleep(3)
@@ -145,13 +167,17 @@ async def continue_track_downloads(batch_size: int = 30):
             logger.info(f"Errors: {error_count}")
 
             # Check remaining
-            remaining = session.query(FlightDiscovery).filter(
-                and_(
-                    FlightDiscovery.track_downloaded == False,
-                    FlightDiscovery.registration.in_(active_registrations),
-                    FlightDiscovery.track_download_error.is_(None)
+            remaining = (
+                session.query(FlightDiscovery)
+                .filter(
+                    and_(
+                        FlightDiscovery.track_downloaded == False,
+                        FlightDiscovery.registration.in_(active_registrations),
+                        FlightDiscovery.track_download_error.is_(None),
+                    )
                 )
-            ).count()
+                .count()
+            )
 
             logger.info(f"Remaining to download: {remaining}")
             logger.info("=" * 60)

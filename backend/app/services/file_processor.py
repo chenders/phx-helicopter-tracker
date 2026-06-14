@@ -2,7 +2,7 @@
 File processing service for handling uploaded flight data files
 """
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import json
 import csv

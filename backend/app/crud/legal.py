@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc, func
+from sqlalchemy import and_, desc, func, or_
 
 from app.crud.base import CRUDBase
 from app.models.legal import LegalDocument, ConstitutionalAnalysis, LegalPrecedent

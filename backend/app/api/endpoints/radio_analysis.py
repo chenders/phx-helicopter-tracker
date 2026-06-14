@@ -72,13 +72,15 @@ async def get_keyword_frequency(
 
         keywords = []
         for keyword, kw_type, total_count, trans_count, avg_conf in results:
-            keywords.append({
-                "keyword": keyword,
-                "type": kw_type,
-                "total_occurrences": total_count,
-                "transcription_count": trans_count,
-                "avg_confidence": round(avg_conf, 3) if avg_conf else None,
-            })
+            keywords.append(
+                {
+                    "keyword": keyword,
+                    "type": kw_type,
+                    "total_occurrences": total_count,
+                    "transcription_count": trans_count,
+                    "avg_confidence": round(avg_conf, 3) if avg_conf else None,
+                }
+            )
 
         return {
             "total_keywords": len(keywords),
@@ -87,7 +89,7 @@ async def get_keyword_frequency(
                 "keyword_type": keyword_type,
                 "start_date": start_date.isoformat() if start_date else None,
                 "end_date": end_date.isoformat() if end_date else None,
-            }
+            },
         }
 
     except Exception as e:
@@ -110,28 +112,38 @@ async def get_hourly_activity(
         # Query for hourly activity
         results = (
             db.query(
-                func.extract('hour', RadioArchive.recording_start).label('hour'),
-                func.extract('dow', RadioArchive.recording_start).label('day_of_week'),
-                func.count(RadioArchive.id).label('archive_count'),
-                func.sum(RadioArchive.duration_seconds).label('total_duration'),
+                func.extract("hour", RadioArchive.recording_start).label("hour"),
+                func.extract("dow", RadioArchive.recording_start).label("day_of_week"),
+                func.count(RadioArchive.id).label("archive_count"),
+                func.sum(RadioArchive.duration_seconds).label("total_duration"),
             )
             .filter(RadioArchive.recording_start >= start_date)
-            .group_by('hour', 'day_of_week')
+            .group_by("hour", "day_of_week")
             .all()
         )
 
         # Format data for heatmap
         heatmap_data = []
         for hour, dow, count, duration in results:
-            heatmap_data.append({
-                "hour": int(hour),
-                "day_of_week": int(dow),  # 0=Sunday, 6=Saturday
-                "archive_count": count,
-                "total_duration_seconds": duration or 0,
-            })
+            heatmap_data.append(
+                {
+                    "hour": int(hour),
+                    "day_of_week": int(dow),  # 0=Sunday, 6=Saturday
+                    "archive_count": count,
+                    "total_duration_seconds": duration or 0,
+                }
+            )
 
         # Get day names
-        day_names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+        day_names = [
+            "Sunday",
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+        ]
 
         return {
             "days_analyzed": days_back,
@@ -147,7 +159,9 @@ async def get_hourly_activity(
 @router.get("/timeline/activity")
 async def get_activity_timeline(
     days_back: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
-    granularity: str = Query("daily", regex="^(hourly|daily|weekly)$", description="Time granularity"),
+    granularity: str = Query(
+        "daily", regex="^(hourly|daily|weekly)$", description="Time granularity"
+    ),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     """
@@ -160,35 +174,45 @@ async def get_activity_timeline(
 
         # Determine date truncation based on granularity
         if granularity == "hourly":
-            trunc = func.date_trunc('hour', RadioArchive.recording_start)
+            trunc = func.date_trunc("hour", RadioArchive.recording_start)
         elif granularity == "daily":
-            trunc = func.date_trunc('day', RadioArchive.recording_start)
+            trunc = func.date_trunc("day", RadioArchive.recording_start)
         else:  # weekly
-            trunc = func.date_trunc('week', RadioArchive.recording_start)
+            trunc = func.date_trunc("week", RadioArchive.recording_start)
 
         # Query archives with transcription stats
         results = (
             db.query(
-                trunc.label('time_bucket'),
-                func.count(RadioArchive.id).label('archive_count'),
-                func.count(RadioTranscription.id).label('transcription_count'),
-                func.sum(case((RadioArchive.transcribed == True, RadioArchive.duration_seconds), else_=0)).label('transcribed_duration'),
+                trunc.label("time_bucket"),
+                func.count(RadioArchive.id).label("archive_count"),
+                func.count(RadioTranscription.id).label("transcription_count"),
+                func.sum(
+                    case(
+                        (
+                            RadioArchive.transcribed == True,
+                            RadioArchive.duration_seconds,
+                        ),
+                        else_=0,
+                    )
+                ).label("transcribed_duration"),
             )
             .outerjoin(RadioTranscription)
             .filter(RadioArchive.recording_start >= start_date)
-            .group_by('time_bucket')
-            .order_by('time_bucket')
+            .group_by("time_bucket")
+            .order_by("time_bucket")
             .all()
         )
 
         timeline = []
         for bucket, archive_count, trans_count, trans_duration in results:
-            timeline.append({
-                "timestamp": bucket.isoformat() if bucket else None,
-                "archive_count": archive_count,
-                "transcription_count": trans_count or 0,
-                "transcribed_duration_seconds": trans_duration or 0,
-            })
+            timeline.append(
+                {
+                    "timestamp": bucket.isoformat() if bucket else None,
+                    "archive_count": archive_count,
+                    "transcription_count": trans_count or 0,
+                    "transcribed_duration_seconds": trans_duration or 0,
+                }
+            )
 
         return {
             "granularity": granularity,
@@ -253,9 +277,13 @@ async def get_entity_summary(
                     incident_codes[code] = incident_codes.get(code, 0) + 1
 
         # Sort by frequency
-        top_tail_numbers = sorted(tail_numbers.items(), key=lambda x: x[1], reverse=True)[:20]
+        top_tail_numbers = sorted(
+            tail_numbers.items(), key=lambda x: x[1], reverse=True
+        )[:20]
         top_locations = sorted(locations.items(), key=lambda x: x[1], reverse=True)[:50]
-        top_incident_codes = sorted(incident_codes.items(), key=lambda x: x[1], reverse=True)[:30]
+        top_incident_codes = sorted(
+            incident_codes.items(), key=lambda x: x[1], reverse=True
+        )[:30]
 
         return {
             "days_analyzed": days_back,
@@ -266,9 +294,13 @@ async def get_entity_summary(
                 "unique_locations": len(locations),
                 "unique_incident_codes": len(incident_codes),
             },
-            "top_tail_numbers": [{"tail_number": t, "count": c} for t, c in top_tail_numbers],
+            "top_tail_numbers": [
+                {"tail_number": t, "count": c} for t, c in top_tail_numbers
+            ],
             "top_locations": [{"location": l, "count": c} for l, c in top_locations],
-            "top_incident_codes": [{"code": c, "count": cnt} for c, cnt in top_incident_codes],
+            "top_incident_codes": [
+                {"code": c, "count": cnt} for c, cnt in top_incident_codes
+            ],
         }
 
     except Exception as e:
@@ -277,7 +309,9 @@ async def get_entity_summary(
 
 @router.get("/entities/tail-numbers")
 async def get_tail_number_mentions(
-    tail_number: Optional[str] = Query(None, description="Specific tail number to search"),
+    tail_number: Optional[str] = Query(
+        None, description="Specific tail number to search"
+    ),
     days_back: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -311,18 +345,24 @@ async def get_tail_number_mentions(
 
         mentions = []
         for segment, filename, recording_start in results:
-            mentions.append({
-                "segment_id": segment.id,
-                "filename": filename,
-                "recording_start": recording_start.isoformat() if recording_start else None,
-                "absolute_timestamp": segment.absolute_timestamp.isoformat() if segment.absolute_timestamp else None,
-                "start_time": segment.start_time,
-                "end_time": segment.end_time,
-                "text": segment.text,
-                "tail_numbers": segment.tail_numbers,
-                "confidence": segment.confidence,
-                "urgency_score": segment.urgency_score,
-            })
+            mentions.append(
+                {
+                    "segment_id": segment.id,
+                    "filename": filename,
+                    "recording_start": recording_start.isoformat()
+                    if recording_start
+                    else None,
+                    "absolute_timestamp": segment.absolute_timestamp.isoformat()
+                    if segment.absolute_timestamp
+                    else None,
+                    "start_time": segment.start_time,
+                    "end_time": segment.end_time,
+                    "text": segment.text,
+                    "tail_numbers": segment.tail_numbers,
+                    "confidence": segment.confidence,
+                    "urgency_score": segment.urgency_score,
+                }
+            )
 
         return {
             "tail_number_filter": tail_number,
@@ -338,8 +378,12 @@ async def get_tail_number_mentions(
 @router.get("/correlation/flight-radio")
 async def get_flight_radio_correlations(
     flight_id: Optional[int] = Query(None, description="Specific flight ID"),
-    correlation_type: Optional[str] = Query(None, description="Filter by correlation type"),
-    min_strength: float = Query(0.5, ge=0.0, le=1.0, description="Minimum correlation strength"),
+    correlation_type: Optional[str] = Query(
+        None, description="Filter by correlation type"
+    ),
+    min_strength: float = Query(
+        0.5, ge=0.0, le=1.0, description="Minimum correlation strength"
+    ),
     limit: int = Query(50, ge=1, le=200, description="Maximum results"),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -360,7 +404,9 @@ async def get_flight_radio_correlations(
                 RadioSegment.absolute_timestamp,
             )
             .join(FlightLog, FlightRadioCorrelation.flight_log_id == FlightLog.id)
-            .join(RadioSegment, FlightRadioCorrelation.radio_segment_id == RadioSegment.id)
+            .join(
+                RadioSegment, FlightRadioCorrelation.radio_segment_id == RadioSegment.id
+            )
             .filter(FlightRadioCorrelation.correlation_strength >= min_strength)
         )
 
@@ -369,7 +415,9 @@ async def get_flight_radio_correlations(
             query = query.filter(FlightRadioCorrelation.flight_log_id == flight_id)
 
         if correlation_type:
-            query = query.filter(FlightRadioCorrelation.correlation_type == correlation_type)
+            query = query.filter(
+                FlightRadioCorrelation.correlation_type == correlation_type
+            )
 
         results = (
             query.order_by(desc(FlightRadioCorrelation.correlation_strength))
@@ -379,25 +427,29 @@ async def get_flight_radio_correlations(
 
         correlations = []
         for corr, flight_id_str, callsign, dep_time, seg_text, seg_timestamp in results:
-            correlations.append({
-                "correlation_id": corr.id,
-                "correlation_type": corr.correlation_type,
-                "correlation_strength": corr.correlation_strength,
-                "time_difference_seconds": corr.time_difference_seconds,
-                "flight": {
-                    "id": corr.flight_log_id,
-                    "flight_id": flight_id_str,
-                    "callsign": callsign,
-                    "departure_time": dep_time.isoformat() if dep_time else None,
-                },
-                "radio_segment": {
-                    "id": corr.radio_segment_id,
-                    "text": seg_text,
-                    "timestamp": seg_timestamp.isoformat() if seg_timestamp else None,
-                },
-                "matched_keywords": corr.matched_keywords,
-                "notes": corr.correlation_notes,
-            })
+            correlations.append(
+                {
+                    "correlation_id": corr.id,
+                    "correlation_type": corr.correlation_type,
+                    "correlation_strength": corr.correlation_strength,
+                    "time_difference_seconds": corr.time_difference_seconds,
+                    "flight": {
+                        "id": corr.flight_log_id,
+                        "flight_id": flight_id_str,
+                        "callsign": callsign,
+                        "departure_time": dep_time.isoformat() if dep_time else None,
+                    },
+                    "radio_segment": {
+                        "id": corr.radio_segment_id,
+                        "text": seg_text,
+                        "timestamp": seg_timestamp.isoformat()
+                        if seg_timestamp
+                        else None,
+                    },
+                    "matched_keywords": corr.matched_keywords,
+                    "notes": corr.correlation_notes,
+                }
+            )
 
         return {
             "total_correlations": len(correlations),
@@ -415,7 +467,9 @@ async def get_flight_radio_correlations(
 
 @router.get("/segments/high-urgency")
 async def get_high_urgency_segments(
-    min_urgency: float = Query(0.7, ge=0.0, le=1.0, description="Minimum urgency score"),
+    min_urgency: float = Query(
+        0.7, ge=0.0, le=1.0, description="Minimum urgency score"
+    ),
     days_back: int = Query(7, ge=1, le=90, description="Number of days to analyze"),
     limit: int = Query(50, ge=1, le=200, description="Maximum results"),
     db: Session = Depends(get_db),
@@ -445,20 +499,26 @@ async def get_high_urgency_segments(
 
         urgent_segments = []
         for segment, filename, recording_start in results:
-            urgent_segments.append({
-                "segment_id": segment.id,
-                "filename": filename,
-                "recording_start": recording_start.isoformat() if recording_start else None,
-                "absolute_timestamp": segment.absolute_timestamp.isoformat() if segment.absolute_timestamp else None,
-                "urgency_score": segment.urgency_score,
-                "text": segment.text,
-                "contains_tail_number": segment.contains_tail_number,
-                "contains_location": segment.contains_location,
-                "contains_incident_code": segment.contains_incident_code,
-                "tail_numbers": segment.tail_numbers,
-                "locations": segment.locations,
-                "incident_codes": segment.incident_codes,
-            })
+            urgent_segments.append(
+                {
+                    "segment_id": segment.id,
+                    "filename": filename,
+                    "recording_start": recording_start.isoformat()
+                    if recording_start
+                    else None,
+                    "absolute_timestamp": segment.absolute_timestamp.isoformat()
+                    if segment.absolute_timestamp
+                    else None,
+                    "urgency_score": segment.urgency_score,
+                    "text": segment.text,
+                    "contains_tail_number": segment.contains_tail_number,
+                    "contains_location": segment.contains_location,
+                    "contains_incident_code": segment.contains_incident_code,
+                    "tail_numbers": segment.tail_numbers,
+                    "locations": segment.locations,
+                    "incident_codes": segment.incident_codes,
+                }
+            )
 
         return {
             "min_urgency": min_urgency,
@@ -493,7 +553,10 @@ async def get_segments_during_flight(
                 RadioArchive.recording_start,
                 RadioArchive.duration_seconds,
             )
-            .join(RadioTranscription, RadioSegment.transcription_id == RadioTranscription.id)
+            .join(
+                RadioTranscription,
+                RadioSegment.transcription_id == RadioTranscription.id,
+            )
             .join(RadioArchive, RadioTranscription.archive_id == RadioArchive.id)
             .filter(
                 and_(
@@ -509,7 +572,9 @@ async def get_segments_during_flight(
         for segment, filename, file_path, recording_start, duration in segments:
             result = {
                 "segment_id": segment.id,
-                "timestamp": segment.absolute_timestamp.isoformat() if segment.absolute_timestamp else None,
+                "timestamp": segment.absolute_timestamp.isoformat()
+                if segment.absolute_timestamp
+                else None,
                 "start_time": segment.start_time,
                 "end_time": segment.end_time,
                 "text": segment.text,
@@ -519,14 +584,18 @@ async def get_segments_during_flight(
                 "incident_codes": segment.incident_codes,
                 "audio_file": {
                     "filename": filename,
-                    "recording_start": recording_start.isoformat() if recording_start else None,
+                    "recording_start": recording_start.isoformat()
+                    if recording_start
+                    else None,
                     "duration_seconds": duration,
-                }
+                },
             }
 
             if include_audio_url:
                 # Construct audio URL for the MP3 file
-                result["audio_file"]["audio_url"] = f"/api/v1/radio/archives/{filename}/audio"
+                result["audio_file"][
+                    "audio_url"
+                ] = f"/api/v1/radio/archives/{filename}/audio"
                 # Also include the segment-specific start/end times for audio playback
                 result["audio_file"]["segment_start"] = segment.start_time
                 result["audio_file"]["segment_end"] = segment.end_time
@@ -556,16 +625,32 @@ async def get_analysis_stats(
     try:
         # Get counts
         total_archives = db.query(func.count(RadioArchive.id)).scalar()
-        transcribed_archives = db.query(func.count(RadioArchive.id)).filter(RadioArchive.transcribed == True).scalar()
+        transcribed_archives = (
+            db.query(func.count(RadioArchive.id))
+            .filter(RadioArchive.transcribed == True)
+            .scalar()
+        )
         total_transcriptions = db.query(func.count(RadioTranscription.id)).scalar()
         total_segments = db.query(func.count(RadioSegment.id)).scalar()
         total_keywords = db.query(func.count(RadioKeyword.id)).scalar()
         total_correlations = db.query(func.count(FlightRadioCorrelation.id)).scalar()
 
         # Segments with entities
-        segments_with_tail_numbers = db.query(func.count(RadioSegment.id)).filter(RadioSegment.contains_tail_number == True).scalar()
-        segments_with_locations = db.query(func.count(RadioSegment.id)).filter(RadioSegment.contains_location == True).scalar()
-        segments_with_codes = db.query(func.count(RadioSegment.id)).filter(RadioSegment.contains_incident_code == True).scalar()
+        segments_with_tail_numbers = (
+            db.query(func.count(RadioSegment.id))
+            .filter(RadioSegment.contains_tail_number == True)
+            .scalar()
+        )
+        segments_with_locations = (
+            db.query(func.count(RadioSegment.id))
+            .filter(RadioSegment.contains_location == True)
+            .scalar()
+        )
+        segments_with_codes = (
+            db.query(func.count(RadioSegment.id))
+            .filter(RadioSegment.contains_incident_code == True)
+            .scalar()
+        )
 
         # Date range
         oldest_archive = db.query(func.min(RadioArchive.recording_start)).scalar()
@@ -586,10 +671,18 @@ async def get_analysis_stats(
                 "segments_with_incident_codes": segments_with_codes or 0,
             },
             "coverage": {
-                "transcription_percentage": round((transcribed_archives / total_archives * 100), 1) if total_archives else 0,
-                "oldest_archive": oldest_archive.isoformat() if oldest_archive else None,
-                "newest_archive": newest_archive.isoformat() if newest_archive else None,
-            }
+                "transcription_percentage": round(
+                    (transcribed_archives / total_archives * 100), 1
+                )
+                if total_archives
+                else 0,
+                "oldest_archive": oldest_archive.isoformat()
+                if oldest_archive
+                else None,
+                "newest_archive": newest_archive.isoformat()
+                if newest_archive
+                else None,
+            },
         }
 
     except Exception as e:

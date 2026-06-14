@@ -61,53 +61,64 @@ def import_transcriptions_from_json(
             for json_file in json_files:
                 try:
                     # Load transcription data
-                    with open(json_file, 'r') as f:
+                    with open(json_file, "r") as f:
                         data = json.load(f)
 
-                    filename = data.get('filename')
+                    filename = data.get("filename")
                     if not filename:
                         logger.warning(f"No filename in {json_file}, skipping")
                         continue
 
                     # Check if already imported
-                    existing_archive = db.query(RadioArchive).filter(
-                        RadioArchive.filename == filename
-                    ).first()
+                    existing_archive = (
+                        db.query(RadioArchive)
+                        .filter(RadioArchive.filename == filename)
+                        .first()
+                    )
 
                     if existing_archive:
                         skipped_count += 1
                         continue
 
                     # Extract metadata
-                    recording_time_str = data.get('recording_time')
+                    recording_time_str = data.get("recording_time")
                     if recording_time_str:
-                        recording_start = datetime.fromisoformat(recording_time_str.replace('Z', '+00:00'))
+                        recording_start = datetime.fromisoformat(
+                            recording_time_str.replace("Z", "+00:00")
+                        )
                     else:
                         # Fall back to file modification time
-                        recording_start = datetime.fromtimestamp(json_file.stat().st_mtime)
+                        recording_start = datetime.fromtimestamp(
+                            json_file.stat().st_mtime
+                        )
 
-                    duration = data.get('metadata', {}).get('duration', 0)
+                    duration = data.get("metadata", {}).get("duration", 0)
                     recording_end = recording_start
                     if duration:
                         from datetime import timedelta
+
                         recording_end = recording_start + timedelta(seconds=duration)
 
                     # Get corresponding MP3 file path
-                    mp3_file = json_file.with_suffix('.mp3')
+                    mp3_file = json_file.with_suffix(".mp3")
                     file_path = str(mp3_file) if mp3_file.exists() else str(json_file)
-                    file_size_bytes = mp3_file.stat().st_size if mp3_file.exists() else 0
+                    file_size_bytes = (
+                        mp3_file.stat().st_size if mp3_file.exists() else 0
+                    )
 
                     # Create RadioArchive record
                     archive = RadioArchive(
                         filename=filename,
                         file_path=file_path,
                         file_size_bytes=file_size_bytes,
-                        feed_id=data.get('metadata', {}).get('feed_id', '12145'),
-                        feed_name=data.get('metadata', {}).get('feed_name', 'Phoenix Police'),
+                        feed_id=data.get("metadata", {}).get("feed_id", "12145"),
+                        feed_name=data.get("metadata", {}).get(
+                            "feed_name", "Phoenix Police"
+                        ),
                         recording_start=recording_start,
                         recording_end=recording_end,
                         duration_seconds=duration,
-                        download_source='imported',
+                        download_source="imported",
                         downloaded_at=datetime.now(),
                         transcribed=True,
                     )
@@ -115,29 +126,33 @@ def import_transcriptions_from_json(
                     db.flush()  # Get archive ID
 
                     # Create RadioTranscription record
-                    transcribed_at_str = data.get('transcribed_at')
+                    transcribed_at_str = data.get("transcribed_at")
                     if transcribed_at_str:
-                        transcribed_at = datetime.fromisoformat(transcribed_at_str.replace('Z', '+00:00'))
+                        transcribed_at = datetime.fromisoformat(
+                            transcribed_at_str.replace("Z", "+00:00")
+                        )
                     else:
                         transcribed_at = datetime.now()
 
-                    full_text = data.get('text', '')
-                    language = data.get('metadata', {}).get('language', 'en')
-                    language_probability = data.get('metadata', {}).get('language_probability', 0.0)
+                    full_text = data.get("text", "")
+                    language = data.get("metadata", {}).get("language", "en")
+                    language_probability = data.get("metadata", {}).get(
+                        "language_probability", 0.0
+                    )
 
                     transcription = RadioTranscription(
                         archive_id=archive.id,
                         full_text=full_text,
                         language=language,
-                        model_name=data.get('model', 'unknown'),
-                        model_version=data.get('engine', 'faster-whisper'),
+                        model_name=data.get("model", "unknown"),
+                        model_version=data.get("engine", "faster-whisper"),
                         confidence_score=None,  # Not available in JSON
                         no_speech_probability=None,
                         transcribed_at=transcribed_at,
                         transcription_time_seconds=None,
                         worker_hostname=None,
                         detected_language_probability=language_probability,
-                        whisper_metadata=data.get('metadata', {}),
+                        whisper_metadata=data.get("metadata", {}),
                         keywords_extracted=False,
                         entities_extracted=False,
                     )
@@ -145,15 +160,15 @@ def import_transcriptions_from_json(
                     db.flush()  # Get transcription ID
 
                     # Create RadioSegment records
-                    segments = data.get('segments', [])
+                    segments = data.get("segments", [])
                     for seg in segments:
                         segment = RadioSegment(
                             transcription_id=transcription.id,
-                            segment_index=seg.get('id', 0),
-                            start_time=seg.get('start', 0),
-                            end_time=seg.get('end', 0),
-                            duration_seconds=seg.get('end', 0) - seg.get('start', 0),
-                            text=seg.get('text', ''),
+                            segment_index=seg.get("id", 0),
+                            start_time=seg.get("start", 0),
+                            end_time=seg.get("end", 0),
+                            duration_seconds=seg.get("end", 0) - seg.get("start", 0),
+                            text=seg.get("text", ""),
                             contains_tail_number=False,
                             contains_location=False,
                             contains_incident_code=False,
@@ -169,7 +184,9 @@ def import_transcriptions_from_json(
                     imported_count += 1
 
                     if imported_count % 10 == 0:
-                        logger.info(f"Imported {imported_count} transcriptions so far...")
+                        logger.info(
+                            f"Imported {imported_count} transcriptions so far..."
+                        )
 
                 except Exception as e:
                     db.rollback()
@@ -221,17 +238,17 @@ def batch_import_and_extract(
         # Step 1: Import transcriptions
         logger.info("Step 1: Importing transcriptions from JSON files")
         import_result = import_transcriptions_from_json.apply(
-            kwargs={'batch_size': batch_size}
+            kwargs={"batch_size": batch_size}
         ).get()
 
-        if not import_result.get('success', False):
+        if not import_result.get("success", False):
             return {
                 "success": False,
                 "error": "Import failed",
                 "import_result": import_result,
             }
 
-        imported_count = import_result.get('imported', 0)
+        imported_count = import_result.get("imported", 0)
 
         if imported_count == 0:
             logger.info("No new transcriptions to import")
@@ -249,7 +266,7 @@ def batch_import_and_extract(
         from app.workers.radio_analysis_tasks import process_untranscribed_archives
 
         extract_result = process_untranscribed_archives.apply(
-            kwargs={'batch_size': batch_size}
+            kwargs={"batch_size": batch_size}
         ).get()
 
         return {

@@ -1,18 +1,36 @@
+# Pre-commit / pre-push hooks.
+# One-time setup:  pip install pre-commit && pre-commit install   # installs both hook types
+# Run manually:    pre-commit run --all-files --hook-stage pre-push
+#
+# Split by intent:
+#   - black auto-formats at COMMIT time (fast, mutating, keeps commits tidy)
+#   - the non-mutating CHECKS (schema sync + the ruff bug/async gate) run at
+#     PRE-PUSH, so they gate what reaches the remote without slowing each commit.
+default_install_hook_types: [pre-commit, pre-push]
 repos:
   - repo: local
     hooks:
-      - id: alembic-check
-        name: Check Alembic Schema Sync
-        entry: bash -c 'cd backend && python check_schema.py'
-        language: system
-        pass_filenames: false
-        files: ^backend/(app/models/.*\.py|alembic/versions/.*\.py)$
-        stages: [commit]
-
       - id: black
         name: Format Python code with Black
         entry: bash -c 'cd backend && black .'
         language: system
         pass_filenames: false
         files: \.py$
-        stages: [commit]
+        stages: [pre-commit]
+
+      - id: alembic-check
+        name: Check Alembic Schema Sync
+        entry: bash -c 'cd backend && python check_schema.py'
+        language: system
+        pass_filenames: false
+        files: ^backend/(app/models/.*\.py|alembic/versions/.*\.py)$
+        stages: [pre-push]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.5 # keep in sync with backend/pyproject.toml ruff pin
+    hooks:
+      - id: ruff
+        name: ruff bug + async gate (F,ASYNC; excl. F401/F841)
+        args: ["--select", "F,ASYNC", "--ignore", "F401,F841"]
+        files: ^backend/.*\.py$
+        stages: [pre-push]

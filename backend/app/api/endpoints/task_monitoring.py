@@ -54,13 +54,13 @@ def get_monitoring_dashboard(
         for name, config in beat_schedule.items():
             # Convert schedule object to string representation
             schedule = config.get("schedule")
-            if hasattr(schedule, '__repr__'):
+            if hasattr(schedule, "__repr__"):
                 schedule_str = str(schedule)
             elif isinstance(schedule, (int, float)):
                 schedule_str = f"{schedule} seconds"
             else:
                 schedule_str = str(schedule)
-                
+
             scheduled_tasks.append(
                 {
                     "name": name,
@@ -212,7 +212,7 @@ def get_scheduled_tasks() -> List[Dict[str, Any]]:
                 schedule_val = schedule
             else:
                 schedule_val = str(schedule)
-                
+
             scheduled.append(
                 {
                     "name": name,

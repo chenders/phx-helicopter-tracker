@@ -48,7 +48,9 @@ class FlightLog(Base):
     fuel_consumed_gallons = Column(Float)
 
     # Data sources
-    data_source = Column(String(50), index=True)  # 'flightradar24', 'flightradar24_historical', 'manual'
+    data_source = Column(
+        String(50), index=True
+    )  # 'flightradar24', 'flightradar24_historical', 'manual'
     raw_data = Column(JSONB)  # Store original tracking data
 
     # Flight pattern analysis

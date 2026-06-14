@@ -14,6 +14,7 @@ from app.db.database import SessionLocal
 from app.models.aircraft import Aircraft
 from datetime import datetime
 
+
 def check_aircraft_summary():
     """Display summary of Phoenix PD helicopter fleet status"""
 
@@ -21,13 +22,15 @@ def check_aircraft_summary():
     try:
         # Get all Phoenix PD helicopters
         result = session.execute(
-            select(Aircraft).where(Aircraft.is_phoenix_pd == True).order_by(Aircraft.registration)
+            select(Aircraft)
+            .where(Aircraft.is_phoenix_pd == True)
+            .order_by(Aircraft.registration)
         )
         aircraft_list = result.scalars().all()
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("PHOENIX PD HELICOPTER FLEET STATUS")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         active_count = 0
         inactive_count = 0
@@ -42,9 +45,11 @@ def check_aircraft_summary():
             print(f"{aircraft.registration}: {status}")
             if aircraft.last_seen:
                 days_ago = (datetime.utcnow() - aircraft.last_seen).days
-                print(f"  Last seen: {aircraft.last_seen.strftime('%Y-%m-%d')} ({days_ago} days ago)")
+                print(
+                    f"  Last seen: {aircraft.last_seen.strftime('%Y-%m-%d')} ({days_ago} days ago)"
+                )
             else:
-                print(f"  Last seen: No recent flight data")
+                print("  Last seen: No recent flight data")
             print()
 
         print("-" * 60)
@@ -58,13 +63,18 @@ def check_aircraft_summary():
         print("\nFlight Activity (Last 30 Days):")
         for aircraft in aircraft_list:
             if aircraft.is_active:
-                flight_count = session.query(FlightLog).filter(
-                    FlightLog.aircraft_id == aircraft.id
-                ).count()
-                print(f"  {aircraft.registration}: {flight_count} flights recorded in database")
+                flight_count = (
+                    session.query(FlightLog)
+                    .filter(FlightLog.aircraft_id == aircraft.id)
+                    .count()
+                )
+                print(
+                    f"  {aircraft.registration}: {flight_count} flights recorded in database"
+                )
 
     finally:
         session.close()
+
 
 if __name__ == "__main__":
     check_aircraft_summary()
