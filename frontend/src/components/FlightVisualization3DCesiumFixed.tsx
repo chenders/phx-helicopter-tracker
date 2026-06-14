@@ -1325,19 +1325,51 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           );
         });
 
-        // Create flight path
-        const flightPath = viewer.entities.add({
-          name: "Flight Path",
-          polyline: {
-            positions: cartesianPositions,
-            width: 4,
-            material: new Cesium.PolylineGlowMaterialProperty({
-              glowPower: 0.2,
-              color: Cesium.Color.RED.withAlpha(0.9),
-            }),
-            clampToGround: false,
-            show: true,
-          },
+        // Split the path into continuous segments, breaking wherever there is a
+        // tracking gap between consecutive positions. Drawing one unbroken line
+        // across a gap would imply a flight path that was never recorded —
+        // misleading for evidence. Normal sampling is ~2-3s (<=16s even on dense
+        // flights); a delta over GAP_THRESHOLD_SECONDS means tracking was lost
+        // (out of range, transponder off, etc.), so the line is broken there.
+        const GAP_THRESHOLD_SECONDS = 30;
+        const pathSegments: any[][] = [];
+        let currentSegment: any[] = [];
+        for (let i = 0; i < displayPositions.length; i++) {
+          if (i > 0) {
+            const prevTs = displayPositions[i - 1].timestamp;
+            const curTs = displayPositions[i].timestamp;
+            const gapSeconds =
+              prevTs && curTs
+                ? (new Date(curTs).getTime() - new Date(prevTs).getTime()) / 1000
+                : 0;
+            if (gapSeconds > GAP_THRESHOLD_SECONDS) {
+              if (currentSegment.length >= 2) pathSegments.push(currentSegment);
+              currentSegment = [];
+            }
+          }
+          currentSegment.push(cartesianPositions[i]);
+        }
+        if (currentSegment.length >= 2) pathSegments.push(currentSegment);
+
+        // One polyline entity per continuous segment; gaps are left visibly
+        // unbridged rather than connected by a fabricated straight line.
+        pathSegments.forEach((segmentPositions, segIdx) => {
+          viewer.entities.add({
+            name:
+              segIdx === 0
+                ? "Flight Path"
+                : `Flight Path (segment ${segIdx + 1})`,
+            polyline: {
+              positions: segmentPositions,
+              width: 4,
+              material: new Cesium.PolylineGlowMaterialProperty({
+                glowPower: 0.2,
+                color: Cesium.Color.RED.withAlpha(0.9),
+              }),
+              clampToGround: false,
+              show: true,
+            },
+          });
         });
 
         // Add start marker
