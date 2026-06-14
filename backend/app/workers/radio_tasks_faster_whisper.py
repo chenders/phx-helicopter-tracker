@@ -52,14 +52,23 @@ PHX_RADIO_PROMPT = (
 # Only dropped when no_speech_prob is also elevated (see segment post-filter), so a
 # genuine short transmission like "Thanks" / "Copy" is never deleted.
 HALLUCINATION_PHRASES = {
-    "you", "thank you", "thanks", "thanks for watching", "thank you for watching",
-    "bye", "bye-bye", "thanks for having me", "thank you for listening",
-    "thank you very much", "please subscribe",
+    "you",
+    "thank you",
+    "thanks",
+    "thanks for watching",
+    "thank you for watching",
+    "bye",
+    "bye-bye",
+    "thanks for having me",
+    "thank you for listening",
+    "thank you very much",
+    "please subscribe",
 }
 
 
-def compute_speech_clips(mp3_path, noise_db=-40, min_silence=0.8,
-                         pad=0.3, merge_gap=0.4, min_len=0.4):
+def compute_speech_clips(
+    mp3_path, noise_db=-40, min_silence=0.8, pad=0.3, merge_gap=0.4, min_len=0.4
+):
     """Detect non-silent regions by dB energy (ffmpeg silencedetect) and return
     (clip_timestamps, duration_seconds). clip_timestamps is a flat list
     [s0, e0, s1, e1, ...] for faster-whisper; empty if the file is effectively silent.
@@ -69,13 +78,34 @@ def compute_speech_clips(mp3_path, noise_db=-40, min_silence=0.8,
     Silero VAD, which scores this 32 kbps audio's real speech as silence and drops it.
     """
     proc = subprocess.run(
-        ["ffmpeg", "-hide_banner", "-i", str(mp3_path), "-af",
-         f"silencedetect=noise={noise_db}dB:d={min_silence}", "-f", "null", "/dev/null"],
-        capture_output=True, text=True)
+        [
+            "ffmpeg",
+            "-hide_banner",
+            "-i",
+            str(mp3_path),
+            "-af",
+            f"silencedetect=noise={noise_db}dB:d={min_silence}",
+            "-f",
+            "null",
+            "/dev/null",
+        ],
+        capture_output=True,
+        text=True,
+    )
     dur_proc = subprocess.run(
-        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-         "-of", "default=noprint_wrappers=1:nokey=1", str(mp3_path)],
-        capture_output=True, text=True)
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(mp3_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
     try:
         duration = float(dur_proc.stdout.strip())
     except ValueError:
@@ -393,7 +423,14 @@ def transcribe_phoenix_pd_archives_faster(
                         language="en",
                         condition_on_previous_text=False,  # CRITICAL - prevents repetition loops
                         beam_size=5,
-                        temperature=(0.0, 0.2, 0.4, 0.6, 0.8, 1.0),  # Fallback strategy breaks loops
+                        temperature=(
+                            0.0,
+                            0.2,
+                            0.4,
+                            0.6,
+                            0.8,
+                            1.0,
+                        ),  # Fallback strategy breaks loops
                         clip_timestamps=clips,  # energy-gated: decode only real transmissions
                         initial_prompt=PHX_RADIO_PROMPT,  # bias toward PHX PD vocab
                         compression_ratio_threshold=2.2,  # 1.35 discarded valid short "10-4. 10-4."
@@ -437,7 +474,9 @@ def transcribe_phoenix_pd_archives_faster(
                             # Confidence provenance for QA / legal defensibility (consumers
                             # ignore unknown fields). Lower no_speech_prob = more speech-like.
                             "no_speech_prob": round(nsp, 4),
-                            "avg_logprob": round(getattr(segment, "avg_logprob", 0.0), 4),
+                            "avg_logprob": round(
+                                getattr(segment, "avg_logprob", 0.0), 4
+                            ),
                         }
                     )
 
@@ -455,7 +494,9 @@ def transcribe_phoenix_pd_archives_faster(
                     "metadata": {
                         "feed_id": PHOENIX_PD_FEED_ID,
                         "feed_name": "Phoenix Police",
-                        "duration": info.duration if info is not None else audio_duration,
+                        "duration": info.duration
+                        if info is not None
+                        else audio_duration,
                         # Feed is always English; language is forced in transcribe() so no
                         # detection ever runs. Hardcode rather than echo info.language.
                         "language": "en",
