@@ -59,3 +59,65 @@ def compute_public_id(
     """Deterministic 16-hex-char public id for a flight."""
     key = canonical_flight_key(registration, departure_time)
     return hashlib.sha256(key.encode("utf-8")).hexdigest()[:PUBLIC_ID_LENGTH]
+
+
+# --- SQL derivation -------------------------------------------------------
+# The DB-side derivation MUST stay byte-identical to compute_public_id above.
+# These DDL strings are the single source of truth, shared by the
+# add_flight_public_id migration (production) and tests/conftest.py (test DB
+# created via Base.metadata.create_all(), which does NOT include triggers), so
+# both environments populate public_id exactly the same way.
+
+# pgcrypto's digest() provides sha256. IMMUTABLE: pure function of inputs (the
+# to_char format is numeric/UTC-only, so locale-independent).
+PUBLIC_ID_FUNCTION_DDL = """
+CREATE OR REPLACE FUNCTION flight_public_id(reg text, dep timestamptz)
+RETURNS text AS $$
+    SELECT substr(
+        encode(
+            digest(
+                coalesce(upper(reg), 'UNKNOWN') || '|' ||
+                coalesce(
+                    to_char(dep AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+                    'UNKNOWN'
+                ),
+                'sha256'
+            ),
+            'hex'
+        ),
+        1, 16
+    )
+$$ LANGUAGE sql IMMUTABLE
+"""
+
+PUBLIC_ID_TRIGGER_FUNCTION_DDL = """
+CREATE OR REPLACE FUNCTION set_flight_public_id() RETURNS trigger AS $$
+BEGIN
+    NEW.public_id := flight_public_id(
+        (SELECT registration FROM aircraft WHERE id = NEW.aircraft_id),
+        NEW.departure_time
+    );
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+"""
+
+PUBLIC_ID_TRIGGER_DDL = """
+CREATE TRIGGER trg_set_flight_public_id
+BEFORE INSERT OR UPDATE OF aircraft_id, departure_time ON flight_logs
+FOR EACH ROW EXECUTE FUNCTION set_flight_public_id()
+"""
+
+
+def install_public_id_sql(connection) -> None:
+    """Install pgcrypto + the public_id function and sync trigger on a
+    Postgres connection. Used by the migration and the test DB setup."""
+    from sqlalchemy import text as _text
+
+    connection.execute(_text("CREATE EXTENSION IF NOT EXISTS pgcrypto"))
+    connection.execute(_text(PUBLIC_ID_FUNCTION_DDL))
+    connection.execute(_text(PUBLIC_ID_TRIGGER_FUNCTION_DDL))
+    connection.execute(
+        _text("DROP TRIGGER IF EXISTS trg_set_flight_public_id ON flight_logs")
+    )
+    connection.execute(_text(PUBLIC_ID_TRIGGER_DDL))
