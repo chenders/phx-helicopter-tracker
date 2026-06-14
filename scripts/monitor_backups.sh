@@ -88,7 +88,7 @@ check_daily_backups() {
     fi
 
     # Verify backup contains data
-    TABLE_COUNT=$(zcat "$LATEST_BACKUP" 2>/dev/null | grep -c "CREATE TABLE" || echo "0")
+    TABLE_COUNT=$(zcat "$LATEST_BACKUP" 2>/dev/null | grep -c "CREATE TABLE" || true)
 
     if [ "$TABLE_COUNT" -lt 5 ]; then
         create_alert "Daily backup appears corrupted - only ${TABLE_COUNT} tables found"
@@ -134,7 +134,7 @@ check_backup_logs() {
 
     # Check main backup log
     if [ -f "${BACKUP_DIR}/backup.log" ]; then
-        RECENT_ERRORS=$(tail -100 "${BACKUP_DIR}/backup.log" | grep -c "ERROR" || echo "0")
+        RECENT_ERRORS=$(tail -100 "${BACKUP_DIR}/backup.log" | grep -c "ERROR" || true)
 
         if [ "$RECENT_ERRORS" -gt 0 ]; then
             log_message "WARNING: Found ${RECENT_ERRORS} errors in recent backup log"
@@ -150,7 +150,7 @@ check_backup_logs() {
 
     # Check hourly backup log
     if [ -f "${BACKUP_DIR}/hourly.log" ]; then
-        RECENT_HOURLY_ERRORS=$(tail -100 "${BACKUP_DIR}/hourly.log" | grep -c "ERROR" || echo "0")
+        RECENT_HOURLY_ERRORS=$(tail -100 "${BACKUP_DIR}/hourly.log" | grep -c "ERROR" || true)
 
         if [ "$RECENT_HOURLY_ERRORS" -gt 0 ]; then
             log_message "WARNING: Found ${RECENT_HOURLY_ERRORS} errors in recent hourly backup log"
