@@ -54,6 +54,11 @@ celery_app.conf.update(
         "app.workers.radio_tasks.*": {"queue": "radio"},
         "app.workers.radio_analysis_tasks.*": {"queue": "analysis"},
         "app.workers.radio_import_tasks.*": {"queue": "data_import"},
+        # radio_import_tasks register custom task names, so the glob above does
+        # not match them — route them explicitly so they stay on data_import
+        # instead of falling through to the default `celery` queue.
+        "import_transcriptions_from_json": {"queue": "data_import"},
+        "batch_import_and_extract": {"queue": "data_import"},
         "app.workers.fr24_scheduler.*": {"queue": "scheduler"},
         # TRANSCRIPTION TASKS - ONLY processed by dedicated GPU workers
         # DO NOT process these on the main server
@@ -228,7 +233,7 @@ celery_app.conf.update(
             "schedule": 1200.0,  # Every 20 minutes
             "kwargs": {
                 "batch_size": 5,  # Process 5 files at a time with faster-whisper
-                "model_name": "base",
+                "model_name": "medium",
             },
             "options": {
                 "time_limit": 7200,  # 2 hour limit
@@ -237,6 +242,12 @@ celery_app.conf.update(
                 "acks_late": False,  # Acknowledge immediately to prevent requeuing
                 "queue": "transcription",  # Route to GPU worker
             },
+        },
+        # Import JSON transcripts into the DB (powers RadioAnalysis + flight-radio correlation)
+        "import-radio-transcriptions-to-db": {
+            "task": "import_transcriptions_from_json",
+            "schedule": 1800.0,  # Every 30 minutes - import new JSON transcripts into DB
+            "kwargs": {"batch_size": 200},
         },
         # REMOVED cleanup-old-radio-archives - we want to keep all radio archives permanently
         # Radio transcription analysis - extract entities and correlate with flights
