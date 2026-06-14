@@ -41,9 +41,9 @@ export const StreetLabelList: React.FC<StreetLabelListProps> = ({ labels, classN
   };
 
   return (
-    <div className={`absolute right-4 top-20 z-30 ${className}`} style={{ maxHeight: 'calc(100vh - 200px)' }}>
+    <div className={`w-64 flex flex-col min-h-0 ${className}`}>
       <div
-        className="bg-black/60 backdrop-blur-sm border border-cyan-400/30 rounded-lg overflow-hidden w-64"
+        className="bg-black/60 backdrop-blur-sm border border-cyan-400/30 rounded-lg overflow-hidden w-64 flex flex-col flex-1 min-h-0"
         style={{
           boxShadow: `0 0 15px rgba(0, 212, 255, 0.2)`,
         }}
@@ -56,7 +56,7 @@ export const StreetLabelList: React.FC<StreetLabelListProps> = ({ labels, classN
         </div>
 
         {/* Content */}
-        <div className="max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-cyan-400/30 scrollbar-track-transparent">
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin scrollbar-thumb-cyan-400/30 scrollbar-track-transparent">
           {/* Areas */}
           {areas.length > 0 && (
             <div className="px-3 py-2">

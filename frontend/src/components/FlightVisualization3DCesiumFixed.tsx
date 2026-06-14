@@ -2930,33 +2930,42 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           </div>
         )}
 
-        {/* 2D Street Label List - Shows nearby streets and areas */}
+        {/* Right-side overlay stack: the locations panel flex-fills the space
+            above the fixed-size minimap, so the two can never overlap at any
+            viewport size without hand-maintained pixel offsets. top-44 keeps the
+            stack clear of the HUD's default position (the HUD is independently
+            draggable; collisions from dragging it here are the user's choice).
+            pointer-events-none on the wrapper + auto on children keeps the gaps
+            click-through to the Cesium canvas for camera dragging. */}
         {!isLoading && positions.length > 0 && (
-          <StreetLabelList labels={nearbyLabels} />
-        )}
+          <div className="absolute right-4 top-44 bottom-4 z-30 flex flex-col items-end gap-3 pointer-events-none">
+            {/* 2D Street Label List - Shows nearby streets and areas */}
+            <StreetLabelList labels={nearbyLabels} className="flex-1 min-h-0 pointer-events-auto" />
 
-        {/* Phoenix Area Minimap - Division-inspired overview map */}
-        {!isLoading && positions.length > 0 && viewerRef.current && (
-          <PhoenixMinimap
-            viewer={viewerRef.current}
-            flightPath={positions.map(p => ({ latitude: p.latitude, longitude: p.longitude }))}
-            currentPosition={positions[Math.floor(sliderPosition / 100 * (positions.length - 1))] ? {
-              latitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].latitude,
-              longitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].longitude,
-            } : undefined}
-            className="absolute bottom-4 right-4 z-[9999]"
-            size={200}
-            onClick={(latitude, longitude) => {
-              // Navigate camera to clicked location
-              if (viewerRef.current && window.Cesium) {
-                const Cesium = window.Cesium;
-                viewerRef.current.camera.flyTo({
-                  destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, 5000),
-                  duration: 1.5,
-                });
-              }
-            }}
-          />
+            {/* Phoenix Area Minimap - Division-inspired overview map */}
+            {viewerRef.current && (
+              <PhoenixMinimap
+                viewer={viewerRef.current}
+                flightPath={positions.map(p => ({ latitude: p.latitude, longitude: p.longitude }))}
+                currentPosition={positions[Math.floor(sliderPosition / 100 * (positions.length - 1))] ? {
+                  latitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].latitude,
+                  longitude: positions[Math.floor(sliderPosition / 100 * (positions.length - 1))].longitude,
+                } : undefined}
+                className="relative flex-shrink-0 pointer-events-auto z-[9999]"
+                size={200}
+                onClick={(latitude, longitude) => {
+                  // Navigate camera to clicked location
+                  if (viewerRef.current && window.Cesium) {
+                    const Cesium = window.Cesium;
+                    viewerRef.current.camera.flyTo({
+                      destination: Cesium.Cartesian3.fromDegrees(longitude, latitude, 5000),
+                      duration: 1.5,
+                    });
+                  }
+                }}
+              />
+            )}
+          </div>
         )}
       </div>
 
