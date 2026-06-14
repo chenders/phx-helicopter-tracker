@@ -83,10 +83,10 @@ def create_flight_log(
     return flight
 
 
-@router.get("/logs/{flight_id}", response_model=FlightLog)
-def get_flight_log(*, db: Session = Depends(get_db), flight_id: int) -> FlightLog:
-    """Get specific flight log by ID"""
-    flight = flight_log_crud.get(db, id=flight_id)
+@router.get("/logs/{public_id}", response_model=FlightLog)
+def get_flight_log(*, db: Session = Depends(get_db), public_id: str) -> FlightLog:
+    """Get a flight log by its stable public_id (the canonical external id)."""
+    flight = flight_log_crud.get_by_public_id(db, public_id=public_id)
     if not flight:
         raise HTTPException(status_code=404, detail="Flight log not found")
     return flight
@@ -428,6 +428,7 @@ def search_flights(
 
         flight_dict = {
             "id": flight.id,
+            "public_id": flight.public_id,
             "aircraft_id": flight.aircraft_id,
             "registration": flight.aircraft_id,  # Assuming aircraft_id is registration
             "callsign": flight.callsign,
@@ -573,18 +574,18 @@ def search_flights(
     return {"flights": results, "total": len(results)}
 
 
-@router.get("/{flight_id}/positions", response_model=List[FlightPosition])
+@router.get("/{public_id}/positions", response_model=List[FlightPosition])
 def get_flight_positions_by_id(
-    *, db: Session = Depends(get_db), flight_id: int
+    *, db: Session = Depends(get_db), public_id: str
 ) -> List[FlightPosition]:
-    """Get all positions for a specific flight"""
-    flight = flight_log_crud.get(db, id=flight_id)
+    """Get all positions for a flight, addressed by its stable public_id."""
+    flight = flight_log_crud.get_by_public_id(db, public_id=public_id)
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
     positions = (
         db.query(FlightPositionModel)
-        .filter(FlightPositionModel.flight_log_id == flight_id)
+        .filter(FlightPositionModel.flight_log_id == flight.id)
         .order_by(FlightPositionModel.timestamp)
         .all()
     )
@@ -592,21 +593,21 @@ def get_flight_positions_by_id(
     return positions
 
 
-@router.get("/{flight_id}/patterns")
+@router.get("/{public_id}/patterns")
 def get_flight_patterns(
-    *, db: Session = Depends(get_db), flight_id: int
+    *, db: Session = Depends(get_db), public_id: str
 ) -> Dict[str, Any]:
-    """Get abnormal patterns detected for a specific flight"""
+    """Get abnormal patterns for a flight, addressed by its stable public_id."""
     from app.models.abnormal_patterns import AbnormalPattern
 
-    flight = flight_log_crud.get(db, id=flight_id)
+    flight = flight_log_crud.get_by_public_id(db, public_id=public_id)
     if not flight:
         raise HTTPException(status_code=404, detail="Flight not found")
 
     # Get all abnormal patterns for this flight
     patterns = (
         db.query(AbnormalPattern)
-        .filter(AbnormalPattern.flight_log_id == flight_id)
+        .filter(AbnormalPattern.flight_log_id == flight.id)
         .all()
     )
 
@@ -641,7 +642,7 @@ def get_flight_patterns(
                         )
 
     return {
-        "flight_id": flight_id,
+        "public_id": public_id,
         "patterns": [
             {
                 "id": pattern.id,

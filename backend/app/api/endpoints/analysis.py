@@ -2010,6 +2010,7 @@ def get_historical_analysis(
         flights_list.append(
             {
                 "id": flight.id,
+                "public_id": flight.public_id,
                 "flight_id": flight.flight_id,
                 "aircraft_registration": aircraft_reg,
                 "departure_time": flight.departure_time.isoformat()

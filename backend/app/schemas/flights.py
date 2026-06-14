@@ -107,6 +107,9 @@ class FlightLog(FlightLogBase):
     """Full flight log schema with database fields"""
 
     id: int
+    public_id: str = Field(
+        ..., description="Stable, rebuild-permanent public identifier"
+    )
     created_at: datetime
     updated_at: Optional[datetime] = None
 

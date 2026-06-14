@@ -629,7 +629,7 @@ export function HistoricalAnalysisPage() {
                       {/* Link to flight detail page */}
                       <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                         <Link
-                          to={`/flight/${flight.id}`}
+                          to={`/flight/${flight.public_id}`}
                           onClick={(e) => e.stopPropagation()}
                           className="flex items-center justify-center gap-1 text-xs px-2 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                         >

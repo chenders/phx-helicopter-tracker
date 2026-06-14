@@ -15,6 +15,12 @@ class CRUDFlightLog(CRUDBase[FlightLog, FlightLogCreate, FlightLogUpdate]):
         """Get flight log by flight ID"""
         return db.query(FlightLog).filter(FlightLog.flight_id == flight_id).first()
 
+    def get_by_public_id(
+        self, db: Session, *, public_id: str
+    ) -> Optional[FlightLog]:
+        """Get flight log by its stable public_id."""
+        return db.query(FlightLog).filter(FlightLog.public_id == public_id).first()
+
     def get_by_aircraft(
         self, db: Session, *, aircraft_id: int, skip: int = 0, limit: int = 100
     ) -> List[FlightLog]:

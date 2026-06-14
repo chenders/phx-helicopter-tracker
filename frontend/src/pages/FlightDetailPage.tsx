@@ -440,15 +440,14 @@ export function FlightDetailPage() {
     try {
       setLoading(true)
 
-      // Load flight details
+      // Everything is addressed by the stable public_id (the route param);
+      // the internal numeric id is never used by the client.
       const flightResponse = await axios.get(`/api/v1/flights/logs/${flightId}`)
       setFlight(flightResponse.data)
 
-      // Load positions
       const positionsResponse = await axios.get(`/api/v1/flights/${flightId}/positions`)
       setPositions(positionsResponse.data)
 
-      // Load abnormal patterns
       const patternsResponse = await axios.get(`/api/v1/flights/${flightId}/patterns`)
       setPatterns(patternsResponse.data)
 

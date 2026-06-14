@@ -6,6 +6,7 @@ import { useNavigate, Link } from 'react-router-dom'
 
 interface FlightResult {
   id: number
+  public_id: string
   aircraft_id: string
   flight_id?: string
   registration: string
@@ -858,7 +859,7 @@ export function FlightSearchPage() {
                               }
                             }
                           }
-                          navigate(`/flight/${flight.id}?${params.toString()}`)
+                          navigate(`/flight/${flight.public_id}?${params.toString()}`)
                         }}
                         className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium flex items-center gap-1"
                       >
