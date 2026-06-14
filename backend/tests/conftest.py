@@ -284,13 +284,15 @@ def mock_websocket():
 @pytest.fixture
 def surveillance_flight(db_session, sample_aircraft):
     """Create a flight with surveillance patterns."""
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
 
     flight = FlightLog(
         aircraft_id=sample_aircraft.id,
         flight_id="SURV_001",
         callsign="Air15",
-        departure_time=datetime.now(timezone.utc),
+        # distinct departure_time from sample_flight_log (same aircraft) so their
+        # derived public_ids don't collide if a test uses both fixtures
+        departure_time=datetime.now(timezone.utc) - timedelta(minutes=30),
         arrival_time=datetime.now(timezone.utc),
         flight_duration_minutes=120.0,
         departure_airport="KDVT",

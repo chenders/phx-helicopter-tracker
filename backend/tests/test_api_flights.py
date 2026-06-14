@@ -27,9 +27,7 @@ class TestFlightAPI:
         # public_id is set by the DB trigger on insert
         assert sample_flight_log.public_id is not None
 
-        response = client.get(
-            f"/api/v1/flights/logs/{sample_flight_log.public_id}"
-        )
+        response = client.get(f"/api/v1/flights/logs/{sample_flight_log.public_id}")
         assert response.status_code == 200
         data = response.json()
         assert data["public_id"] == sample_flight_log.public_id

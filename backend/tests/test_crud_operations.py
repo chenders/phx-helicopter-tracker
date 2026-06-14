@@ -197,7 +197,9 @@ class TestFlightLogCRUD:
             obj_in=FlightLogCreate(
                 aircraft_id=sample_aircraft.id,
                 flight_id="low_surv",
-                departure_time=datetime.now(timezone.utc),
+                # distinct departure_time so public_id differs from high_surv
+                # (public_id is derived from registration + departure_time)
+                departure_time=datetime.now(timezone.utc) - timedelta(hours=1),
                 surveillance_likelihood=0.3,
             ),
         )
