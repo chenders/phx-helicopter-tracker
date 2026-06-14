@@ -9,9 +9,9 @@
 -- RUN AGAINST THE LOCAL/DEV DATABASE ONLY — never production. The DB must be up. Example:
 --   docker compose up -d db
 --   docker compose exec -T db psql -U postgres -d phoenix_helicopters \
---       -v mcp_pw="'REPLACE_WITH_THE_PASSWORD_IN_YOUR_LOCAL_MCP_CONFIG'" \
---       -f - < scripts/setup_mcp_readonly_role.sql
--- (the password value must be wrapped in single quotes inside the double quotes, as shown)
+--       -v mcp_pw="$PW" -f - < scripts/setup_mcp_readonly_role.sql
+-- where $PW is the RAW password from your local MCP config (claude mcp get postgres-readonly).
+-- Pass it raw, NOT pre-quoted — the script uses psql's :'mcp_pw' which quotes it for you.
 --
 -- The matching connection string lives in your LOCAL Claude MCP config (not committed):
 --   postgresql://mcp_readonly:<password>@localhost:5433/phoenix_helicopters
