@@ -143,13 +143,30 @@ This repo collects evidence of police helicopter surveillance for a civil-rights
   Broadcastify, Google). Fixing failing tests and new warnings is always in scope.
 - `docker compose exec backend pytest` (or `pytest` in a 3.12 poetry env).
 
+## Local checks & enforcement
+
+- **`scripts/check.sh`** — one command that runs the gates CI enforces (ruff bug+async, black,
+  bandit, optionally pip-audit/pytest/npm/tsc/vitest). Run before pushing; `--fix` applies safe
+  autofixes. Mirrors CI so best-practice self-check is a single step.
+- **`.pre-commit-config.yaml`** — the ruff bug gate + alembic check run at pre-push. `pre-commit
+  install` once to activate. (CI runs the same gates; for full DRY, a `pre-commit run --all-files`
+  CI job can be the single source of truth for static checks.)
+- **`.editorconfig`** — consistent indent/charset/EOL across editors.
+- **Copilot:** `.github/copilot-instructions.md` (cross-cutting) + path-scoped
+  `.github/instructions/{python,typescript}.instructions.md`; `.github/pull_request_template.md`
+  carries the pre-merge + data-safety checklist.
+
 ## Hooks (local-only)
 
-`.claude/hooks/` and `.claude/settings.json` are gitignored, so hooks live on each machine, not
-in the repo. The pre-push reminder is `.claude/hooks/pre-pr-reviewer-reminder.py`, wired in
-`.claude/settings.json` under `hooks.PreToolUse` (matcher `Bash`); it injects a non-blocking
-reminder when a command contains `git push`. To set it up on a new machine, recreate those two
-files (source in this repo's history / `docs/plans/claude-code-agents.md`).
+`.claude/hooks/` and `.claude/settings.json` are gitignored, so hooks live on each machine, not in
+the repo (recreate them on a new machine — source is in this repo's history). Wired under
+`hooks.PreToolUse` (matcher `Bash`):
+
+- **`data-safety-guard.py`** — **BLOCKS** catastrophic destruction of irreplaceable flight evidence
+  (`docker compose down -v`, volume `rm`/`prune`, `DROP`/`TRUNCATE`/`dropdb`, `rm -rf` of data/
+  backups). Enforces the CLAUDE.md data-safety rule mechanically; a human can still run such a
+  command directly in a terminal after backing up.
+- **`pre-pr-reviewer-reminder.py`** — non-blocking reminder to run `/pre-pr-review` at `git push`.
 
 ## What we deliberately did NOT add (and why)
 

@@ -20,9 +20,12 @@ service-wrapper usage — update `CLAUDE.md`, `AGENTS.md`, **and** this file, pl
 reviewer agents (`.claude/agents/*-pre-pr-reviewer.md`) that encode the same checklist. A
 rule in one but not the others is a bug; flag it.
 
-(If language-specific volume grows, split into path-scoped
-`.github/instructions/*.instructions.md` files — e.g. `python` for `backend/**/*.py`,
-`typescript` for `frontend/**`. Not split yet.)
+Language-specific rules live in path-scoped files Copilot activates only for matching changes:
+- `.github/instructions/python.instructions.md` — `applyTo: "backend/**/*.py"`
+- `.github/instructions/typescript.instructions.md` — `applyTo: "frontend/**"`
+
+Cross-cutting rules stay here; language rules go in the path-scoped file whose glob covers them.
+Keep these in sync with `CLAUDE.md`, `AGENTS.md`, and the reviewer agents.
 
 ## Review Priorities
 
