@@ -142,7 +142,8 @@ if targets:
                 "text": full_text, "segments": kept,
                 "metadata": {"feed_id": FEED_ID, "feed_name": "Phoenix Police",
                              "duration": info.duration if info is not None else audio_duration,
-                             "language": "en", "language_probability": 1.0},  # always English; forced in transcribe()
+                             "language": "en", "language_probability": 1.0,  # always English; forced in transcribe()
+                             "silent": len(kept) == 0},  # no transmissions (e.g. silent feed dropout)
             }
             with open(mp3_file.with_suffix(".json"), "w") as f:
                 json.dump(data, f, indent=2)

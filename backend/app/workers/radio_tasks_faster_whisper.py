@@ -460,6 +460,9 @@ def transcribe_phoenix_pd_archives_faster(
                         # detection ever runs. Hardcode rather than echo info.language.
                         "language": "en",
                         "language_probability": 1.0,
+                        # True when the archive yielded no transmissions (e.g. -91 dB
+                        # silent feed dropout) so consumers can show a clear placeholder.
+                        "silent": len(kept_segments) == 0,
                     },
                 }
 

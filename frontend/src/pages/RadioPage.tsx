@@ -963,9 +963,13 @@ export function RadioPage() {
                                         </div>
                                       )
                                     })
-                                  ) : (
+                                  ) : transcription.text ? (
                                     <div className={`text-sm text-gray-300 ${wordWrapEnabled ? 'break-words whitespace-pre-wrap' : 'whitespace-pre overflow-x-auto'}`}>
                                       {transcription.text}
+                                    </div>
+                                  ) : (
+                                    <div className="text-sm text-gray-500 italic py-2">
+                                      No radio transmissions detected — silent archive (feed dropout).
                                     </div>
                                   )}
                                 </div>
@@ -1184,9 +1188,13 @@ export function RadioPage() {
                                           </div>
                                         )
                                       })
-                                    ) : (
+                                    ) : transcription.text ? (
                                       <div className={`text-xs text-gray-300 ${wordWrapEnabled ? 'break-words' : 'whitespace-pre-wrap'}`}>
                                         {transcription.text}
+                                      </div>
+                                    ) : (
+                                      <div className="text-xs text-gray-500 italic py-2">
+                                        No radio transmissions detected — silent archive (feed dropout).
                                       </div>
                                     )}
                                   </div>
