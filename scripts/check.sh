@@ -19,13 +19,25 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$ROOT"
 
 RUN_TESTS=0 RUN_AUDIT=0 DO_FIX=0 ONLY=""
 JOBS="$( (nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4) | tr -d ' ' )"
-for a in "$@"; do case "$a" in
-  --tests) RUN_TESTS=1 ;; --audit) RUN_AUDIT=1 ;; --fix) DO_FIX=1 ;;
-  --backend) ONLY=backend ;; --frontend) ONLY=frontend ;;
-  --jobs=*) JOBS="${a#*=}" ;; --jobs) ;; # value handled below
-  -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
-  *) [ "${PREV:-}" = "--jobs" ] && JOBS="$a" || { echo "unknown arg: $a"; exit 2; } ;;
-esac; PREV="$a"; done
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --tests) RUN_TESTS=1 ;;
+    --audit) RUN_AUDIT=1 ;;
+    --fix) DO_FIX=1 ;;
+    --backend) ONLY=backend ;;
+    --frontend) ONLY=frontend ;;
+    --jobs) shift; JOBS="${1:-}" ;;       # value is the next token (empty if missing)
+    --jobs=*) JOBS="${1#*=}" ;;
+    -h|--help) grep -E '^#( |$)' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;  # print only the doc-comment, no code
+    *) echo "error: unknown arg: $1" >&2; exit 2 ;;
+  esac
+  shift
+done
+# Reject a missing / non-numeric --jobs instead of silently disabling the throttle.
+case "$JOBS" in
+  ''|*[!0-9]*) echo "error: --jobs needs a positive integer (got: '${JOBS}')" >&2; exit 2 ;;
+esac
+[ "$JOBS" -lt 1 ] && { echo "error: --jobs must be >= 1" >&2; exit 2; }
 GH="${GITHUB_ACTIONS:-}"
 
 c_ok=$'\033[32m'; c_bad=$'\033[31m'; c_warn=$'\033[33m'; c_b=$'\033[1m'; c_z=$'\033[0m'

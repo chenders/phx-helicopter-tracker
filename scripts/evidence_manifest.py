@@ -32,7 +32,7 @@ import sys
 from pathlib import Path
 
 CHUNK = 1 << 20  # 1 MiB
-MANIFEST_VERSION = 1
+MANIFEST_VERSION = 2
 DEFAULT_MANIFEST_NAME = "MANIFEST.json"
 
 
@@ -59,17 +59,29 @@ def _git_commit() -> str | None:
         return None
 
 
-def _iter_files(root: Path, manifest_name: str):
+def _iter_files(root: Path, skip_abspath: Path | None = None):
     """Yield every regular file under root, sorted for deterministic manifests.
 
-    Skips the manifest file itself so a manifest can live inside the dir it describes.
+    Skips EXACTLY ONE file — the manifest itself, identified by its resolved absolute path
+    (`skip_abspath`), NOT by basename. Skipping by basename would let any other file that
+    merely shares the manifest's name (e.g. a nested `MANIFEST.json` that is itself evidence)
+    go un-hashed, so tampering with it would falsely report INTACT. Broken symlinks are
+    skipped with a warning rather than silently dropped (an evidence file must not vanish
+    unnoticed).
     """
     if root.is_file():
         yield root
         return
+    skip = skip_abspath.resolve() if skip_abspath is not None else None
     for p in sorted(root.rglob("*")):
-        if p.is_file() and p.name != manifest_name:
-            yield p
+        if p.is_symlink() and not p.exists():
+            print(f"warning: skipping broken symlink {p}", file=sys.stderr)
+            continue
+        if not p.is_file():
+            continue
+        if skip is not None and p.resolve() == skip:
+            continue
+        yield p
 
 
 def _file_record(path: Path, base: Path) -> dict:
@@ -89,9 +101,21 @@ def generate(target: Path, out: Path | None) -> int:
         print(f"error: {target} does not exist", file=sys.stderr)
         return 2
     base = target if target.is_dir() else target.parent
-    manifest_name = out.name if out else DEFAULT_MANIFEST_NAME
 
-    files = [_file_record(p, base) for p in _iter_files(target, manifest_name)]
+    # If the manifest will live INSIDE the tree it describes, record its path (relative to
+    # base) so `verify` can skip exactly that file regardless of what the manifest is later
+    # named or where the verifier reads it from. If it lives outside (or stdout), nothing in
+    # the tree is the manifest, so nothing is skipped.
+    manifest_self: str | None = None
+    skip_abspath: Path | None = None
+    if out is not None:
+        skip_abspath = out.resolve()
+        try:
+            manifest_self = str(skip_abspath.relative_to(base.resolve()))
+        except ValueError:
+            manifest_self = None  # manifest stored outside the evidence tree
+
+    files = [_file_record(p, base) for p in _iter_files(target, skip_abspath)]
     manifest = {
         "manifest_version": MANIFEST_VERSION,
         "generated_utc": _utc_now_iso(),
@@ -99,6 +123,7 @@ def generate(target: Path, out: Path | None) -> int:
         "host": socket.gethostname(),
         "git_commit": _git_commit(),
         "root": str(target),
+        "manifest_self": manifest_self,  # rel-path of THIS manifest within the tree, or null
         "file_count": len(files),
         "total_bytes": sum(f["size_bytes"] for f in files),
         "hash_algorithm": "sha256",
@@ -125,14 +150,20 @@ def verify(target: Path, manifest_path: Path) -> int:
         return 2
     manifest = json.loads(manifest_path.read_text())
     base = target if target.is_dir() else target.parent
-    recorded = {f["path"]: f for f in manifest.get("files", [])}
 
+    # Skip exactly the file that was the manifest at generate time (by its recorded in-tree
+    # path), independent of what `-m` is named or where it's stored. Falls back to None for
+    # a manifest generated outside the tree / to stdout.
+    manifest_self = manifest.get("manifest_self")
+    skip_abspath = (base / manifest_self).resolve() if manifest_self else None
+
+    recorded = {f["path"]: f for f in manifest.get("files", [])}
     current_paths = {
         str(p.relative_to(base))
-        for p in _iter_files(target, manifest_path.name)
+        for p in _iter_files(target, skip_abspath)
     }
 
-    changed, missing, added = [], [], []
+    changed, missing = [], []
     for rel, rec in recorded.items():
         fp = base / rel
         if not fp.exists():
