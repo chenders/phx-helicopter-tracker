@@ -21,8 +21,14 @@ recurring bug categories before they reach `frontend-ci`/`backend-ci` or Copilot
    - Backend Python / Celery / Alembic / docker-compose changes → dispatch
      **`backend-pre-pr-reviewer`**.
    - `frontend/**` changes → dispatch **`frontend-pre-pr-reviewer`**.
-   - Both → dispatch **both in parallel** (single message, two `Task` calls).
-   - Docs/config only → say so; a full review isn't needed.
+   - Claude/Copilot config — `.claude/agents/**`, `.claude/commands/**`, `CLAUDE.md`, `AGENTS.md`,
+     `.github/copilot-instructions.md`, `.github/instructions/**`,
+     `docs/plans/claude-code-agents.md` → dispatch **`claude-config-reviewer`**.
+   - Standalone scripts (`scripts/**`) with real logic, not covered by the above → dispatch
+     **`bug-hunter`** scoped to those files.
+   - Multiple buckets → dispatch the relevant agents **in parallel** (single message, multiple
+     `Task` calls).
+   - Pure docs/prose with no config or code → say so; a full review isn't needed.
 
 3. **Dispatch** the relevant agent(s) via the `Task` tool with the resolved range in the
    prompt, e.g.:

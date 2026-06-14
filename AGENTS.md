@@ -45,6 +45,7 @@ A local `PreToolUse` hook surfaces a non-blocking reminder at push time (see Hoo
 | `fr24-api-cost-expert` | sonnet | FR24 services/workers/schedulers, ingestion strategy | Credit-cost estimate, rate-limit (30/min) compliance, wrapper discipline, redundant-call/budget waste |
 | `fr24-api-capabilities-expert` | sonnet | FR24 data-acquisition questions; missing/gov-filtered data | What FR24 can retrieve & how; alternative sources (ADS-B Exchange, FAA, public records) when it can't |
 | `bug-hunter` | opus | on demand / `--deep` | Adversarial tool-augmented bug hunt; weights evidence/data-integrity defects highest |
+| `claude-config-reviewer` | sonnet | `.claude/**`, instruction files, `CLAUDE.md`/`AGENTS.md` | Config quality: frontmatter, roster/sync drift, dangling references, contradictions |
 
 Also available from installed plugins (situational): `pr-review-toolkit:silent-failure-hunter`,
 `pr-review-toolkit:pr-test-analyzer`, `pr-review-toolkit:type-design-analyzer`,
