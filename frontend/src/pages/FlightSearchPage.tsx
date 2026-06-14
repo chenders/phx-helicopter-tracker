@@ -419,7 +419,7 @@ export function FlightSearchPage() {
 
   const fetchFlightDetails = async (flight: FlightResult) => {
     try {
-      const response = await axios.get(`/api/v1/flights/${flight.id}/positions`)
+      const response = await axios.get(`/api/v1/flights/${flight.public_id}/positions`)
       if (response.data) {
         const path = response.data.map((pos: any) => ({
           lat: pos.latitude,
@@ -714,9 +714,9 @@ export function FlightSearchPage() {
                                   {flight.grouped_count}
                                 </span>
                               )}
-                              {flight.id && (
-                                <span className="text-xs text-gray-500 dark:text-gray-500">
-                                  #{flight.id}
+                              {flight.public_id && (
+                                <span className="text-xs text-gray-500 dark:text-gray-500 font-mono">
+                                  {flight.public_id}
                                 </span>
                               )}
                               {flight.has_data_quality_issue && (

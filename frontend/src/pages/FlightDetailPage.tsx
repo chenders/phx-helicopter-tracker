@@ -21,6 +21,7 @@ import { FlightDetailHeader } from '../components/FlightDetailHeader'
 
 interface FlightDetails {
   id: number
+  public_id: string
   aircraft_id: string
   flight_id: string
   callsign: string
@@ -857,7 +858,7 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
 
         {/* Compact Flight Header Component */}
         <FlightDetailHeader
-          flightId={flight.flight_id || `#${flight.id}`}
+          flightId={flight.flight_id || flight.public_id}
           aircraft={flight.aircraft_id}
           callsign={flight.callsign || 'No Callsign'}
           departureTime={flight.departure_time}
