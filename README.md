@@ -71,6 +71,24 @@ docker exec phx-helicopter-tracker-backend-1 alembic upgrade head
 docker compose logs -f
 ```
 
+### Deploying updates
+
+`docker compose restart` does **not** rebuild images, so after a `git pull` it serves stale
+code in production mode (the frontend `dist/` is baked into the image at build time). Use the
+deploy script, which pulls and then rebuilds only what changed (Docker layer cache decides —
+a real rebuild when source changed, a no-op when it didn't):
+
+```bash
+./scripts/deploy.sh              # pull + rebuild/restart all services
+./scripts/deploy.sh frontend     # just the frontend
+```
+
+On a prod host, point Compose at the prod overlay once via the standard env var:
+
+```bash
+export COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
+```
+
 ### Access Points
 
 - 🌐 **Frontend Application**: http://localhost:3000 (development)
