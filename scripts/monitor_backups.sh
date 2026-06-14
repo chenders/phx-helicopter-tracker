@@ -15,6 +15,14 @@ MAX_AGE_HOURS=26  # Daily backups should be less than 26 hours old
 MAX_HOURLY_AGE_MINUTES=70  # Hourly backups should be less than 70 minutes old
 MIN_BACKUP_SIZE_KB=100  # Minimum size for a valid backup (100KB)
 
+# New Relic alerting via the local nri-statsd agent (udp/8125 -> NR account 2198636).
+# Best-effort: metric emission must never affect the monitor's own outcome.
+STATSD_HOST="${STATSD_HOST:-localhost}"
+STATSD_PORT="${STATSD_PORT:-8125}"
+nr_metric() {
+    command -v nc >/dev/null 2>&1 && printf '%s' "$1" | nc -u -w1 "$STATSD_HOST" "$STATSD_PORT" 2>/dev/null || true
+}
+
 # Colors for terminal output
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
@@ -185,9 +193,16 @@ main() {
     if [ $STATUS -eq 0 ]; then
         echo -e "${GREEN}✓ All backup checks passed${NC}"
         log_message "Monitoring check completed successfully"
+        # Report healthy to New Relic (gauge reported every run enables
+        # both value-based and loss-of-signal alerting).
+        nr_metric "phx_helicopter.backup.ok:1|g"
     else
         echo -e "${RED}✗ Backup issues detected - check $ALERT_FILE${NC}"
         log_message "Monitoring check completed with issues"
+        # Report failure to New Relic: gauge -> 0 (current health) + a failure
+        # counter (explicit event). The human-readable reason is in BACKUP_ALERT.txt.
+        nr_metric "phx_helicopter.backup.ok:0|g"
+        nr_metric "phx_helicopter.backup.failure:1|c"
 
         # Display alert file if it exists
         if [ -f "$ALERT_FILE" ]; then
