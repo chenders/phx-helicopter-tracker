@@ -182,12 +182,13 @@ dict keys (F601), and sync/async mismatches (ASYNC, e.g. blocking `open`/`sleep`
 
 | Workflow | Trigger | Purpose |
 |----------|---------|---------|
-| `backend-ci.yml` | push/PR to `main`/`dev`, paths `backend/**` | `lint-and-format` (black/ruff) · `test` (pytest) · `type-check` |
-| `frontend-ci.yml` | push/PR to `main`/`dev`, paths `frontend/**` | ESLint + TypeScript type-check |
-| `lint.yml` | push to `main`/`dev`/`develop`, all PRs | Ruff bug + async gate (`F,ASYNC`) |
+| `backend-ci.yml` | push/PR to `main`/`dev`, paths `backend/**`, `scripts/check.sh` | **One job, one setup** → `scripts/check.sh --backend --tests --audit` (parallel: ruff + black + pytest block; mypy + bandit + pip-audit advisory) |
+| `frontend-ci.yml` | push/PR to `main`/`dev`, paths `frontend/**`, `scripts/check.sh` | **One job, one `npm ci`** → `scripts/check.sh --frontend --tests --audit` (parallel: eslint + tsc block; vitest + npm-audit advisory) + production build |
+| `lint.yml` | push to `main`/`dev`/`develop`, all PRs | Ruff bug + async gate (`F,ASYNC`) — cheap universal gate |
 | `schema-check.yml` | PR touching `backend/app/models/**` or `backend/alembic/versions/**`; push to `main`/`dev` | `alembic check` — models vs migrations |
 
-All gates must be green before merge.
+All gates must be green before merge. CI and local dev share one definition via `scripts/check.sh`
+(see AGENTS.md) — one setup per environment, checks run in parallel, no per-check setup tax.
 
 ## Common Pitfalls
 
