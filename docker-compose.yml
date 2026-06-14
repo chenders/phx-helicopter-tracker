@@ -98,9 +98,10 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    # IMPORTANT: Including transcription queue for CPU-based processing (slower than GPU)
-    # For GPU acceleration, deploy separate transcription-worker on GPU-enabled machine
-    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 --queues=celery,tracking,analysis,legal,data_import,radio,scheduler,transcription
+    # NOTE: transcription is handled by the GPU worker on the separate transcription-worker
+    # box (faster-whisper on CUDA). This worker does NOT consume the `transcription` queue —
+    # faster-whisper is not installed in this image, so it would fail every transcribe task.
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2 --queues=celery,tracking,analysis,legal,data_import,radio,scheduler
 
   celery-beat:
     build:
