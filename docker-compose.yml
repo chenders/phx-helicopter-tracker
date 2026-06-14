@@ -9,8 +9,10 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      # CRITICAL: This must match where PostgreSQL actually stores data
-      - postgres_data:/var/lib/postgresql/data
+      # CRITICAL: timescaledb-ha stores its cluster at /home/postgres/pgdata
+      # (NOT /var/lib/postgresql/data). Mounting the wrong path means data lives
+      # in the container's ephemeral layer and is lost on every recreate.
+      - tsdb_data:/home/postgres/pgdata
       # Mount backups directory for easy access
       - ./backups:/backups:ro
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -191,6 +193,8 @@ services:
     restart: unless-stopped
 
 volumes:
+  tsdb_data:
+  # Retained (orphaned) — old mis-mounted volume kept as a fallback, do not delete.
   postgres_data:
   redis_data:
 
