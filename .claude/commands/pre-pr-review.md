@@ -22,7 +22,7 @@ recurring bug categories before they reach `frontend-ci`/`backend-ci` or Copilot
      **`backend-pre-pr-reviewer`**.
    - `frontend/**` changes → dispatch **`frontend-pre-pr-reviewer`**.
    - Claude/Copilot config — `.claude/agents/**`, `.claude/commands/**`, `CLAUDE.md`, `AGENTS.md`,
-     `.github/copilot-instructions.md`, `.github/instructions/**`,
+     `.github/copilot-instructions.md`, `.github/instructions/**`, `.github/skills/**`,
      `docs/plans/claude-code-agents.md` → dispatch **`claude-config-reviewer`**.
    - Standalone scripts (`scripts/**`) with real logic, not covered by the above → dispatch
      **`bug-hunter`** scoped to those files.

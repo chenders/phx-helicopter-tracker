@@ -117,7 +117,7 @@ local dev DB and stays "Failed to connect" until you create the role:
 docker compose up -d db
 # password = the one in your local MCP config (claude mcp get postgres-readonly)
 docker compose exec -T db psql -U postgres -d phoenix_helicopters \
-  -v mcp_pw="'<that-password>'" -f - < scripts/setup_mcp_readonly_role.sql
+  -v mcp_pw="<that-password>" -f - < scripts/setup_mcp_readonly_role.sql
 ```
 
 Only ever point it at a **local/dev** database, never production. To inspect/remove:
@@ -172,7 +172,7 @@ the repo (recreate them on a new machine — source is in this repo's history). 
 ## What we deliberately did NOT add (and why)
 
 - **Anthropic reference `server-postgres` MCP** — archived after a SQL-injection that bypassed
-  its own read-only mode. Avoid. (We use `crystaldba/postgres-mcp` instead — see Postgres MCP below.)
+  its own read-only mode. Avoid. (We use `crystaldba/postgres-mcp` instead — see Postgres MCP above.)
 - **`mcp-language-server`** — redundant with `serena` (already available).
 - **vulture / sqlfluff / safety / radon** — low value or redundant for this stack (see calibration doc).
 - **Multi-persona security-audit fleet** (the va-mobile-apps-analysis model) — overkill for a

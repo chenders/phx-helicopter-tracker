@@ -51,8 +51,8 @@ evidence** — including in the UI.
 - Only raise **high-confidence** issues; prefer silence over noise. State fixes as fixes, not
   "consider".
 - For deeper, project-specific checks, the same rules are enumerated in
-  `.github/instructions/python.instructions.md` (backend) and `typescript.instructions.md`
-  (frontend/UI). The repo's local reviewer agents (`.claude/agents/`) and `scripts/check.sh`
+  `.github/instructions/python.instructions.md` (backend) and
+  `.github/instructions/typescript.instructions.md` (frontend/UI). The repo's local reviewer agents (`.claude/agents/`) and `scripts/check.sh`
   encode the same checklist for developers.
 
 ## Do not flag

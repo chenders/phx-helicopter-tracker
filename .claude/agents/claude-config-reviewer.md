@@ -15,7 +15,7 @@ keep them valid, consistent, and honest. You review the configuration, not appli
 ## Scope (what you check)
 
 `git diff dev...HEAD` filtered to: `.claude/agents/**`, `.claude/commands/**`, `CLAUDE.md`,
-`AGENTS.md`, `.github/copilot-instructions.md`, `.github/instructions/**`,
+`AGENTS.md`, `.github/copilot-instructions.md`, `.github/instructions/**`, `.github/skills/**`,
 `docs/plans/claude-code-agents.md`. If none changed, say so and stop.
 
 ## What to flag

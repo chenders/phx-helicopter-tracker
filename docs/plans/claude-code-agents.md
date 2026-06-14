@@ -20,6 +20,14 @@ pipeline over many targets, overkill for a normal dev loop).
 | `scripts/evidence_manifest.py` | Script | committed | Chain-of-custody SHA-256 manifest for evidence exports |
 | `.python-version` | Pin | committed | Forces Python 3.12.3 (pyenv/uv/IDEs) — see below |
 | `backend/pyproject.toml` (+lock) | Dev deps | committed | Adds `bandit`, `pip-audit` |
+| `.claude/agents/*` (16 more) | Agents | force-added | Technical-review (`hud-ux-reviewer`, `db-migration-reviewer`, `fr24-api-cost-expert`, `fr24-api-capabilities-expert`, `claude-config-reviewer`), `project-expert`, + 10 domain/case personas — **the AGENTS.md roster is the canonical, complete list** |
+| `.claude/commands/*` (6 more) | Slash commands | force-added | `tech-review`, `case-review`, `evidence-review`, `ui-ux-review`, `design-review`, `3d-view-review` |
+| `.claude/hooks/data-safety-guard.py` | PreToolUse hook | **local only** | BLOCKS destructive DB/data commands (`down -v`, volume rm/prune, `DROP`/`TRUNCATE`, `rm -rf` of data/backups) |
+| `scripts/check.sh` | Script | committed | One-command parallel quality gate (local + CI, single source of truth) |
+| `scripts/setup_mcp_readonly_role.sql` | Script | committed | Creates the read-only Postgres role for the MCP |
+| `.editorconfig` | Config | committed | Consistent indent/charset/EOL across editors |
+| `.github/copilot-instructions.md` + `instructions/*` + `skills/code-review/SKILL.md` | Copilot config | committed | Make Copilot's own PR review project-aware |
+| `.github/pull_request_template.md` | Template | committed | Pre-merge + data-safety checklist |
 
 **Gitignore note:** all of `.claude/` is gitignored in this repo (`.gitignore` line `.claude`).
 Shareable tooling (agents, commands) is committed with `git add -f`, following the existing
@@ -85,10 +93,11 @@ Cheapest win available: drop `|| true` on a scoped path (`app/services app/api`)
 errors are triaged. (Deferred — tightening could turn CI red on pre-existing issues; do it in a
 focused PR.)
 
-**Trial / not installed** (high value, need noise-tuning before becoming gates; the bug-hunter
-uses them *if present*): **semgrep** (Semgrep Inc, LGPL engine; registry rules now restricted-
-license but fine for internal CI; pairs with the `semgrep-rule-creator` skill), **pyright**
-(Microsoft, MIT; alternative to mypy — pick one, don't stack).
+**Installed locally (pipx), trial as gates** (high value, need noise-tuning before becoming
+blocking CI gates; the bug-hunter uses them *if present*): **semgrep** (Semgrep Inc, LGPL engine;
+registry rules now restricted-license but fine for internal CI; pairs with the
+`semgrep-rule-creator` skill) and **pyright** (Microsoft, MIT; alternative to mypy — pick one,
+don't stack) are both installed via pipx (`~/.local/bin`) but are NOT wired into CI as gates yet.
 
 **Needs human sign-off:** **`crystaldba/postgres-mcp`** — genuinely useful for catching
 missing-index / bad-plan / N+1 bugs in the TimescaleDB/PostGIS queries, but it executes SQL.
