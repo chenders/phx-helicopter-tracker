@@ -17,7 +17,7 @@ in **[`docs/lawsuit-research.md`](docs/lawsuit-research.md)** — read that for 
 ## Tech Stack
 
 - **Backend**: FastAPI (Python 3.12), SQLAlchemy, Alembic, Celery + Redis
-- **Database**: PostgreSQL 15 with TimescaleDB + PostGIS (`timescale/timescaledb-ha:pg15`)
+- **Database**: PostgreSQL 15 with TimescaleDB + PostGIS (`timescale/timescaledb-ha:pg15-ts2.14-all`)
 - **Frontend**: React 18 + TypeScript, Vite, Tailwind CSS, React Query, React Router
 - **Infra**: Docker Compose; Nginx reverse proxy; Flower for Celery monitoring
 - **External services**: FlightRadar24 API, Broadcastify, Google Maps/Tiles, faster-whisper (GPU transcription)
@@ -33,7 +33,7 @@ in **[`docs/lawsuit-research.md`](docs/lawsuit-research.md)** — read that for 
 ## Important System Information
 
 ### Database
-- **Name**: `phoenix_helicopters` · **User**: `postgres` · **Image**: `timescale/timescaledb-ha:pg15` (TimescaleDB + PostGIS)
+- **Name**: `phoenix_helicopters` · **User**: `postgres` · **Image**: `timescale/timescaledb-ha:pg15-ts2.14-all` (TimescaleDB + PostGIS)
 - **psql access**: `docker compose exec db psql -U postgres phoenix_helicopters`
 - **Model locations**: models `backend/app/models/`, session `backend/app/db/database.py`,
   migrations `backend/alembic/versions/`, config `backend/alembic.ini`
@@ -82,7 +82,7 @@ docker compose exec backend alembic current         # current version
 ```
 External services
 ├── FlightRadar24 → flightradar24_api_service.py  (USE THIS — never direct HTTP; rate-limited + credit-managed)
-├── Broadcastify  → radio_service.py / radio_tasks.py
+├── Broadcastify  → radio_tasks.py (+ _alternative/_faster_whisper variants; no dedicated wrapper)
 ├── Google Maps   → direct calls OK (no rate limit)
 └── Database      → SQLAlchemy models only, never raw SQL
 
@@ -153,8 +153,9 @@ docker compose build --no-cache
 
 **Backend** (`backend/app/`): `main.py` (FastAPI entry + CORS), `core/config.py`
 (pydantic-settings), `db/database.py` (SQLAlchemy session), `api/` (routers),
-`models/` (ORM), `schemas/` (Pydantic), `services/` (business logic / external
-wrappers), `workers/` (Celery tasks + `celery_app.py`).
+`models/` (ORM), `schemas/` (Pydantic), `crud/` (DB operations — keep DB access here,
+not in routers/services), `services/` (business logic / external wrappers), `workers/`
+(Celery tasks + `celery_app.py`).
 
 **Frontend** (`frontend/src/`): `main.tsx` (React Query + Router providers),
 `App.tsx` (routing), `components/`, `pages/`, `hooks/`, `types/`, `utils/`.
