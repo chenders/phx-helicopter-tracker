@@ -19,6 +19,12 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
+# openai-whisper==20231117's legacy setup.py imports pkg_resources, which newer
+# setuptools no longer provides inside PEP 517 build isolation. Constrain setuptools
+# for build environments so its sdist wheel builds. Applies to every pip step below.
+RUN echo "setuptools<70" > /etc/pip-build-constraints.txt
+ENV PIP_CONSTRAINT=/etc/pip-build-constraints.txt
+
 # Copy requirements file
 COPY requirements.txt .
 
