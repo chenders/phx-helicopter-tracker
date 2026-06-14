@@ -935,13 +935,13 @@ export const FlightVisualization3DCesiumFixed: React.FC<
           };
         });
 
-        const timeStepInSeconds = 5;
-        const totalSeconds = timeStepInSeconds * (flightData.length - 1);
+        // Build the clock from the REAL recorded timestamps. Previously every
+        // sample was forced 5s apart (timeStepInSeconds), which fabricated a
+        // uniform timeline and hid the true gaps between recorded positions —
+        // misleading for evidence. start/stop now span the actual flight.
         const start = Cesium.JulianDate.fromIso8601(flightData[0].timestamp);
-        const stop = Cesium.JulianDate.addSeconds(
-          start,
-          totalSeconds,
-          new Cesium.JulianDate(),
+        const stop = Cesium.JulianDate.fromIso8601(
+          flightData[flightData.length - 1].timestamp,
         );
         viewer.clock.startTime = start.clone();
         viewer.clock.stopTime = stop.clone();
@@ -957,15 +957,24 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         const positionProperty = new Cesium.SampledPositionProperty();
         const orientationProperty = new Cesium.SampledProperty(Cesium.Quaternion);
 
+        // Cesium sampled properties require strictly increasing sample times.
+        let lastSampleTime: any = null;
+
         for (let i = 0; i < flightData.length; i++) {
           const dataPoint = flightData[i];
 
-          // Declare the time for this individual sample and store it in a new JulianDate instance.
-          const time = Cesium.JulianDate.addSeconds(
-            start,
-            i * timeStepInSeconds,
-            new Cesium.JulianDate(),
-          );
+          // Use this position's REAL recorded timestamp. Skip any missing,
+          // duplicate, or out-of-order timestamps so the series stays strictly
+          // increasing (and honest about the real spacing between positions).
+          if (!dataPoint.timestamp) continue;
+          const time = Cesium.JulianDate.fromIso8601(dataPoint.timestamp);
+          if (
+            lastSampleTime &&
+            Cesium.JulianDate.lessThanOrEquals(time, lastSampleTime)
+          ) {
+            continue;
+          }
+          lastSampleTime = time;
           // Convert altitude from feet to meters (Cesium uses meters)
           const position = Cesium.Cartesian3.fromDegrees(
             dataPoint.longitude,
