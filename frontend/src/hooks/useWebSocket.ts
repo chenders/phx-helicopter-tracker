@@ -10,8 +10,11 @@ interface WebSocketHook {
 export function useWebSocket(): WebSocketHook {
   const [lastMessage, setLastMessage] = useState<any>(null)
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected')
+  // Exposed in the return value as reactive state so consumers reading `socket`
+  // see the current instance (a ref would always read null at render time).
+  const [socket, setSocket] = useState<WebSocket | null>(null)
 
-  // The live socket lives in a ref so the effect cleanup always closes the
+  // The live socket also lives in a ref so the effect cleanup always closes the
   // CURRENT socket. (Previously the socket was only in state, and the []-deps
   // cleanup closed over the initial `null`, so the socket was never closed on
   // unmount — and each reconnect spawned another orphaned socket.)
@@ -45,6 +48,7 @@ export function useWebSocket(): WebSocketHook {
 
       const ws = new WebSocket(wsUrl)
       socketRef.current = ws
+      setSocket(ws)
       setConnectionStatus('connecting')
 
       ws.onopen = () => {
@@ -99,6 +103,7 @@ export function useWebSocket(): WebSocketHook {
         ws.onmessage = null
         ws.close()
         socketRef.current = null
+        setSocket(null)
       }
     }
   }, [])
@@ -111,7 +116,7 @@ export function useWebSocket(): WebSocketHook {
   }
 
   return {
-    socket: socketRef.current,
+    socket,
     lastMessage,
     connectionStatus,
     sendMessage

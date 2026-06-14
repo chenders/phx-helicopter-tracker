@@ -944,10 +944,21 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         // sample was forced 5s apart (timeStepInSeconds), which fabricated a
         // uniform timeline and hid the true gaps between recorded positions —
         // misleading for evidence. start/stop now span the actual flight.
-        const start = Cesium.JulianDate.fromIso8601(flightData[0].timestamp);
-        const stop = Cesium.JulianDate.fromIso8601(
-          flightData[flightData.length - 1].timestamp,
-        );
+        //
+        // Derive the span from the first/last positions that actually have a
+        // valid timestamp — not flightData[0]/[last] blindly. A null/malformed
+        // timestamp there would throw in fromIso8601 and abort the whole viewer,
+        // and if position 0 were skipped by the sample loop's guard, `start`
+        // would sit ahead of the first real sample (helicopter at the origin).
+        const firstValid = flightData.find((d) => !!d.timestamp);
+        const lastValid = [...flightData].reverse().find((d) => !!d.timestamp);
+        if (!firstValid || !lastValid) {
+          throw new Error(
+            "No positions with valid timestamps — cannot build the 3D timeline",
+          );
+        }
+        const start = Cesium.JulianDate.fromIso8601(firstValid.timestamp);
+        const stop = Cesium.JulianDate.fromIso8601(lastValid.timestamp);
         viewer.clock.startTime = start.clone();
         viewer.clock.stopTime = stop.clone();
         viewer.clock.currentTime = start.clone();
@@ -1338,7 +1349,17 @@ export const FlightVisualization3DCesiumFixed: React.FC<
         // (out of range, transponder off, etc.), so the line is broken there.
         const GAP_THRESHOLD_SECONDS = 30;
         const pathSegments: any[][] = [];
+        // A position isolated on both sides by gaps can't form a line. Keep it
+        // as a point rather than dropping it — silently omitting a real recorded
+        // coordinate would be an evidence gap, not a rendering nicety.
+        const isolatedPoints: any[] = [];
         let currentSegment: any[] = [];
+        const flushSegment = () => {
+          if (currentSegment.length >= 2) pathSegments.push(currentSegment);
+          else if (currentSegment.length === 1)
+            isolatedPoints.push(currentSegment[0]);
+          currentSegment = [];
+        };
         for (let i = 0; i < displayPositions.length; i++) {
           if (i > 0) {
             const prevTs = displayPositions[i - 1].timestamp;
@@ -1348,13 +1369,12 @@ export const FlightVisualization3DCesiumFixed: React.FC<
                 ? (new Date(curTs).getTime() - new Date(prevTs).getTime()) / 1000
                 : 0;
             if (gapSeconds > GAP_THRESHOLD_SECONDS) {
-              if (currentSegment.length >= 2) pathSegments.push(currentSegment);
-              currentSegment = [];
+              flushSegment();
             }
           }
           currentSegment.push(cartesianPositions[i]);
         }
-        if (currentSegment.length >= 2) pathSegments.push(currentSegment);
+        flushSegment();
 
         // One polyline entity per continuous segment; gaps are left visibly
         // unbridged rather than connected by a fabricated straight line.
@@ -1373,6 +1393,22 @@ export const FlightVisualization3DCesiumFixed: React.FC<
               }),
               clampToGround: false,
               show: true,
+            },
+          });
+        });
+
+        // Render any gap-isolated single positions as points so they remain
+        // visible in the record instead of disappearing.
+        isolatedPoints.forEach((pointPosition) => {
+          viewer.entities.add({
+            name: "Isolated position",
+            position: pointPosition,
+            point: {
+              pixelSize: 8,
+              color: Cesium.Color.RED.withAlpha(0.9),
+              outlineColor: Cesium.Color.WHITE,
+              outlineWidth: 1,
+              disableDepthTestDistance: Number.POSITIVE_INFINITY,
             },
           });
         });
