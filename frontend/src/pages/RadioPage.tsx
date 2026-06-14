@@ -55,6 +55,11 @@ export function RadioPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [hasSearched, setHasSearched] = useState(false)
+  const [searchMeta, setSearchMeta] = useState<{
+    total_files: number
+    total_segments: number
+    truncated: boolean
+  } | null>(null)
   const [downloadingTask, setDownloadingTask] = useState<string | null>(null)
   const [transcribingTask, setTranscribingTask] = useState<string | null>(null)
   const [transcribingFiles, setTranscribingFiles] = useState<Set<string>>(new Set())
@@ -149,20 +154,35 @@ export function RadioPage() {
   const searchTranscriptions = async () => {
     if (!searchQuery.trim()) {
       setSearchResults([])
+      setSearchMeta(null)
       setHasSearched(false)
       return
     }
-    
+
     setHasSearched(true)
-    
+
     try {
       const response = await axios.get('/api/v1/radio/search', {
         params: { query: searchQuery }
       })
-      setSearchResults(response.data)
+      const data = response.data
+      // Backend returns { results, total_files, total_segments, truncated, ... }.
+      // Fall back to the legacy bare-array shape just in case.
+      const results = Array.isArray(data) ? data : (data.results || [])
+      setSearchResults(results)
+      setSearchMeta(
+        Array.isArray(data)
+          ? null
+          : {
+              total_files: data.total_files ?? results.length,
+              total_segments: data.total_segments ?? 0,
+              truncated: !!data.truncated,
+            }
+      )
     } catch (error) {
       console.error('Search failed:', error)
       setSearchResults([])
+      setSearchMeta(null)
     }
   }
 
@@ -607,6 +627,7 @@ export function RadioPage() {
                 onClick={() => {
                   setSearchQuery('')
                   setSearchResults([])
+                  setSearchMeta(null)
                   setHasSearched(false)
                 }}
                 className="px-4 md:px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center justify-center text-sm md:text-base"
@@ -620,8 +641,15 @@ export function RadioPage() {
         {hasSearched && (
           <div className="mt-4 space-y-2">
             <h3 className="font-semibold text-gray-900 dark:text-white">
-              Search Results {searchResults.length > 0 && `(${searchResults.length})`}
+              Search Results{searchMeta && searchMeta.total_segments > 0
+                ? ` (${searchMeta.total_segments} match${searchMeta.total_segments === 1 ? '' : 'es'} in ${searchMeta.total_files} file${searchMeta.total_files === 1 ? '' : 's'})`
+                : searchResults.length > 0 ? ` (${searchResults.length})` : ''}
             </h3>
+            {searchMeta?.truncated && (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Showing the top {searchResults.length} files — refine your search to narrow results.
+              </p>
+            )}
             {searchResults.length === 0 ? (
               <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                 <p className="text-yellow-800 dark:text-yellow-200">
