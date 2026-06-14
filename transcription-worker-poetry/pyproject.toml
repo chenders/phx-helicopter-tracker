@@ -1,0 +1,54 @@
+[tool.poetry]
+name = "phx-transcription-worker"
+version = "1.0.0"
+description = "GPU-accelerated Celery worker for Phoenix PD radio transcription using Faster Whisper"
+authors = ["Phoenix Helicopter Tracker"]
+readme = "README.md"
+packages = [{include = "worker"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+# Celery and Redis
+celery = {extras = ["redis"], version = "^5.3.4"}
+redis = "^5.0.1"
+
+# Database (matching main backend)
+sqlalchemy = "^2.0.23"
+psycopg2-binary = "^2.9.9"
+
+# Faster Whisper for GPU transcription
+faster-whisper = "1.2.1"  # pinned exact for reproducible GPU worker output
+av = "^13.0.0"  # Explicit constraint to avoid non-existent 16.0.0
+
+# Audio processing
+soundfile = "^0.12.1"
+
+# Web requests
+requests = "^2.31.0"
+
+# Configuration
+pydantic = "^2.4.2"
+pydantic-settings = "^2.0.3"
+python-dotenv = "^1.0.0"
+
+# Utilities
+python-dateutil = "^2.8.2"
+whisperx = {version = "^3.8.5", python = ">=3.11,<3.14"}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.3"
+black = "^23.10.1"
+ruff = "^0.1.5"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

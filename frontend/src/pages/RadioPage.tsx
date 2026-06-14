@@ -35,6 +35,8 @@ interface Transcription {
     start: number
     end: number
     text: string
+    no_speech_prob?: number  // provenance: model's silence probability (lower = more speech-like)
+    avg_logprob?: number     // provenance: average token log-probability for the segment
   }>
   model?: string
   transcribed_at?: string
