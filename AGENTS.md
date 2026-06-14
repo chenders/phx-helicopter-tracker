@@ -65,6 +65,12 @@ Also available from installed plugins (situational): `pr-review-toolkit:silent-f
 | `investigative-narrative-writer` | opus | Turns VERIFIED findings into accurate, compelling narrative; finds "the moment" |
 | `records-request-strategist` | sonnet | Plans/tracks the A.R.S. § 39-121 records campaign; complements `/foia-request` |
 
+### Project knowledge
+
+| Agent | Model | Role |
+|-------|-------|------|
+| `project-expert` | opus | The resident expert — current capabilities ("can it show live PD helicopters?"), deep technical answers on any subsystem, and goal/progress/barrier status. Always grounded in the actual code, never assumptions. |
+
 ### Slash commands
 
 | Command | Does |
