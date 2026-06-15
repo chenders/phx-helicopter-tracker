@@ -20,7 +20,7 @@ import FlightVisualization3DCesium, { HudData } from '../components/FlightVisual
 import { FlightDetailHeader } from '../components/FlightDetailHeader'
 
 interface FlightDetails {
-  id: number
+  public_id: string
   aircraft_id: string
   flight_id: string
   callsign: string
@@ -440,15 +440,14 @@ export function FlightDetailPage() {
     try {
       setLoading(true)
 
-      // Load flight details
+      // Everything is addressed by the stable public_id (the route param);
+      // the internal numeric id is never used by the client.
       const flightResponse = await axios.get(`/api/v1/flights/logs/${flightId}`)
       setFlight(flightResponse.data)
 
-      // Load positions
       const positionsResponse = await axios.get(`/api/v1/flights/${flightId}/positions`)
       setPositions(positionsResponse.data)
 
-      // Load abnormal patterns
       const patternsResponse = await axios.get(`/api/v1/flights/${flightId}/patterns`)
       setPatterns(patternsResponse.data)
 
@@ -858,7 +857,7 @@ ${positions.map(p => `          ${p.longitude},${p.latitude},${p.altitude_feet *
 
         {/* Compact Flight Header Component */}
         <FlightDetailHeader
-          flightId={flight.flight_id || `#${flight.id}`}
+          flightId={flight.flight_id || flight.public_id}
           aircraft={flight.aircraft_id}
           callsign={flight.callsign || 'No Callsign'}
           departureTime={flight.departure_time}

@@ -15,7 +15,7 @@ interface DiscrepancyData {
 }
 
 interface FlightDiscrepancy {
-  id: number
+  public_id: string
   flight_id: string
   departure_time: string
   recorded_duration_minutes: number
@@ -343,7 +343,7 @@ export function DataQualityPage() {
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {worstCases.slice(0, 10).map((flight) => (
-                <tr key={flight.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                <tr key={flight.public_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                   <td className="px-4 py-3 text-sm text-gray-900 dark:text-white font-mono">
                     {flight.flight_id}
                   </td>

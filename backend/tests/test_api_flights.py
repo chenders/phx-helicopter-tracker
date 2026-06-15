@@ -23,14 +23,14 @@ class TestFlightAPI:
     def test_get_flight_by_id(
         self, client: TestClient, db_session: Session, sample_flight_log: FlightLog
     ):
-        """Test getting flight by ID"""
-        # First verify the flight exists in our session
-        assert sample_flight_log.id is not None
+        """Test getting a flight by its stable public_id"""
+        # public_id is set by the DB trigger on insert
+        assert sample_flight_log.public_id is not None
 
-        response = client.get(f"/api/v1/flights/logs/{sample_flight_log.id}")
+        response = client.get(f"/api/v1/flights/logs/{sample_flight_log.public_id}")
         assert response.status_code == 200
         data = response.json()
-        assert data["id"] == sample_flight_log.id
+        assert data["public_id"] == sample_flight_log.public_id
         assert data["flight_id"] == sample_flight_log.flight_id
 
     def test_get_recent_flights(self, client: TestClient, db_session: Session):

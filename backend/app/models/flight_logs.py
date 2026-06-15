@@ -8,6 +8,7 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     Index,
+    FetchedValue,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -25,6 +26,13 @@ class FlightLog(Base):
     # Flight identification
     flight_id = Column(String(100), unique=True, index=True)  # Internal tracking ID
     callsign = Column(String(20), index=True)  # Radio callsign if available
+
+    # Stable, vendor-neutral public identifier — derived from the aircraft
+    # registration + departure_time by the trg_set_flight_public_id DB trigger
+    # (see the add_flight_public_id migration), so it survives database rebuilds
+    # and re-ingests, unlike the sequence-assigned numeric id. Set server-side;
+    # application code reads it, never assigns it.
+    public_id = Column(String(16), server_default=FetchedValue(), nullable=False)
 
     # Flight times
     departure_time = Column(DateTime(timezone=True), index=True)
@@ -80,6 +88,7 @@ class FlightLog(Base):
 
     # Indexes for efficient querying
     __table_args__ = (
+        Index("uq_flight_logs_public_id", "public_id", unique=True),
         Index("idx_flight_logs_time_range", "departure_time", "arrival_time"),
         Index("idx_flight_logs_aircraft_date", "aircraft_id", "departure_time"),
         Index(

@@ -1923,7 +1923,7 @@ def get_historical_analysis(
 
         flight_paths.append(
             {
-                "id": flight.id,  # Add ID for matching with flights_list
+                "public_id": flight.public_id,  # match with flights_list
                 "flight_id": flight.flight_id,
                 "aircraft_registration": aircraft_reg,
                 "coordinates": coordinates,
@@ -2010,6 +2010,7 @@ def get_historical_analysis(
         flights_list.append(
             {
                 "id": flight.id,
+                "public_id": flight.public_id,
                 "flight_id": flight.flight_id,
                 "aircraft_registration": aircraft_reg,
                 "departure_time": flight.departure_time.isoformat()

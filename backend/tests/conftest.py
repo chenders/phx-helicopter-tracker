@@ -53,6 +53,15 @@ def setup_test_db():
             conn.execute(_text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
     # Create all tables at the start of the test session
     Base.metadata.create_all(bind=test_engine)
+    # flight_logs.public_id is populated by a DB trigger in production;
+    # create_all() doesn't include triggers, so install the same function +
+    # trigger here (mirrors the add_flight_public_id migration). Without it,
+    # FlightLog inserts would violate the NOT NULL public_id constraint.
+    if "postgres" in TEST_DATABASE_URL:
+        from app.core.flight_identity import install_public_id_sql
+
+        with test_engine.begin() as conn:
+            install_public_id_sql(conn)
     yield
     # Clean up at the end of the test session
     Base.metadata.drop_all(bind=test_engine)
@@ -275,13 +284,15 @@ def mock_websocket():
 @pytest.fixture
 def surveillance_flight(db_session, sample_aircraft):
     """Create a flight with surveillance patterns."""
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
 
     flight = FlightLog(
         aircraft_id=sample_aircraft.id,
         flight_id="SURV_001",
         callsign="Air15",
-        departure_time=datetime.now(timezone.utc),
+        # distinct departure_time from sample_flight_log (same aircraft) so their
+        # derived public_ids don't collide if a test uses both fixtures
+        departure_time=datetime.now(timezone.utc) - timedelta(minutes=30),
         arrival_time=datetime.now(timezone.utc),
         flight_duration_minutes=120.0,
         departure_airport="KDVT",
